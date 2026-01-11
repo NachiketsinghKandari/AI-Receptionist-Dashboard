@@ -74,9 +74,19 @@ export async function GET(request: NextRequest) {
     // If filtering for multiple transfers, find platform_call_ids from webhooks with 2+ transfers
     let platformCallIdsWithMultipleTransfers: string[] | null = null;
     if (multipleTransfers) {
-      const webhooksResponse = await client
+      let webhooksQuery = client
         .from('webhook_dumps')
         .select('platform_call_id, payload');
+
+      // Apply the same date filters to webhooks query
+      if (startDate) {
+        webhooksQuery = webhooksQuery.gte('received_at', startDate);
+      }
+      if (endDate) {
+        webhooksQuery = webhooksQuery.lte('received_at', endDate);
+      }
+
+      const webhooksResponse = await webhooksQuery;
 
       if (webhooksResponse.error) {
         console.error('Error fetching webhooks for multiple transfers filter:', webhooksResponse.error);
