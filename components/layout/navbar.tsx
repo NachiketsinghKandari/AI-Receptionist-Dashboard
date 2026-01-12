@@ -109,29 +109,30 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-full items-center justify-between px-4 md:px-6">
-        {/* Logo */}
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center">
-            <HelloCounselLogo className="h-5 w-auto text-foreground" />
+      <div className="flex h-full items-center px-4 md:px-6">
+        {/* Branding section - matches filter sidebar width */}
+        <div className="w-64 shrink-0 flex items-center">
+          <Link href="/" className="flex items-center gap-2">
+            <HelloCounselLogo className="h-6 w-auto text-foreground" />
+            <span className="text-muted-foreground text-sm font-medium">Dashboard</span>
           </Link>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                isActive={isActive(item.href)}
-              />
-            ))}
-          </nav>
         </div>
 
+        {/* Desktop Navigation - starts after branding section */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive(item.href)}
+            />
+          ))}
+        </nav>
+
         {/* Right side */}
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           {/* Environment Switcher */}
           <EnvironmentSwitcher />
 
@@ -180,8 +181,9 @@ export function Navbar() {
               <VisuallyHidden.Root>
                 <SheetTitle>Navigation Menu</SheetTitle>
               </VisuallyHidden.Root>
-              <div className="flex items-center mb-6">
-                <HelloCounselLogo className="h-5 w-auto text-foreground" />
+              <div className="flex items-center gap-2 mb-6">
+                <HelloCounselLogo className="h-6 w-auto text-foreground" />
+                <span className="text-muted-foreground text-sm font-medium">Dashboard</span>
               </div>
               <nav className="flex flex-col gap-1">
                 {navItems.map((item) => (
