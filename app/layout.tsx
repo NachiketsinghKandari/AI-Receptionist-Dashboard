@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'HelloCounsel Dashboard',
   description: 'Call routing and management dashboard',
+  icons: {
+    icon: '/HelloCounsel-logo.svg',
+  },
 };
 
 export default function RootLayout({
