@@ -12,6 +12,8 @@ import { useEmails } from '@/hooks/use-emails';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK } from '@/lib/constants';
 import type { Email } from '@/types/database';
+import { EmailBodyDisplay } from '@/components/email/email-body-display';
+import { RecipientsDisplay } from '@/components/email/recipients-display';
 import type { SortOrder } from '@/types/api';
 import { format, subDays } from 'date-fns';
 
@@ -44,9 +46,9 @@ const columns: ColumnDef<Email>[] = [
     cell: ({ row }) => {
       const recipients = row.getValue('recipients') as string[];
       return (
-        <span className="truncate max-w-[150px] block">
-          {Array.isArray(recipients) ? recipients.join(', ') : recipients}
-        </span>
+        <div className="max-w-[180px]">
+          <RecipientsDisplay recipients={recipients} compact className="text-sm" />
+        </div>
       );
     },
   },
@@ -222,11 +224,9 @@ export default function EmailsPage() {
                 <div className="space-y-1.5 text-sm">
                   <div className="flex">
                     <span className="w-16 text-muted-foreground font-medium shrink-0">To:</span>
-                    <span className="flex-1">
-                      {Array.isArray(selectedEmail.recipients)
-                        ? selectedEmail.recipients.join(', ')
-                        : selectedEmail.recipients}
-                    </span>
+                    <div className="flex-1">
+                      <RecipientsDisplay recipients={selectedEmail.recipients} />
+                    </div>
                   </div>
                   <div className="flex">
                     <span className="w-16 text-muted-foreground font-medium shrink-0">Date:</span>
@@ -255,26 +255,7 @@ export default function EmailsPage() {
                   <CardTitle className="text-sm font-medium">Message</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="bg-muted/30 rounded-md p-4 border border-border/50">
-                    <div
-                      className="max-w-2xl text-sm leading-relaxed space-y-3
-                        [&_p]:mb-3
-                        [&_a]:text-primary [&_a]:underline [&_a]:hover:text-primary/80
-                        [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1
-                        [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1
-                        [&_li]:text-foreground
-                        [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2
-                        [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2
-                        [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-1
-                        [&_strong]:font-semibold
-                        [&_em]:italic
-                        [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground
-                        [&_hr]:border-border [&_hr]:my-4
-                        [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded [&_pre]:overflow-auto [&_pre]:text-xs
-                        [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded [&_code]:text-xs"
-                      dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
-                    />
-                  </div>
+                  <EmailBodyDisplay body={selectedEmail.body} />
                 </CardContent>
               </Card>
             )}

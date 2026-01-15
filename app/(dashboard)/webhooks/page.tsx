@@ -6,6 +6,7 @@ import { Webhook as WebhookIcon, Building2, Bot, BarChart3, FileText, ChevronDow
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { JsonViewer } from '@/components/ui/json-viewer';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -286,9 +287,9 @@ export default function WebhooksPage() {
                     <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
-                <pre className="p-3 bg-muted/30 text-xs overflow-auto max-h-60 border-t">
-                  {JSON.stringify(parsedPayload.squadOverrides, null, 2)}
-                </pre>
+                <div className="border-t">
+                  <JsonViewer data={parsedPayload.squadOverrides} className="max-h-60 rounded-none border-0" />
+                </div>
               </details>
             )}
 
@@ -304,9 +305,9 @@ export default function WebhooksPage() {
                     <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
-                <pre className="p-3 bg-muted/30 text-xs overflow-auto max-h-60 border-t">
-                  {JSON.stringify(parsedPayload.assistantOverrides, null, 2)}
-                </pre>
+                <div className="border-t">
+                  <JsonViewer data={parsedPayload.assistantOverrides} className="max-h-60 rounded-none border-0" />
+                </div>
               </details>
             )}
 
@@ -322,9 +323,9 @@ export default function WebhooksPage() {
                     <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
-                <pre className="p-3 bg-muted/30 text-xs overflow-auto max-h-60 border-t">
-                  {JSON.stringify(parsedPayload.structuredOutputs, null, 2)}
-                </pre>
+                <div className="border-t">
+                  <JsonViewer data={parsedPayload.structuredOutputs} className="max-h-60 rounded-none border-0" />
+                </div>
               </details>
             )}
 
@@ -368,9 +369,9 @@ export default function WebhooksPage() {
                   <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                 </div>
               </summary>
-              <pre className="p-3 bg-muted/30 text-xs overflow-auto max-h-80 border-t">
-                {JSON.stringify(selectedWebhook.payload, null, 2)}
-              </pre>
+              <div className="border-t">
+                <JsonViewer data={selectedWebhook.payload} className="max-h-80 rounded-none border-0" />
+              </div>
             </details>
           </div>
         )}

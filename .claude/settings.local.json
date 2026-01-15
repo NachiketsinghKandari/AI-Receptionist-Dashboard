@@ -6,7 +6,11 @@
       "Bash(npm run lint:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(head:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

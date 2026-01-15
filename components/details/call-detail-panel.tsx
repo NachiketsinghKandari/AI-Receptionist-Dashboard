@@ -45,6 +45,9 @@ import {
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { parseWebhookPayload } from '@/lib/webhook-utils';
+import { EmailBodyDisplay } from '@/components/email/email-body-display';
+import { RecipientsDisplay } from '@/components/email/recipients-display';
+import { JsonViewer } from '@/components/ui/json-viewer';
 
 interface CallDetailPanelProps {
   callId: number;
@@ -194,7 +197,13 @@ function EmailItem({ email }: { email: Email }) {
         <CollapsibleContent>
           <CardContent className="p-3 pt-0 border-t bg-muted/30">
             <div className="grid grid-cols-2 gap-2 text-sm pt-3">
-              <InfoRow label="Recipients" value={Array.isArray(email.recipients) ? email.recipients.join(', ') : email.recipients} icon={<User className="h-3.5 w-3.5" />} />
+              <div className="flex items-start gap-3 py-2">
+                <div className="text-muted-foreground mt-0.5"><User className="h-3.5 w-3.5" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Recipients</p>
+                  <RecipientsDisplay recipients={email.recipients} compact className="text-sm font-medium" />
+                </div>
+              </div>
               <InfoRow label="Sent At" value={email.sent_at} icon={<Calendar className="h-3.5 w-3.5" />} />
               <InfoRow label="Email ID" value={`#${email.id}`} icon={<Hash className="h-3.5 w-3.5" />} />
               <InfoRow label="Subject" value={email.subject} icon={<Mail className="h-3.5 w-3.5" />} />
@@ -202,8 +211,8 @@ function EmailItem({ email }: { email: Email }) {
             {email.body && (
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground mb-2">Email Body</p>
-                <div className="p-3 bg-background rounded-md border text-sm max-h-40 overflow-auto">
-                  <div dangerouslySetInnerHTML={{ __html: email.body }} />
+                <div className="p-3 bg-background rounded-md border max-h-60 overflow-auto">
+                  <EmailBodyDisplay body={email.body} compact />
                 </div>
               </div>
             )}
@@ -275,9 +284,9 @@ function WebhookItem({ webhook }: { webhook: Webhook }) {
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                     </div>
                   </summary>
-                  <pre className="p-2 bg-background text-xs overflow-auto max-h-40 border-t">
-                    {JSON.stringify(parsedPayload.squadOverrides, null, 2)}
-                  </pre>
+                  <div className="border-t">
+                    <JsonViewer data={parsedPayload.squadOverrides} className="max-h-40 rounded-none border-0" />
+                  </div>
                 </details>
               )}
 
@@ -293,9 +302,9 @@ function WebhookItem({ webhook }: { webhook: Webhook }) {
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                     </div>
                   </summary>
-                  <pre className="p-2 bg-background text-xs overflow-auto max-h-40 border-t">
-                    {JSON.stringify(parsedPayload.assistantOverrides, null, 2)}
-                  </pre>
+                  <div className="border-t">
+                    <JsonViewer data={parsedPayload.assistantOverrides} className="max-h-40 rounded-none border-0" />
+                  </div>
                 </details>
               )}
 
@@ -311,9 +320,9 @@ function WebhookItem({ webhook }: { webhook: Webhook }) {
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                     </div>
                   </summary>
-                  <pre className="p-2 bg-background text-xs overflow-auto max-h-40 border-t">
-                    {JSON.stringify(parsedPayload.structuredOutputs, null, 2)}
-                  </pre>
+                  <div className="border-t">
+                    <JsonViewer data={parsedPayload.structuredOutputs} className="max-h-40 rounded-none border-0" />
+                  </div>
                 </details>
               )}
 
@@ -357,9 +366,9 @@ function WebhookItem({ webhook }: { webhook: Webhook }) {
                     <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
-                <pre className="p-2 bg-background text-xs overflow-auto max-h-60 border-t">
-                  {JSON.stringify(webhook.payload, null, 2)}
-                </pre>
+                <div className="border-t">
+                  <JsonViewer data={webhook.payload} className="max-h-60 rounded-none border-0" />
+                </div>
               </details>
             </div>
           </CardContent>
