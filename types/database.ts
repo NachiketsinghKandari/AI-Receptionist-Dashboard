@@ -64,6 +64,7 @@ export interface Transfer {
   created_at: string;
   updated_at: string;
   platform_call_id?: string | null; // Joined from calls table
+  caller_name?: string | null; // Joined from calls table - who initiated the call
 }
 
 export interface Webhook {

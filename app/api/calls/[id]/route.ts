@@ -45,9 +45,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return errorResponse('Call not found', 404, 'CALL_NOT_FOUND');
     }
 
+    // Enrich transfers with caller_name from the call
+    const callerName = callResponse.data.caller_name;
+    const enrichedTransfers = (transfersResponse.data || []).map((transfer) => ({
+      ...transfer,
+      caller_name: callerName,
+    }));
+
     return NextResponse.json({
       call: callResponse.data,
-      transfers: transfersResponse.data || [],
+      transfers: enrichedTransfers,
       emails: emailsResponse.data || [],
     });
   } catch (error) {

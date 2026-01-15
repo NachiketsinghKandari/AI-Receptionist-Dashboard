@@ -44,7 +44,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import { parseWebhookPayload } from '@/lib/webhook-utils';
+import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import { JsonViewer } from '@/components/ui/json-viewer';
@@ -133,7 +133,9 @@ function TransferItem({ transfer }: { transfer: Transfer }) {
                   <ArrowLeftRight className="h-3.5 w-3.5 text-orange-500" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{transfer.transferred_to_name}</p>
+                  <p className="text-sm font-medium truncate">
+                    {transfer.caller_name || 'Unknown'} → {transfer.transferred_to_name}
+                  </p>
                   <p className="text-xs text-muted-foreground">{transfer.transfer_type}</p>
                 </div>
               </div>
@@ -224,13 +226,25 @@ function EmailItem({ email }: { email: Email }) {
 }
 
 
-function WebhookItem({ webhook }: { webhook: Webhook }) {
+interface WebhookItemProps {
+  webhook: Webhook;
+  callerName?: string | null;
+  dbTransfers?: Transfer[];
+}
+
+function WebhookItem({ webhook, callerName, dbTransfers = [] }: WebhookItemProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Memoize the expensive payload parsing
+  // Memoize the expensive payload parsing and enrichment
   const parsedPayload = useMemo(
     () => parseWebhookPayload(webhook.payload),
     [webhook.payload]
+  );
+
+  // Enrich parsed transfers with database data
+  const enrichedTransfers = useMemo(
+    () => enrichTransfersWithDatabaseData(parsedPayload.transfers, callerName, dbTransfers),
+    [parsedPayload.transfers, callerName, dbTransfers]
   );
 
   return (
@@ -326,20 +340,20 @@ function WebhookItem({ webhook }: { webhook: Webhook }) {
                 </details>
               )}
 
-              {parsedPayload.transfers && parsedPayload.transfers.length > 0 && (
+              {enrichedTransfers.length > 0 && (
                 <details className="group rounded-lg border border-border overflow-hidden">
                   <summary className="flex items-center justify-between gap-2 p-2 bg-muted/50 hover:bg-muted cursor-pointer list-none">
                     <span className="flex items-center gap-2 font-medium text-xs">
                       <ArrowLeftRight className="h-3.5 w-3.5" />
-                      Transfers ({parsedPayload.transfers.length})
+                      Transfers ({enrichedTransfers.length})
                     </span>
                     <div className="flex items-center gap-1">
-                      <CopyButton value={JSON.stringify(parsedPayload.transfers, null, 2)} />
+                      <CopyButton value={JSON.stringify(enrichedTransfers, null, 2)} />
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                     </div>
                   </summary>
                   <div className="p-2 bg-background border-t space-y-1.5">
-                    {parsedPayload.transfers.map((transfer) => (
+                    {enrichedTransfers.map((transfer) => (
                       <div key={transfer.toolCallId} className="p-1.5 bg-muted/50 rounded border text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-medium">
@@ -771,7 +785,12 @@ export function CallDetailPanel({ callId }: CallDetailPanelProps) {
             ) : webhooksList.length > 0 ? (
               <div className="space-y-2">
                 {webhooksList.map((w) => (
-                  <WebhookItem key={w.id} webhook={w} />
+                  <WebhookItem
+                    key={w.id}
+                    webhook={w}
+                    callerName={call.caller_name}
+                    dbTransfers={transfers}
+                  />
                 ))}
               </div>
             ) : (

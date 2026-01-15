@@ -14,12 +14,13 @@ import { FilterSidebar } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useWebhooks } from '@/hooks/use-webhooks';
+import { useCallDetail } from '@/hooks/use-calls';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, WEBHOOK_PLATFORMS } from '@/lib/constants';
 import type { Webhook } from '@/types/database';
 import type { SortOrder } from '@/types/api';
 import { format, subDays } from 'date-fns';
-import { parseWebhookPayload } from '@/lib/webhook-utils';
+import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
 
 const columns: ColumnDef<Webhook>[] = [
   {
@@ -112,7 +113,21 @@ export default function WebhooksPage() {
 
   const { data, isLoading } = useWebhooks(filters);
 
+  // Fetch call details when a webhook is selected (for enriching transfer data)
+  const { data: callDetailData } = useCallDetail(selectedWebhook?.call_id ?? null);
+
   const parsedPayload = selectedWebhook?.payload ? parseWebhookPayload(selectedWebhook.payload) : null;
+
+  // Enrich transfers with database data (caller name from call, recipient from transfers table)
+  const enrichedTransfers = (() => {
+    const parsedTransfers = parsedPayload?.transfers ?? [];
+    if (!parsedTransfers.length) return [];
+    return enrichTransfersWithDatabaseData(
+      parsedTransfers,
+      callDetailData?.call?.caller_name ?? null,
+      callDetailData?.transfers ?? []
+    );
+  })();
 
   // Navigation logic for detail dialog
   const dataArray = data?.data ?? [];
@@ -329,20 +344,20 @@ export default function WebhooksPage() {
               </details>
             )}
 
-            {parsedPayload?.transfers && parsedPayload.transfers.length > 0 && (
+            {enrichedTransfers.length > 0 && (
               <details className="group rounded-lg border border-border overflow-hidden">
                 <summary className="flex items-center justify-between gap-2 p-3 bg-muted/50 hover:bg-muted cursor-pointer list-none">
                   <span className="flex items-center gap-2 font-medium text-sm">
                     <ArrowLeftRight className="h-4 w-4" />
-                    Transfers ({parsedPayload.transfers.length})
+                    Transfers ({enrichedTransfers.length})
                   </span>
                   <div className="flex items-center gap-1">
-                    <CopyButton value={JSON.stringify(parsedPayload.transfers, null, 2)} />
+                    <CopyButton value={JSON.stringify(enrichedTransfers, null, 2)} />
                     <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
                 <div className="p-3 bg-muted/30 border-t space-y-2">
-                  {parsedPayload.transfers.map((transfer) => (
+                  {enrichedTransfers.map((transfer) => (
                     <div key={transfer.toolCallId} className="p-2 bg-background rounded-md border text-sm">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">
