@@ -12,7 +12,7 @@ interface JsonViewerProps {
   collapsed?: number | boolean;
 }
 
-export function JsonViewer({ data, className, collapsed = 2 }: JsonViewerProps) {
+export function JsonViewer({ data, className, collapsed = false }: JsonViewerProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
