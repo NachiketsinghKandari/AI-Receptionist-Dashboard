@@ -166,11 +166,8 @@ export function EmailBodyDisplay({ body, compact = false }: EmailBodyDisplayProp
         )}
 
         {parsed.nextStep && (
-          <div className="text-xs bg-primary/5 border border-primary/20 rounded p-2">
-            <p className="text-primary font-medium mb-0.5 flex items-center gap-1">
-              <ArrowRight className="h-3 w-3" />
-              Next step
-            </p>
+          <div className="text-xs">
+            <p className="text-muted-foreground font-medium mb-0.5">Next step</p>
             <p className="leading-relaxed">{parsed.nextStep}</p>
           </div>
         )}
@@ -285,12 +282,12 @@ export function EmailBodyDisplay({ body, compact = false }: EmailBodyDisplayProp
 
       {/* Next step section */}
       {parsed.nextStep && (
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+        <div>
           <div className="flex items-center gap-2 mb-2">
             <ArrowRight className="h-4 w-4 text-primary" />
-            <h4 className="text-sm font-semibold text-primary">Next step</h4>
+            <h4 className="text-sm font-semibold">Next step</h4>
           </div>
-          <p className="text-sm leading-relaxed pl-6">
+          <p className="text-sm leading-relaxed text-foreground/90 pl-6">
             {parsed.nextStep}
           </p>
         </div>
