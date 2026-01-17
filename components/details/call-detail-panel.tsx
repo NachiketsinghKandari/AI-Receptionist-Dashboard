@@ -914,9 +914,10 @@ function SentryEventItem({ event }: { event: SentryEvent }) {
                         <div><strong>URL:</strong> {event.request.url}</div>
                       </div>
                       {event.request.body && (
-                        <pre className="mt-1 overflow-auto max-h-40">
-                          {JSON.stringify(event.request.body, null, 2)}
-                        </pre>
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground mb-1">Request Body</p>
+                          <JsonViewer data={event.request.body} className="max-h-40" />
+                        </div>
                       )}
                     </div>
                   </CollapsibleContent>

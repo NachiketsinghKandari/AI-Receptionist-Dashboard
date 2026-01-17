@@ -121,3 +121,29 @@ export interface Session {
   exp: number;
   iat: number;
 }
+
+// Flagged calls types
+export type FlagType = 'sentry' | 'duration' | 'important' | 'transferMismatch';
+
+export interface FlagReasons {
+  sentry: boolean;
+  duration: boolean;
+  important: boolean;
+  transferMismatch: boolean;
+}
+
+export interface FlaggedCallListItem extends CallListItem {
+  flagReasons: FlagReasons;
+}
+
+export interface FlaggedFilters extends BaseFilters {
+  firmId?: number | null;
+  flagType?: FlagType | null;
+}
+
+export interface FlaggedCountResponse {
+  count: number;
+  breakdown: Record<FlagType, number>;
+}
+
+export type FlaggedCallsResponse = PaginatedResponse<FlaggedCallListItem>;

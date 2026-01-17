@@ -19,7 +19,8 @@
       "WebFetch(domain:docs.sentry.io)",
       "Bash(grep:*)",
       "Bash(python3:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(ls:*)"
     ]
   }
 }

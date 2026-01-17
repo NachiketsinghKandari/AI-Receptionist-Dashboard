@@ -77,3 +77,30 @@ export function useImportantCallIds() {
     select: (data) => new Set(data.callIds),
   });
 }
+
+// Types for transfer-email mismatch API
+interface TransferEmailMismatchResponse {
+  callIds: number[];
+}
+
+async function fetchTransferEmailMismatchIds(environment: string): Promise<TransferEmailMismatchResponse> {
+  const response = await fetch(`/api/calls/transfer-email-mismatch?env=${environment}`);
+  if (!response.ok) throw new Error('Failed to fetch transfer-email mismatches');
+  return response.json();
+}
+
+/**
+ * Hook to fetch call IDs where:
+ * - Email subject contains "no action"
+ * - But webhook shows transfer was cancelled/failed
+ * Used to highlight inconsistent calls in the table
+ */
+export function useTransferEmailMismatchIds() {
+  const { environment } = useEnvironment();
+  return useQuery({
+    queryKey: ['calls', 'transfer-email-mismatch', environment],
+    queryFn: () => fetchTransferEmailMismatchIds(environment),
+    staleTime: 60 * 1000, // 1 minute
+    select: (data) => new Set(data.callIds),
+  });
+}
