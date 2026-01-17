@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import type { SentryEventsResponse } from '@/types/api';
 import { CACHE_TTL_DATA } from '@/lib/constants';
 
@@ -76,6 +76,20 @@ export function useSentryBrowse(filters: SentryBrowseFilters) {
   return useQuery({
     queryKey: ['sentry', 'browse', filters],
     queryFn: () => fetchSentryBrowse(filters),
+    staleTime: 60 * 1000, // 1 minute
+  });
+}
+
+/**
+ * Infinite query hook for Sentry browse with "Load More" support
+ * Accumulates events from multiple pages
+ */
+export function useSentryBrowseInfinite(filters: Omit<SentryBrowseFilters, 'cursor'>) {
+  return useInfiniteQuery({
+    queryKey: ['sentry', 'browse', 'infinite', filters],
+    queryFn: ({ pageParam }) => fetchSentryBrowse({ ...filters, cursor: pageParam }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
     staleTime: 60 * 1000, // 1 minute
   });
 }
