@@ -1,14 +1,24 @@
 /**
- * Sentry browse API route - fetches and groups events for browsing
- * Supports filtering by event type, level, and search
+ * Sentry browse API route - fetches events using Discover API
+ * Supports filtering by level, environment, and correlation_id search
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSentryClient } from '@/lib/sentry/client';
 import { getSupabaseClient } from '@/lib/supabase/client';
-import { errorResponse, parseIntOrDefault, clamp } from '@/lib/api/utils';
+import { errorResponse } from '@/lib/api/utils';
 
-const MAX_SENTRY_LIMIT = 100;
+const SENTRY_BASE_URL = 'https://sentry.io/api/0';
+
+interface DiscoverEvent {
+  id: string;
+  title: string;
+  message: string;
+  level: string;
+  timestamp: string;
+  transaction: string;
+  environment: string;
+  correlation_id: string;
+}
 
 interface ParsedEvent {
   event_id: string;
@@ -30,6 +40,7 @@ interface GroupedSummary {
   level: string;
   types: string;
   first_timestamp: string;
+  last_timestamp: string;
 }
 
 function parseEventType(transaction: string): string {
@@ -60,7 +71,7 @@ function groupEvents(events: ParsedEvent[]): { summary: GroupedSummary[]; groups
   for (const [cid, evts] of Object.entries(groups)) {
     const types = [...new Set(evts.map(e => e.event_type))].sort();
     const levels = new Set(evts.map(e => e.level));
-    const timestamps = evts.map(e => e.timestamp).filter(Boolean);
+    const timestamps = evts.map(e => e.timestamp).filter(Boolean).sort();
 
     summary.push({
       correlation_id: cid,
@@ -68,12 +79,13 @@ function groupEvents(events: ParsedEvent[]): { summary: GroupedSummary[]; groups
       event_count: evts.length,
       level: getMaxLevel(levels),
       types: types.join(', '),
-      first_timestamp: timestamps.length > 0 ? timestamps.sort()[0] : '',
+      first_timestamp: timestamps.length > 0 ? timestamps[0] : '',
+      last_timestamp: timestamps.length > 0 ? timestamps[timestamps.length - 1] : '',
     });
   }
 
-  // Sort by first_timestamp descending
-  summary.sort((a, b) => b.first_timestamp.localeCompare(a.first_timestamp));
+  // Sort by last_timestamp descending (most recent activity first)
+  summary.sort((a, b) => b.last_timestamp.localeCompare(a.last_timestamp));
 
   return { summary, groups };
 }
@@ -81,27 +93,127 @@ function groupEvents(events: ParsedEvent[]): { summary: GroupedSummary[]; groups
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = clamp(parseIntOrDefault(searchParams.get('limit'), MAX_SENTRY_LIMIT), 20, MAX_SENTRY_LIMIT);
-    const cursor = searchParams.get('cursor')?.trim() || null;
     const eventType = searchParams.get('eventType')?.trim() || null;
     const level = searchParams.get('level')?.trim() || null;
-    const search = searchParams.get('search')?.trim().toLowerCase() || null;
+    const search = searchParams.get('search')?.trim() || null;
+    const sentryEnv = searchParams.get('sentryEnv')?.trim() || null;
+    const statsPeriod = searchParams.get('statsPeriod')?.trim() || '7d';
 
-    const client = getSentryClient();
+    // Check Sentry configuration
+    const org = process.env.SENTRY_ORG;
+    const token = process.env.SENTRY_AUTH_TOKEN;
 
-    if (!client.isConfigured) {
+    if (!org || !token) {
       return errorResponse('Sentry not configured', 503, 'SENTRY_NOT_CONFIGURED');
     }
 
-    // Fetch events from Sentry
-    const result = await client.fetchEvents('/vapi/', limit, cursor || undefined);
-    const rawEvents = result.events as Array<{
-      eventID: string;
-      message?: string;
-      title?: string;
-      dateCreated: string;
-      tags?: Array<{ key: string; value: string }>;
-    }>;
+    // Use Discover API - supports environment filtering and returns all log levels
+    const url = `${SENTRY_BASE_URL}/organizations/${org}/events/`;
+    const params = new URLSearchParams();
+
+    // Fields to fetch - each as separate parameter
+    const fields = ['id', 'title', 'message', 'level', 'timestamp', 'transaction', 'environment', 'correlation_id'];
+    for (const field of fields) {
+      params.append('field', field);
+    }
+
+    // Build query parts
+    const queryParts: string[] = [];
+
+    // Level filter
+    if (level && level !== 'All') {
+      queryParts.push(`level:${level}`);
+    }
+
+    // Search filter - correlation_id or message
+    if (search) {
+      if (search.includes('-') && search.length > 10) {
+        // Looks like a correlation_id
+        queryParts.push(`correlation_id:${search}`);
+      } else {
+        // General message search
+        queryParts.push(`message:*${search}*`);
+      }
+    }
+
+    if (queryParts.length > 0) {
+      params.set('query', queryParts.join(' '));
+    }
+
+    // Environment filter
+    if (sentryEnv) {
+      params.set('environment', sentryEnv);
+    }
+
+    // Time period and pagination
+    params.set('statsPeriod', statsPeriod);
+    params.set('per_page', '100');
+    params.set('sort', '-timestamp');
+
+    // Fetch events with pagination
+    const allEvents: DiscoverEvent[] = [];
+    let cursor: string | null = null;
+    let pageCount = 0;
+    const maxPages = 10; // Up to 1000 events
+
+    do {
+      if (cursor) {
+        params.set('cursor', cursor);
+      }
+
+      const fullUrl = `${url}?${params}`;
+      console.log('Sentry Discover API URL:', fullUrl);
+
+      const response = await fetch(fullUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+        next: { revalidate: 60 },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Sentry Discover API error:', response.status, errorText);
+        break;
+      }
+
+      const data = await response.json();
+      const events: DiscoverEvent[] = data.data || [];
+      console.log(`Sentry page ${pageCount + 1}: fetched ${events.length} events`);
+
+      if (events.length === 0) break;
+
+      allEvents.push(...events);
+      pageCount++;
+
+      // Parse Link header for next cursor
+      cursor = null;
+      const linkHeader = response.headers.get('link') || '';
+      if (linkHeader) {
+        const links = linkHeader.split(',');
+        for (const link of links) {
+          const parts = link.split(';');
+          let isNext = false;
+          let resultsTrue = false;
+          let cursorVal: string | null = null;
+
+          for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed.includes('rel="next"')) isNext = true;
+            if (trimmed.includes('results="true"')) resultsTrue = true;
+            const cursorMatch = trimmed.match(/cursor="([^"]+)"/);
+            if (cursorMatch) {
+              cursorVal = cursorMatch[1];
+            }
+          }
+
+          if (isNext && resultsTrue && cursorVal) {
+            cursor = cursorVal;
+            break;
+          }
+        }
+      }
+    } while (cursor && pageCount < maxPages);
+
+    console.log('Sentry total events:', allEvents.length);
 
     // Get call ID mapping from Supabase
     const supabase = getSupabaseClient();
@@ -121,72 +233,42 @@ export async function GET(request: NextRequest) {
 
     // Parse events
     const parsedEvents: ParsedEvent[] = [];
-    for (const event of rawEvents) {
-      const tags: Record<string, string> = {};
-      for (const tag of event.tags || []) {
-        tags[tag.key] = tag.value;
-      }
-
-      const transaction = tags.transaction || '';
-
-      // Only include VAPI-related events
-      if (!transaction.includes('/vapi/') && !transaction.includes('vapi')) {
-        continue;
-      }
-
-      const correlationId = tags.correlation_id || 'unknown';
+    for (const event of allEvents) {
+      const transaction = event.transaction || '';
+      const correlationId = event.correlation_id || 'unknown';
       const callId = callIdMap[correlationId] ?? null;
       const fullMessage = event.message || event.title || '';
 
       parsedEvents.push({
-        event_id: event.eventID,
+        event_id: event.id,
         message: fullMessage,
         event_type: parseEventType(transaction),
         transaction,
-        level: tags.level || 'info',
-        environment: tags.environment || '',
+        level: event.level || 'info',
+        environment: event.environment || '',
         correlation_id: correlationId,
         call_id: callId,
-        timestamp: event.dateCreated,
-        logger: tags.logger || '',
+        timestamp: event.timestamp,
+        logger: '',
       });
     }
 
-    // Apply filters
+    // Apply event type filter (client-side)
     let filteredEvents = parsedEvents;
-
     if (eventType && eventType !== 'All') {
       filteredEvents = filteredEvents.filter(e => e.event_type === eventType);
     }
 
-    if (level && level !== 'All') {
-      filteredEvents = filteredEvents.filter(e => e.level === level);
-    }
-
-    if (search) {
-      filteredEvents = filteredEvents.filter(e => {
-        const searchableText = [
-          e.correlation_id,
-          e.call_id?.toString() || '',
-          e.message,
-          e.transaction,
-          e.logger,
-          e.environment,
-        ].join(' ').toLowerCase();
-        return searchableText.includes(search);
-      });
-    }
-
-    // Group events
+    // Group events by correlation_id
     const { summary, groups } = groupEvents(filteredEvents);
 
     return NextResponse.json({
       summary,
       groups,
-      totalEvents: parsedEvents.length,
+      totalEvents: allEvents.length,
       filteredEvents: filteredEvents.length,
-      hasMore: result.hasMore,
-      nextCursor: result.nextCursor,
+      hasMore: false,
+      nextCursor: null,
     });
   } catch (error) {
     console.error('Sentry browse API error:', error);

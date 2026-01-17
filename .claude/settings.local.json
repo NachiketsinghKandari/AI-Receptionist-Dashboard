@@ -10,7 +10,16 @@
       "Bash(head:*)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:github.com)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:docs.sentry.io)",
+      "Bash(grep:*)",
+      "Bash(python3:*)",
+      "WebSearch"
     ]
   }
 }

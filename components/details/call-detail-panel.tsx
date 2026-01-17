@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCallDetail } from '@/hooks/use-calls';
 import { useWebhooksForCall } from '@/hooks/use-webhooks';
 import { useSentryEventsForCall } from '@/hooks/use-sentry-events';
+import { useEnvironment } from '@/components/providers/environment-provider';
 import { formatDuration } from '@/lib/formatting';
 import type { Transfer, Email, Webhook, SentryEvent } from '@/types/database';
 import {
@@ -50,6 +51,12 @@ import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webh
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import { JsonViewer } from '@/components/ui/json-viewer';
+
+// Map dashboard environment to Sentry environment for URL
+const SENTRY_ENV_MAP: Record<string, string> = {
+  production: 'pre-prod',
+  staging: 'stage',
+};
 
 // Highlight reasons type - exported for use in calls page
 export interface HighlightReasons {
@@ -835,6 +842,11 @@ function SentryEventItem({ event }: { event: SentryEvent }) {
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     {getTypeIcon(event.event_type)}
                     {event.event_type}
+                    {event.environment && (
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 h-4">
+                        {event.environment}
+                      </Badge>
+                    )}
                   </p>
                 </div>
               </div>
@@ -918,7 +930,11 @@ function SectionBadge({ count, color, isLoading }: { count: number; color: strin
 
 export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelProps) {
   const { data, isLoading, error } = useCallDetail(callId);
+  const { environment } = useEnvironment();
   const platformCallId = data?.call?.platform_call_id;
+
+  // Map dashboard environment to Sentry environment for URL
+  const sentryEnv = SENTRY_ENV_MAP[environment] || environment;
 
   // Track which highlight-related tabs have been acknowledged (clicked)
   const [logsAcknowledged, setLogsAcknowledged] = useState(false);
@@ -982,7 +998,7 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
         {call.platform_call_id && (
           <Button variant="outline" size="sm" asChild>
             <a
-              href={`https://helloounsil.sentry.io/explore/logs/?logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${call.platform_call_id}&logsSortBys=-timestamp`}
+              href={`https://helloounsil.sentry.io/explore/logs/?environment=${sentryEnv}&logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${call.platform_call_id}&logsSortBys=-timestamp`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -1235,7 +1251,7 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
           ) : (
             <EmptyState
               icon={<CheckCircle className="h-6 w-6 text-green-500" />}
-              message="No errors or warnings logged for this call"
+              message="No logs found for this call"
             />
           )}
         </TabsContent>

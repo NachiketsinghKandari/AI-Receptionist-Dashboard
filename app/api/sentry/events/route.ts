@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('query')?.trim() || null;
     const limit = clamp(parseIntOrDefault(searchParams.get('limit'), MAX_SENTRY_LIMIT), 1, MAX_SENTRY_LIMIT);
     const cursor = searchParams.get('cursor')?.trim() || null;
+    const environment = searchParams.get('environment')?.trim() as 'production' | 'staging' | undefined;
+    const statsPeriod = searchParams.get('statsPeriod')?.trim() || '30d';
 
     const client = getSentryClient();
 
@@ -24,15 +26,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (correlationId) {
-      // Fetch events for a specific call
-      const events = await client.fetchEventsForCall(correlationId, limit);
-      return NextResponse.json({
-        events,
-        hasMore: false,
-        nextCursor: null,
+      // Fetch events for a specific call using Discover API (server-side filtering)
+      const result = await client.fetchEventsForCorrelationId(correlationId, {
+        environment: environment || undefined,
+        statsPeriod,
+        limit,
       });
+      return NextResponse.json(result);
     } else {
-      // Fetch events with pagination
+      // Fetch events with pagination (legacy project events API)
       const result = await client.fetchEvents(query || undefined, limit, cursor || undefined);
       return NextResponse.json(result);
     }

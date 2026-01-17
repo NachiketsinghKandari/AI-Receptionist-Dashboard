@@ -28,13 +28,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
-import { useSentryBrowseInfinite, type SentryGroupedSummary, type SentryParsedEvent } from '@/hooks/use-sentry-events';
+import { useSentryBrowse, type SentryGroupedSummary, type SentryParsedEvent } from '@/hooks/use-sentry-events';
 import { useDebounce } from '@/hooks/use-debounce';
 import { format } from 'date-fns';
 
 const EVENT_TYPES = ['All', 'transfer', 'webhook', 'search_case', 'take_message', 'schedule_callback'];
-const LEVELS = ['All', 'error', 'warning', 'info'];
-const BATCH_SIZES = [20, 50, 100];
+const LEVELS = ['All', 'error', 'warning', 'info', 'debug'];
+const TIME_PERIODS = [
+  { value: '24h', label: 'Last 24 hours' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+];
+const SENTRY_ENVS = [
+  { value: 'pre-prod', label: 'Pre-Prod' },
+  { value: 'stage', label: 'Stage' },
+  { value: 'development', label: 'Development' },
+];
 
 function getLevelIcon(level: string) {
   switch (level) {
@@ -116,10 +125,10 @@ const columns: ColumnDef<SentryGroupedSummary>[] = [
     cell: ({ row }) => <span className="text-sm">{row.getValue('types')}</span>,
   },
   {
-    accessorKey: 'first_timestamp',
-    header: 'First Event',
+    accessorKey: 'last_timestamp',
+    header: 'Last Event',
     cell: ({ row }) => {
-      const value = row.getValue('first_timestamp') as string;
+      const value = row.getValue('last_timestamp') as string;
       if (!value) return '-';
       try {
         return format(new Date(value), 'yyyy-MM-dd HH:mm:ss');
@@ -195,81 +204,37 @@ function EventCard({ event }: { event: SentryParsedEvent }) {
 
 export default function SentryPage() {
   const [eventType, setEventType] = useState('All');
-  const [level, setLevel] = useState('All');
-  const [batchSize, setBatchSize] = useState(100);
+  const [level, setLevel] = useState('error'); // Default to errors
+  const [statsPeriod, setStatsPeriod] = useState('7d'); // Default to 7 days
+  const [sentryEnv, setSentryEnv] = useState('pre-prod'); // Default to pre-prod
   const [search, setSearch] = useState('');
   const [selectedCorrelationId, setSelectedCorrelationId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
   const filters = useMemo(() => ({
-    limit: batchSize,
     eventType: eventType !== 'All' ? eventType : null,
     level: level !== 'All' ? level : null,
     search: debouncedSearch || null,
-  }), [batchSize, eventType, level, debouncedSearch]);
+    statsPeriod,
+    sentryEnv,
+  }), [eventType, level, debouncedSearch, statsPeriod, sentryEnv]);
 
   const {
     data: pagesData,
     isLoading,
     refetch,
     isFetching,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useSentryBrowseInfinite(filters);
+  } = useSentryBrowse(filters);
 
-  // Accumulate data from all pages
+  // Process data from the query
   const accumulatedData = useMemo(() => {
-    if (!pagesData?.pages) return null;
-
-    const allGroups: Record<string, SentryParsedEvent[]> = {};
-
-    for (const page of pagesData.pages) {
-      // Merge groups from each page
-      for (const [correlationId, events] of Object.entries(page.groups)) {
-        if (!allGroups[correlationId]) {
-          allGroups[correlationId] = [];
-        }
-        allGroups[correlationId].push(...events);
-      }
-    }
-
-    // Count actual accumulated events
-    let totalAccumulatedEvents = 0;
-    for (const events of Object.values(allGroups)) {
-      totalAccumulatedEvents += events.length;
-    }
-
-    // Rebuild summary from accumulated groups
-    const summary: SentryGroupedSummary[] = [];
-    for (const [correlationId, events] of Object.entries(allGroups)) {
-      const types = [...new Set(events.map(e => e.event_type))].sort();
-      const levels = new Set(events.map(e => e.level));
-      const timestamps = events.map(e => e.timestamp).filter(Boolean);
-
-      let maxLevel = 'info';
-      if (levels.has('error')) maxLevel = 'error';
-      else if (levels.has('warning')) maxLevel = 'warning';
-
-      summary.push({
-        correlation_id: correlationId,
-        call_id: events[0]?.call_id ?? null,
-        event_count: events.length,
-        level: maxLevel,
-        types: types.join(', '),
-        first_timestamp: timestamps.length > 0 ? timestamps.sort()[0] : '',
-      });
-    }
-
-    // Sort by first_timestamp descending
-    summary.sort((a, b) => b.first_timestamp.localeCompare(a.first_timestamp));
+    if (!pagesData) return null;
 
     return {
-      summary,
-      groups: allGroups,
-      totalEvents: totalAccumulatedEvents,
-      pagesLoaded: pagesData.pages.length,
+      summary: pagesData.summary,
+      groups: pagesData.groups,
+      totalEvents: pagesData.totalEvents,
     };
   }, [pagesData]);
 
@@ -278,7 +243,7 @@ export default function SentryPage() {
     : [];
 
   const selectedSummary = selectedCorrelationId && accumulatedData?.summary
-    ? accumulatedData.summary.find(s => s.correlation_id === selectedCorrelationId)
+    ? accumulatedData.summary.find((s: SentryGroupedSummary) => s.correlation_id === selectedCorrelationId)
     : null;
 
   const handleRowSelect = (row: SentryGroupedSummary | null) => {
@@ -301,7 +266,7 @@ export default function SentryPage() {
   };
 
   const sentryExplorerUrl = selectedCorrelationId
-    ? `https://helloounsil.sentry.io/explore/logs/?logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${selectedCorrelationId}&logsSortBys=-timestamp`
+    ? `https://helloounsil.sentry.io/explore/logs/?environment=${sentryEnv}&logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${selectedCorrelationId}&logsSortBys=-timestamp`
     : null;
 
   return (
@@ -316,7 +281,7 @@ export default function SentryPage() {
         {/* Filters */}
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {/* Search */}
               <div className="lg:col-span-2">
                 <Label htmlFor="search" className="text-sm flex items-center gap-1.5">
@@ -366,17 +331,34 @@ export default function SentryPage() {
                 </Select>
               </div>
 
-              {/* Batch Size */}
+              {/* Time Period */}
               <div>
-                <Label className="text-sm">Batch Size</Label>
-                <Select value={String(batchSize)} onValueChange={(v) => setBatchSize(Number(v))}>
+                <Label className="text-sm">Time Period</Label>
+                <Select value={statsPeriod} onValueChange={setStatsPeriod}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {BATCH_SIZES.map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {size}
+                    {TIME_PERIODS.map((period) => (
+                      <SelectItem key={period.value} value={period.value}>
+                        {period.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sentry Environment */}
+              <div>
+                <Label className="text-sm">Environment</Label>
+                <Select value={sentryEnv} onValueChange={setSentryEnv}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SENTRY_ENVS.map((env) => (
+                      <SelectItem key={env.value} value={env.value}>
+                        {env.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -387,7 +369,7 @@ export default function SentryPage() {
         </Card>
 
         {/* Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">Total Events</p>
@@ -406,12 +388,6 @@ export default function SentryPage() {
               <p className="text-2xl font-bold">
                 {accumulatedData?.summary?.filter((s: SentryGroupedSummary) => s.call_id !== null).length ?? 0}
               </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Batches Loaded</p>
-              <p className="text-2xl font-bold">{accumulatedData?.pagesLoaded ?? 0}</p>
             </CardContent>
           </Card>
         </div>
@@ -455,30 +431,6 @@ export default function SentryPage() {
           )}
         </div>
 
-        {/* Load More Button */}
-        {hasNextPage && (
-          <div className="shrink-0 mt-3 flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-            >
-              {isFetchingNextPage ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  Load More
-                </>
-              )}
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {accumulatedData?.pagesLoaded ?? 0} batch(es) loaded
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Detail Dialog */}
@@ -539,8 +491,8 @@ export default function SentryPage() {
               {selectedGroup.length > 0 ? (
                 <div className="space-y-1">
                   {selectedGroup
-                    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-                    .map((event) => (
+                    .sort((a: SentryParsedEvent, b: SentryParsedEvent) => b.timestamp.localeCompare(a.timestamp))
+                    .map((event: SentryParsedEvent) => (
                       <EventCard key={event.event_id} event={event} />
                     ))}
                 </div>
