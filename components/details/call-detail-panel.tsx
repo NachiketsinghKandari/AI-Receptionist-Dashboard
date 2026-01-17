@@ -42,6 +42,7 @@ import {
   Bot,
   BarChart3,
   Loader2,
+  Wrench,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
@@ -103,6 +104,379 @@ function TranscriptBubble({ message }: { message: TranscriptMessage }) {
         </span>
         {message.text}
       </div>
+    </div>
+  );
+}
+
+// OpenAI formatted message types for advanced transcript
+interface OpenAIToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+interface OpenAIMessage {
+  role: 'system' | 'assistant' | 'user' | 'tool';
+  content?: string;
+  tool_calls?: OpenAIToolCall[];
+  tool_call_id?: string;
+}
+
+interface ExtractedTranscriptData {
+  messages: OpenAIMessage[];
+  endedReason?: string;
+}
+
+/**
+ * Extract messagesOpenAIFormatted and endedReason from webhook payload
+ */
+function extractOpenAIMessages(webhooks: Webhook[]): ExtractedTranscriptData | null {
+  // Find the end-of-call-report webhook which typically has the full artifact
+  const endOfCallWebhook = webhooks.find(w => w.webhook_type === 'end-of-call-report');
+  if (!endOfCallWebhook) return null;
+
+  try {
+    const payload = endOfCallWebhook.payload;
+    const message = payload?.message as Record<string, unknown> | undefined;
+    const artifact = message?.artifact as Record<string, unknown> | undefined;
+    const messagesOpenAIFormatted = artifact?.messagesOpenAIFormatted as OpenAIMessage[] | undefined;
+
+    const endedReason = message?.endedReason as string | undefined;
+
+    if (!messagesOpenAIFormatted || !Array.isArray(messagesOpenAIFormatted)) {
+      return null;
+    }
+
+    return { messages: messagesOpenAIFormatted, endedReason };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert snake_case function name to Title Case
+ */
+function formatFunctionName(name: string): string {
+  return name
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/**
+ * Tool call card showing function invocation and result
+ */
+function ToolCallCard({
+  toolCall,
+  result,
+}: {
+  toolCall: OpenAIToolCall;
+  result?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Parse arguments from JSON string
+  let parsedArgs: unknown = null;
+  try {
+    parsedArgs = JSON.parse(toolCall.function.arguments);
+  } catch {
+    parsedArgs = toolCall.function.arguments;
+  }
+
+  // Parse result if it's JSON
+  let parsedResult: unknown = result;
+  let isSuccess = true;
+  if (result) {
+    try {
+      parsedResult = JSON.parse(result);
+      // Check for success field
+      if (typeof parsedResult === 'object' && parsedResult !== null) {
+        const resultObj = parsedResult as Record<string, unknown>;
+        if (resultObj.success === false) {
+          isSuccess = false;
+        }
+      }
+    } catch {
+      // Keep as string if not valid JSON
+    }
+  }
+
+  // Determine status text based on result
+  const getStatusText = () => {
+    if (!result) return 'Executing...';
+    if (typeof parsedResult === 'string') {
+      if (parsedResult.toLowerCase().includes('initiated') || parsedResult.toLowerCase().includes('executed')) {
+        return 'Completed successfully';
+      }
+      return parsedResult;
+    }
+    if (isSuccess) return 'Completed successfully';
+    return 'Completed with error';
+  };
+
+  return (
+    <div className="flex justify-center my-3">
+      <div className="w-[85%] max-w-md">
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center gap-3 p-3 bg-muted/50 border rounded-xl cursor-pointer hover:bg-muted transition-colors">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <Wrench className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium">
+                    {formatFunctionName(toolCall.function.name)}
+                  </span>
+                  {result && (
+                    isSuccess ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-red-500" />
+                    )
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {getStatusText()}
+                </p>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                isOpen && "rotate-180"
+              )} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-1 p-3 bg-background border border-t-0 rounded-b-xl space-y-3">
+              {/* Request Parameters */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">Request Parameters</p>
+                <div className="bg-muted/30 rounded-lg p-2 border">
+                  {typeof parsedArgs === 'object' ? (
+                    <JsonViewer data={parsedArgs} className="max-h-48" />
+                  ) : (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{String(parsedArgs)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Response Details */}
+              {result && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Response Details</p>
+                  <div className="bg-muted/30 rounded-lg p-2 border">
+                    {typeof parsedResult === 'object' ? (
+                      <JsonViewer data={parsedResult} className="max-h-48" />
+                    ) : (
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{result}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * End of call reason display
+ */
+function EndedReasonCard({ reason }: { reason: string }) {
+  return (
+    <div className="flex justify-center my-3">
+      <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 border rounded-full">
+        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">
+          Call ended: <span className="font-medium text-foreground">{reason}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Advanced transcript component using OpenAI formatted messages
+ * Shows tool calls as cards with their results, and endedReason at the end
+ */
+function AdvancedTranscript({ messages, endedReason }: { messages: OpenAIMessage[]; endedReason?: string }) {
+  // Build a map of tool_call_id -> result for combining calls with results
+  const toolResults = useMemo(() => {
+    const results = new Map<string, string>();
+    for (const msg of messages) {
+      if (msg.role === 'tool' && msg.tool_call_id && msg.content) {
+        results.set(msg.tool_call_id, msg.content);
+      }
+    }
+    return results;
+  }, [messages]);
+
+  // Filter out system and tool messages (tool results are shown with their calls)
+  const displayMessages = messages.filter(msg => msg.role !== 'system' && msg.role !== 'tool');
+
+  return (
+    <div className="space-y-2">
+      {displayMessages.map((msg, idx) => {
+        // Handle tool calls from assistant (combined with result)
+        if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+          return (
+            <div key={idx}>
+              {/* Show any content before tool calls */}
+              {msg.content && (
+                <div className="flex justify-start mb-2">
+                  <div className="max-w-[75%] px-3 py-2 rounded-lg text-sm bg-muted text-foreground rounded-bl-none">
+                    <span className="text-xs font-medium opacity-70 block mb-0.5">Agent</span>
+                    {msg.content}
+                  </div>
+                </div>
+              )}
+              {/* Show tool calls as cards with their results */}
+              {msg.tool_calls.map((tc) => (
+                <ToolCallCard
+                  key={tc.id}
+                  toolCall={tc}
+                  result={toolResults.get(tc.id)}
+                />
+              ))}
+            </div>
+          );
+        }
+
+        // Handle regular assistant message
+        if (msg.role === 'assistant' && msg.content) {
+          return (
+            <div key={idx} className="flex justify-start">
+              <div className="max-w-[75%] px-3 py-2 rounded-lg text-sm bg-muted text-foreground rounded-bl-none">
+                <span className="text-xs font-medium opacity-70 block mb-0.5">Agent</span>
+                {msg.content}
+              </div>
+            </div>
+          );
+        }
+
+        // Handle user message
+        if (msg.role === 'user' && msg.content) {
+          return (
+            <div key={idx} className="flex justify-end">
+              <div className="max-w-[75%] px-3 py-2 rounded-lg text-sm bg-primary text-primary-foreground rounded-br-none">
+                <span className="text-xs font-medium opacity-70 block mb-0.5">Caller</span>
+                {msg.content}
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })}
+
+      {/* Show ended reason at the end */}
+      {endedReason && <EndedReasonCard reason={endedReason} />}
+    </div>
+  );
+}
+
+/**
+ * Transcript tab content with toggle between basic and advanced modes
+ */
+function TranscriptTabContent({
+  transcription,
+  webhooks,
+  webhooksLoading,
+}: {
+  transcription: string | null;
+  webhooks: Webhook[];
+  webhooksLoading: boolean;
+}) {
+  const [mode, setMode] = useState<'basic' | 'advanced'>('basic');
+
+  // Extract OpenAI messages and endedReason from webhooks
+  const extractedData = useMemo(() => {
+    if (webhooksLoading) return null;
+    return extractOpenAIMessages(webhooks);
+  }, [webhooks, webhooksLoading]);
+
+  // Check if advanced mode is available
+  const hasAdvancedData = extractedData !== null && extractedData.messages.length > 0;
+
+  // If advanced mode is selected but no data, fall back to basic
+  const showAdvanced = mode === 'advanced' && hasAdvancedData;
+
+  // No transcript at all
+  if (!transcription && !hasAdvancedData) {
+    return (
+      <EmptyState
+        icon={<FileText className="h-6 w-6 text-muted-foreground" />}
+        message="No transcript available for this call"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Tab-style toggle - only show if advanced data is available */}
+      {hasAdvancedData && (
+        <div className="flex justify-end">
+          <div className="inline-flex items-center rounded-lg border bg-muted p-0.5">
+            <button
+              onClick={() => setMode('basic')}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                mode === 'basic'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Basic
+            </button>
+            <button
+              onClick={() => setMode('advanced')}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                mode === 'advanced'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Advanced
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading state for webhooks when checking for advanced mode */}
+      {webhooksLoading && mode === 'advanced' && (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
+          <span className="text-sm text-muted-foreground">Loading advanced transcript...</span>
+        </div>
+      )}
+
+      {/* Content */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="space-y-3 max-h-[400px] overflow-auto">
+            {showAdvanced ? (
+              <AdvancedTranscript
+                messages={extractedData!.messages}
+                endedReason={extractedData!.endedReason}
+              />
+            ) : transcription ? (
+              parseTranscript(transcription).map((msg, idx) => (
+                <TranscriptBubble key={idx} message={msg} />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No basic transcript available. Switch to Advanced to view tool calls.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -696,22 +1070,11 @@ export function CallDetailPanel({ callId }: CallDetailPanelProps) {
 
         {/* Transcript Tab */}
         <TabsContent value="transcript" className="mt-4">
-          {call.transcription ? (
-            <Card>
-              <CardContent className="p-4">
-                <div className="space-y-3 max-h-[400px] overflow-auto">
-                  {parseTranscript(call.transcription).map((msg, idx) => (
-                    <TranscriptBubble key={idx} message={msg} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <EmptyState
-              icon={<FileText className="h-6 w-6 text-muted-foreground" />}
-              message="No transcript available for this call"
-            />
-          )}
+          <TranscriptTabContent
+            transcription={call.transcription}
+            webhooks={webhooksList}
+            webhooksLoading={webhooksLoading}
+          />
         </TabsContent>
 
         {/* Activity Tab */}
