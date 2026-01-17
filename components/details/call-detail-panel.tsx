@@ -290,10 +290,10 @@ function ToolCallCard({
 function EndedReasonCard({ reason }: { reason: string }) {
   return (
     <div className="flex justify-center my-3">
-      <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 border rounded-full">
-        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">
-          Call ended: <span className="font-medium text-foreground">{reason}</span>
+      <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-full">
+        <Phone className="h-3.5 w-3.5 text-red-400" />
+        <span className="text-xs text-red-600 dark:text-red-400">
+          Call ended: <span className="font-medium">{reason}</span>
         </span>
       </div>
     </div>
@@ -392,7 +392,8 @@ function TranscriptTabContent({
   webhooks: Webhook[];
   webhooksLoading: boolean;
 }) {
-  const [mode, setMode] = useState<'basic' | 'advanced'>('basic');
+  // Default to advanced mode
+  const [mode, setMode] = useState<'basic' | 'advanced'>('advanced');
 
   // Extract OpenAI messages and endedReason from webhooks
   const extractedData = useMemo(() => {
