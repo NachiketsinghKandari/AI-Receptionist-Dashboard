@@ -57,8 +57,18 @@ const columns: ColumnDef<Email>[] = [
     header: 'Status',
     cell: ({ row }) => {
       const status = row.getValue('status') as string;
+      const subject = row.original.subject;
+      const isImportant = subject?.includes('[Important]');
       const variant = status === 'sent' ? 'default' : 'destructive';
-      return <Badge variant={variant}>{status}</Badge>;
+
+      return (
+        <Badge
+          variant={variant}
+          className={isImportant ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800' : ''}
+        >
+          {status}
+        </Badge>
+      );
     },
   },
   {

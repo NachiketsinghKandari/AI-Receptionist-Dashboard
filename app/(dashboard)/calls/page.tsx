@@ -12,7 +12,8 @@ import { FilterSidebar } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { CallDetailPanel } from '@/components/details/call-detail-panel';
-import { useCalls, useCallDetail } from '@/hooks/use-calls';
+import { useCalls, useCallDetail, useImportantCallIds } from '@/hooks/use-calls';
+import { useSentryErrorCorrelationIds } from '@/hooks/use-sentry-events';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants';
 import { formatDuration } from '@/lib/formatting';
@@ -20,69 +21,94 @@ import type { CallListItem } from '@/types/database';
 import type { SortOrder } from '@/types/api';
 import { format, subDays } from 'date-fns';
 
-const columns: ColumnDef<CallListItem>[] = [
-  {
-    accessorKey: 'id',
-    header: 'ID',
-    cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
-  },
-  {
-    accessorKey: 'platform_call_id',
-    header: 'Correlation ID',
-    cell: ({ row }) => {
-      const value = row.getValue('platform_call_id') as string | null;
-      return value ? (
-        <div className="flex items-center gap-1">
-          <span className="font-mono text-xs truncate max-w-[100px]">{value}</span>
-          <CopyButton value={value} />
-        </div>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
+// Helper to create columns with error and important state access
+function createColumns(
+  errorCorrelationIds: Set<string> | undefined,
+  importantCallIds: Set<number> | undefined
+): ColumnDef<CallListItem>[] {
+  return [
+    {
+      accessorKey: 'id',
+      header: 'ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
     },
-  },
-  {
-    accessorKey: 'caller_name',
-    header: 'Caller',
-  },
-  {
-    accessorKey: 'phone_number',
-    header: 'Phone',
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.getValue('phone_number')}</span>
-    ),
-  },
-  {
-    accessorKey: 'call_type',
-    header: 'Type',
-    cell: ({ row }) => {
-      const type = row.getValue('call_type') as string;
-      return <Badge variant="outline">{type}</Badge>;
+    {
+      accessorKey: 'platform_call_id',
+      header: 'Correlation ID',
+      cell: ({ row }) => {
+        const value = row.getValue('platform_call_id') as string | null;
+        return value ? (
+          <div className="flex items-center gap-1">
+            <span className="font-mono text-xs truncate max-w-[100px]">{value}</span>
+            <CopyButton value={value} />
+          </div>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      },
     },
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const status = row.getValue('status') as string;
-      const variant = status === 'completed' ? 'default' : 'secondary';
-      return <Badge variant={variant}>{status}</Badge>;
+    {
+      accessorKey: 'caller_name',
+      header: 'Caller',
     },
-  },
-  {
-    accessorKey: 'started_at',
-    header: 'Started',
-    cell: ({ row }) => {
-      const value = row.getValue('started_at') as string;
-      return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+    {
+      accessorKey: 'call_duration',
+      header: 'Duration',
+      cell: ({ row }) => formatDuration(row.getValue('call_duration')),
     },
-  },
-  {
-    accessorKey: 'call_duration',
-    header: 'Duration',
-    cell: ({ row }) => formatDuration(row.getValue('call_duration')),
-  },
-];
+    {
+      accessorKey: 'call_type',
+      header: 'Type',
+      cell: ({ row }) => {
+        const type = row.getValue('call_type') as string;
+        return <Badge variant="outline">{type}</Badge>;
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.getValue('status') as string;
+        const callId = row.original.id;
+        const correlationId = row.original.platform_call_id;
+        const duration = row.original.call_duration;
+        const hasError = correlationId && errorCorrelationIds?.has(correlationId);
+        const isLongCall = duration !== null && duration > 300; // > 5 minutes
+        const isImportant = importantCallIds?.has(callId);
+        const variant = status === 'completed' ? 'default' : 'secondary';
+
+        // Sentry error (red) takes precedence over long call / important (orange)
+        let className = '';
+        if (hasError) {
+          className = 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
+        } else if (isLongCall || isImportant) {
+          className = 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800';
+        }
+
+        return (
+          <Badge variant={variant} className={className}>
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'started_at',
+      header: 'Started',
+      cell: ({ row }) => {
+        const value = row.getValue('started_at') as string;
+        return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+      },
+    },
+    {
+      accessorKey: 'phone_number',
+      header: 'Phone',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">{row.getValue('phone_number')}</span>
+      ),
+    },
+  ];
+}
 
 export default function CallsPage() {
   // Filter state
@@ -134,6 +160,18 @@ export default function CallsPage() {
   };
 
   const { data, isLoading, isFetching } = useCalls(filters);
+
+  // Fetch Sentry error correlation IDs (runs in background)
+  const { data: errorCorrelationIds } = useSentryErrorCorrelationIds();
+
+  // Fetch important call IDs (runs in background)
+  const { data: importantCallIds } = useImportantCallIds();
+
+  // Memoize columns with Sentry error and important call data
+  const columns = useMemo(
+    () => createColumns(errorCorrelationIds, importantCallIds),
+    [errorCorrelationIds, importantCallIds]
+  );
 
   const handleRowSelect = (row: CallListItem | null) => {
     setSelectedCallId(row?.id ?? null);

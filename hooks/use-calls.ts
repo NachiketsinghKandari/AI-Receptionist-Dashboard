@@ -52,3 +52,28 @@ export function useCallDetail(id: number | null) {
     staleTime: CACHE_TTL_DATA * 1000,
   });
 }
+
+// Types for important calls API
+interface ImportantCallsResponse {
+  callIds: number[];
+}
+
+async function fetchImportantCallIds(environment: string): Promise<ImportantCallsResponse> {
+  const response = await fetch(`/api/calls/important?env=${environment}`);
+  if (!response.ok) throw new Error('Failed to fetch important calls');
+  return response.json();
+}
+
+/**
+ * Hook to fetch call IDs that have emails with "[Important]" in the subject
+ * Used to highlight important calls in the table
+ */
+export function useImportantCallIds() {
+  const { environment } = useEnvironment();
+  return useQuery({
+    queryKey: ['calls', 'important', environment],
+    queryFn: () => fetchImportantCallIds(environment),
+    staleTime: 60 * 1000, // 1 minute
+    select: (data) => new Set(data.callIds),
+  });
+}

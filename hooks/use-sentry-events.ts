@@ -79,3 +79,27 @@ export function useSentryBrowse(filters: SentryBrowseFilters) {
     staleTime: 60 * 1000, // 1 minute
   });
 }
+
+// Types for error check API
+interface SentryErrorCheckResponse {
+  correlationIds: string[];
+}
+
+async function fetchSentryErrorCheck(): Promise<SentryErrorCheckResponse> {
+  const response = await fetch('/api/sentry/error-check');
+  if (!response.ok) throw new Error('Failed to fetch Sentry error check');
+  return response.json();
+}
+
+/**
+ * Hook to fetch correlation IDs that have Sentry errors
+ * Used to highlight calls with errors in the table
+ */
+export function useSentryErrorCorrelationIds() {
+  return useQuery({
+    queryKey: ['sentry', 'error-check'],
+    queryFn: fetchSentryErrorCheck,
+    staleTime: 60 * 1000, // 1 minute
+    select: (data) => new Set(data.correlationIds),
+  });
+}
