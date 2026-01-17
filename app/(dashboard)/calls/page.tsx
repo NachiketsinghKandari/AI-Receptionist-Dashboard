@@ -19,6 +19,7 @@ import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, CALL_TYPES, TRANSFER_TYPES } fro
 import { formatDuration } from '@/lib/formatting';
 import type { CallListItem } from '@/types/database';
 import type { SortOrder } from '@/types/api';
+import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { format, subDays } from 'date-fns';
 
 // Helper to create columns with error and important state access
@@ -123,6 +124,7 @@ export default function CallsPage() {
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
   const [selectedCallId, setSelectedCallId] = useState<number | null>(null);
+  const [highlightReasons, setHighlightReasons] = useState<HighlightReasons>({ sentry: false, duration: false, important: false });
   const [sortBy, setSortBy] = useState<string | null>('started_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
@@ -174,6 +176,21 @@ export default function CallsPage() {
   );
 
   const handleRowSelect = (row: CallListItem | null) => {
+    if (row) {
+      // Compute highlight reasons for the selected row
+      const correlationId = row.platform_call_id;
+      const hasSentry = !!(correlationId && errorCorrelationIds?.has(correlationId));
+      const hasDuration = row.call_duration !== null && row.call_duration > 300;
+      const hasImportant = !!(importantCallIds?.has(row.id));
+
+      setHighlightReasons({
+        sentry: hasSentry,
+        duration: hasDuration,
+        important: hasImportant,
+      });
+    } else {
+      setHighlightReasons({ sentry: false, duration: false, important: false });
+    }
     setSelectedCallId(row?.id ?? null);
   };
 
@@ -309,6 +326,7 @@ export default function CallsPage() {
       {/* Detail Drawer */}
       <CallDetailDrawer
         callId={selectedCallId}
+        highlightReasons={highlightReasons}
         onClose={() => setSelectedCallId(null)}
         onPrevious={handlePrevious}
         onNext={handleNext}
@@ -321,6 +339,7 @@ export default function CallsPage() {
 
 function CallDetailDrawer({
   callId,
+  highlightReasons,
   onClose,
   onPrevious,
   onNext,
@@ -328,6 +347,7 @@ function CallDetailDrawer({
   hasNext,
 }: {
   callId: number | null;
+  highlightReasons: HighlightReasons;
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -353,7 +373,7 @@ function CallDetailDrawer({
       }
       subtitle={call ? `${call.caller_name} - ${call.phone_number}` : undefined}
     >
-      {callId && <CallDetailPanel callId={callId} />}
+      {callId && <CallDetailPanel callId={callId} highlightReasons={highlightReasons} />}
     </DetailDialog>
   );
 }

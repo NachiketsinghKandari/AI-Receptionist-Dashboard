@@ -44,14 +44,23 @@ import {
   Loader2,
   Wrench,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
+
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import { JsonViewer } from '@/components/ui/json-viewer';
 
+// Highlight reasons type - exported for use in calls page
+export interface HighlightReasons {
+  sentry: boolean;
+  duration: boolean;
+  important: boolean;
+}
+
 interface CallDetailPanelProps {
   callId: number;
+  highlightReasons?: HighlightReasons;
 }
 
 function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -907,9 +916,19 @@ function SectionBadge({ count, color, isLoading }: { count: number; color: strin
   );
 }
 
-export function CallDetailPanel({ callId }: CallDetailPanelProps) {
+export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const platformCallId = data?.call?.platform_call_id;
+
+  // Track which highlight-related tabs have been acknowledged (clicked)
+  const [logsAcknowledged, setLogsAcknowledged] = useState(false);
+  const [activityAcknowledged, setActivityAcknowledged] = useState(false);
+
+  // Reset acknowledged state when callId changes (modal reopened for different call)
+  useEffect(() => {
+    setLogsAcknowledged(false);
+    setActivityAcknowledged(false);
+  }, [callId]);
 
   // Fetch webhooks and sentry events in parallel once we have platformCallId
   const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
@@ -990,7 +1009,14 @@ export function CallDetailPanel({ callId }: CallDetailPanelProps) {
       )}
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs
+        defaultValue="overview"
+        className="w-full"
+        onValueChange={(value) => {
+          if (value === 'logs') setLogsAcknowledged(true);
+          if (value === 'activity') setActivityAcknowledged(true);
+        }}
+      >
         <TabsList className="w-full grid grid-cols-4">
           <TabsTrigger value="overview" className="text-xs">
             <ClipboardList className="h-3.5 w-3.5 mr-1" />
@@ -1000,12 +1026,24 @@ export function CallDetailPanel({ callId }: CallDetailPanelProps) {
             <FileText className="h-3.5 w-3.5 mr-1" />
             Transcript
           </TabsTrigger>
-          <TabsTrigger value="activity" className="text-xs">
+          <TabsTrigger
+            value="activity"
+            className={cn(
+              "text-xs",
+              highlightReasons?.important && !activityAcknowledged && "animate-pulse-orange"
+            )}
+          >
             <Activity className="h-3.5 w-3.5 mr-1" />
             Activity
             <SectionBadge count={activityCount} color="bg-primary/20 text-primary" isLoading={webhooksLoading} />
           </TabsTrigger>
-          <TabsTrigger value="logs" className="text-xs">
+          <TabsTrigger
+            value="logs"
+            className={cn(
+              "text-xs",
+              highlightReasons?.sentry && !logsAcknowledged && "animate-pulse-red"
+            )}
+          >
             <Bug className="h-3.5 w-3.5 mr-1" />
             Logs
             {sentryLoading ? (
@@ -1028,7 +1066,15 @@ export function CallDetailPanel({ callId }: CallDetailPanelProps) {
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 <InfoRow label="Caller" value={call.caller_name} icon={<User className="h-3.5 w-3.5" />} />
                 <InfoRow label="Phone" value={call.phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
-                <InfoRow label="Duration" value={formatDuration(call.call_duration)} icon={<Clock className="h-3.5 w-3.5" />} />
+                <InfoRow
+                  label="Duration"
+                  value={
+                    <span className={cn(highlightReasons?.duration && "animate-pulse-orange-text")}>
+                      {formatDuration(call.call_duration)}
+                    </span>
+                  }
+                  icon={<Clock className="h-3.5 w-3.5" />}
+                />
                 <InfoRow label="Started" value={call.started_at} icon={<Calendar className="h-3.5 w-3.5" />} />
               </div>
             </CardContent>
