@@ -17,7 +17,8 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowUpDown, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export type SortOrder = 'asc' | 'desc' | null;
 
@@ -31,6 +32,7 @@ interface DataTableProps<TData, TValue> {
   onRowSelect?: (row: TData | null) => void;
   selectedRowId?: string | number | null;
   isLoading?: boolean;
+  isFetching?: boolean;
   getRowId?: (row: TData) => string;
   // Sorting props
   sortBy?: string | null;
@@ -49,12 +51,15 @@ export function DataTable<TData, TValue>({
   onRowSelect,
   selectedRowId,
   isLoading,
+  isFetching,
   getRowId,
   sortBy,
   sortOrder,
   onSort,
   sortableColumns = [],
 }: DataTableProps<TData, TValue>) {
+  // Show refetching state when we have data but are fetching new data
+  const isRefetching = isFetching && !isLoading && data.length > 0;
   const table = useReactTable({
     data,
     columns,
@@ -109,8 +114,17 @@ export function DataTable<TData, TValue>({
   return (
     <div className="flex flex-col h-full">
       {/* Scrollable table container - sizes to content, scrolls when needed */}
-      <div className="min-h-0 overflow-auto rounded-md border">
-        <Table unstyled>
+      <div className="relative min-h-0 overflow-auto rounded-md border">
+        {/* Refetching overlay */}
+        {isRefetching && (
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-start justify-center pt-20">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-background border rounded-full shadow-sm">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Updating...</span>
+            </div>
+          </div>
+        )}
+        <Table unstyled className={cn(isRefetching && "opacity-50 transition-opacity")}>
           <TableHeader className="sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-background hover:bg-background">

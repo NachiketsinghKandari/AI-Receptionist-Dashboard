@@ -104,7 +104,7 @@ export default function TransfersPage() {
     setOffset(0);
   };
 
-  const { data, isLoading } = useTransfers(filters);
+  const { data, isLoading, isFetching } = useTransfers(filters);
 
   // Navigation logic for detail dialog
   const dataArray = data?.data ?? [];
@@ -189,6 +189,7 @@ export default function TransfersPage() {
             onRowSelect={(row) => setSelectedTransfer(row as Transfer | null)}
             selectedRowId={selectedTransfer?.id ?? null}
             isLoading={isLoading}
+            isFetching={isFetching}
             getRowId={(row) => String(row.id)}
             sortBy={sortBy}
             sortOrder={sortOrder}

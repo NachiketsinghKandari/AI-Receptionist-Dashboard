@@ -111,7 +111,7 @@ export default function WebhooksPage() {
     setOffset(0);
   };
 
-  const { data, isLoading } = useWebhooks(filters);
+  const { data, isLoading, isFetching } = useWebhooks(filters);
 
   // Fetch call details when a webhook is selected (for enriching transfer data)
   const { data: callDetailData } = useCallDetail(selectedWebhook?.call_id ?? null);
@@ -227,6 +227,7 @@ export default function WebhooksPage() {
             onRowSelect={(row) => setSelectedWebhook(row as Webhook | null)}
             selectedRowId={selectedWebhook?.id ?? null}
             isLoading={isLoading}
+            isFetching={isFetching}
             getRowId={(row) => String(row.id)}
             sortBy={sortBy}
             sortOrder={sortOrder}

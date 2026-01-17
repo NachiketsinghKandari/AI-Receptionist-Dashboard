@@ -133,7 +133,7 @@ export default function CallsPage() {
     setOffset(0); // Reset to first page when sorting changes
   };
 
-  const { data, isLoading } = useCalls(filters);
+  const { data, isLoading, isFetching } = useCalls(filters);
 
   const handleRowSelect = (row: CallListItem | null) => {
     setSelectedCallId(row?.id ?? null);
@@ -258,6 +258,7 @@ export default function CallsPage() {
             onRowSelect={handleRowSelect}
             selectedRowId={selectedCallId}
             isLoading={isLoading}
+            isFetching={isFetching}
             getRowId={(row) => String(row.id)}
             sortBy={sortBy}
             sortOrder={sortOrder}

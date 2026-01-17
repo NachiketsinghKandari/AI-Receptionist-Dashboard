@@ -110,7 +110,7 @@ export default function EmailsPage() {
     setOffset(0);
   };
 
-  const { data, isLoading } = useEmails(filters);
+  const { data, isLoading, isFetching } = useEmails(filters);
 
   // Navigation logic for detail dialog
   const dataArray = data?.data ?? [];
@@ -179,6 +179,7 @@ export default function EmailsPage() {
             onRowSelect={(row) => setSelectedEmail(row as Email | null)}
             selectedRowId={selectedEmail?.id ?? null}
             isLoading={isLoading}
+            isFetching={isFetching}
             getRowId={(row) => String(row.id)}
             sortBy={sortBy}
             sortOrder={sortOrder}
