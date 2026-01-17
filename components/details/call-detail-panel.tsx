@@ -63,6 +63,7 @@ export interface HighlightReasons {
   sentry: boolean;
   duration: boolean;
   important: boolean;
+  transferMismatch: boolean;
 }
 
 interface CallDetailPanelProps {
@@ -510,12 +511,18 @@ function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode
   );
 }
 
-function TransferItem({ transfer }: { transfer: Transfer }) {
+function TransferItem({ transfer, highlight }: { transfer: Transfer; highlight?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!acknowledged) setAcknowledged(true);
+  };
 
   return (
-    <Card className="overflow-hidden">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Card className={cn("overflow-hidden", highlight && !acknowledged && "animate-pulse-yellow")}>
+      <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
         <CollapsibleTrigger asChild>
           <CardHeader className="p-3 cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between gap-2">
@@ -560,12 +567,18 @@ function TransferItem({ transfer }: { transfer: Transfer }) {
   );
 }
 
-function EmailItem({ email }: { email: Email }) {
+function EmailItem({ email, highlight }: { email: Email; highlight?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!acknowledged) setAcknowledged(true);
+  };
 
   return (
-    <Card className="overflow-hidden">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Card className={cn("overflow-hidden", highlight && !acknowledged && "animate-pulse-yellow")}>
+      <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
         <CollapsibleTrigger asChild>
           <CardHeader className="p-3 cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between gap-2">
@@ -621,10 +634,18 @@ interface WebhookItemProps {
   webhook: Webhook;
   callerName?: string | null;
   dbTransfers?: Transfer[];
+  highlight?: boolean;
 }
 
-function WebhookItem({ webhook, callerName, dbTransfers = [] }: WebhookItemProps) {
+function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: WebhookItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [transfersAcknowledged, setTransfersAcknowledged] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!acknowledged) setAcknowledged(true);
+  };
 
   // Memoize the expensive payload parsing and enrichment
   const parsedPayload = useMemo(
@@ -639,8 +660,8 @@ function WebhookItem({ webhook, callerName, dbTransfers = [] }: WebhookItemProps
   );
 
   return (
-    <Card className="overflow-hidden">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Card className={cn("overflow-hidden", highlight && !acknowledged && "animate-pulse-yellow")}>
+      <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
         <CollapsibleTrigger asChild>
           <CardHeader className="p-3 cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between gap-2">
@@ -732,7 +753,15 @@ function WebhookItem({ webhook, callerName, dbTransfers = [] }: WebhookItemProps
               )}
 
               {enrichedTransfers.length > 0 && (
-                <details className="group rounded-lg border border-border overflow-hidden">
+                <details
+                  className={cn(
+                    "group rounded-lg border border-border overflow-hidden",
+                    highlight && !transfersAcknowledged && "animate-pulse-yellow"
+                  )}
+                  onToggle={() => {
+                    if (!transfersAcknowledged) setTransfersAcknowledged(true);
+                  }}
+                >
                   <summary className="flex items-center justify-between gap-2 p-2 bg-muted/50 hover:bg-muted cursor-pointer list-none">
                     <span className="flex items-center gap-2 font-medium text-xs">
                       <ArrowLeftRight className="h-3.5 w-3.5" />
@@ -1046,7 +1075,8 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
             value="activity"
             className={cn(
               "text-xs",
-              highlightReasons?.important && !activityAcknowledged && "animate-pulse-orange"
+              highlightReasons?.important && !activityAcknowledged && "animate-pulse-orange",
+              highlightReasons?.transferMismatch && !activityAcknowledged && "animate-pulse-yellow"
             )}
           >
             <Activity className="h-3.5 w-3.5 mr-1" />
@@ -1152,7 +1182,7 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
             {transfers.length > 0 ? (
               <div className="space-y-2">
                 {transfers.map((t) => (
-                  <TransferItem key={t.id} transfer={t} />
+                  <TransferItem key={t.id} transfer={t} highlight={highlightReasons?.transferMismatch} />
                 ))}
               </div>
             ) : (
@@ -1176,7 +1206,7 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
             {emails.length > 0 ? (
               <div className="space-y-2">
                 {emails.map((e) => (
-                  <EmailItem key={e.id} email={e} />
+                  <EmailItem key={e.id} email={e} highlight={highlightReasons?.transferMismatch} />
                 ))}
               </div>
             ) : (
@@ -1216,6 +1246,7 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
                     webhook={w}
                     callerName={call.caller_name}
                     dbTransfers={transfers}
+                    highlight={highlightReasons?.transferMismatch}
                   />
                 ))}
               </div>
