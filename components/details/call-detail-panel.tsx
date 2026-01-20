@@ -54,7 +54,7 @@ import { JsonViewer } from '@/components/ui/json-viewer';
 
 // Map dashboard environment to Sentry environment for URL
 const SENTRY_ENV_MAP: Record<string, string> = {
-  production: 'pre-prod',
+  production: 'production',
   staging: 'stage',
 };
 

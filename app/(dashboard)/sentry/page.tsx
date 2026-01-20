@@ -40,8 +40,10 @@ const TIME_PERIODS = [
   { value: '30d', label: 'Last 30 days' },
 ];
 const SENTRY_ENVS = [
+  { value: 'production', label: 'Production' },
   { value: 'pre-prod', label: 'Pre-Prod' },
   { value: 'stage', label: 'Stage' },
+  { value: 'develop', label: 'Develop' },
   { value: 'development', label: 'Development' },
 ];
 
@@ -205,8 +207,8 @@ function EventCard({ event }: { event: SentryParsedEvent }) {
 export default function SentryPage() {
   const [eventType, setEventType] = useState('All');
   const [level, setLevel] = useState('error'); // Default to errors
-  const [statsPeriod, setStatsPeriod] = useState('7d'); // Default to 7 days
-  const [sentryEnv, setSentryEnv] = useState('pre-prod'); // Default to pre-prod
+  const [statsPeriod, setStatsPeriod] = useState('30d'); // Default to 30 days
+  const [sentryEnv, setSentryEnv] = useState('production'); // Default to production
   const [search, setSearch] = useState('');
   const [selectedCorrelationId, setSelectedCorrelationId] = useState<string | null>(null);
 
