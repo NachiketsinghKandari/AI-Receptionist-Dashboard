@@ -42,7 +42,7 @@ function createColumns(generatingReportId?: string): ColumnDef<EODReport>[] {
       id: 'error_count',
       header: 'Errors',
       cell: ({ row }) => {
-        // Use AI-computed error count if available, otherwise fallback to raw count
+        // Use AI-computed error count if available, otherwise fallback to Cekura status count
         const aiErrors = row.original.errors;
         if (aiErrors !== null && aiErrors !== undefined) {
           return (
@@ -51,12 +51,11 @@ function createColumns(generatingReportId?: string): ColumnDef<EODReport>[] {
             </Badge>
           );
         }
-        // Fallback: count from raw data
+        // Fallback: count calls where cekura.status !== 'success'
         const rawData = row.original.raw_data as EODRawData;
-        const errorCount = rawData?.calls?.reduce(
-          (sum, call) => sum + (call.sentry?.errors?.length || 0),
-          0
-        ) ?? 0;
+        const errorCount = rawData?.calls?.filter(
+          (call) => call.cekura?.status !== 'success'
+        ).length ?? 0;
         return (
           <Badge variant={errorCount > 0 ? 'destructive' : 'secondary'}>
             {errorCount}
@@ -121,7 +120,6 @@ export default function EODReportsPage() {
 
   // Generate report state
   const [reportDate, setReportDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [generatedRawData, setGeneratedRawData] = useState<EODRawData | null>(null);
 
   const filters = useMemo(
     () => ({
@@ -153,23 +151,23 @@ export default function EODReportsPage() {
 
   const handleGenerate = async () => {
     try {
+      // Step 1: Generate raw data from Cekura + Sentry
       const result = await generateMutation.mutateAsync(reportDate);
-      setGeneratedRawData(result.raw_data);
+      const rawData = result.raw_data;
+
+      // Step 2: Save the report to database
+      const saveResult = await saveMutation.mutateAsync({ reportDate, rawData });
+
+      // Step 3: Generate AI report (called directly since after() hook is unreliable)
+      await aiGenerateMutation.mutateAsync({
+        reportId: saveResult.report.id,
+        rawData,
+      });
     } catch (error) {
       console.error('Failed to generate report:', error);
     }
   };
 
-  const handleSave = async () => {
-    if (!generatedRawData) return;
-
-    try {
-      await saveMutation.mutateAsync({ reportDate, rawData: generatedRawData });
-      setGeneratedRawData(null); // Clear after save
-    } catch (error) {
-      console.error('Failed to save report:', error);
-    }
-  };
 
   // Navigation logic for detail dialog
   const dataArray = data?.data ?? [];
@@ -213,23 +211,30 @@ export default function EODReportsPage() {
               id="reportDate"
               type="date"
               value={reportDate}
-              onChange={(e) => {
-                setReportDate(e.target.value);
-                setGeneratedRawData(null);
-              }}
+              onChange={(e) => setReportDate(e.target.value)}
               className="mt-1"
             />
           </div>
 
           <Button
             onClick={handleGenerate}
-            disabled={generateMutation.isPending || !reportDate}
+            disabled={generateMutation.isPending || saveMutation.isPending || aiGenerateMutation.isPending || !reportDate}
             className="w-full"
           >
             {generateMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
+                Fetching data...
+              </>
+            ) : saveMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving report...
+              </>
+            ) : aiGenerateMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating AI report...
               </>
             ) : (
               <>
@@ -239,68 +244,25 @@ export default function EODReportsPage() {
             )}
           </Button>
 
-          {generateMutation.isError && (
+          {(generateMutation.isError || saveMutation.isError || aiGenerateMutation.isError) && (
             <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
-              {generateMutation.error?.message || 'Failed to generate'}
+              {generateMutation.error?.message || saveMutation.error?.message || aiGenerateMutation.error?.message || 'Failed to generate'}
             </div>
           )}
 
-          {/* Preview generated data */}
-          {generatedRawData && (
+          {/* Success message after full pipeline completes */}
+          {aiGenerateMutation.isSuccess && !generateMutation.isPending && !saveMutation.isPending && !aiGenerateMutation.isPending && (
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  Generated Preview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Calls:</span>
-                  <span className="font-mono">{generatedRawData.count}</span>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Report generated!</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">With Errors:</span>
-                  <span className="font-mono">
-                    {generatedRawData.calls.filter(c => c.sentry.errors.length > 0).length}
-                  </span>
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Sparkles className="h-3 w-3" />
+                  <span className="text-xs">AI insights ready</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Environment:</span>
-                  <Badge variant="outline" className="text-xs">
-                    {generatedRawData.environment}
-                  </Badge>
-                </div>
-
-                <Button
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending}
-                  variant="default"
-                  className="w-full mt-2"
-                >
-                  {saveMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Report'
-                  )}
-                </Button>
-
-                {saveMutation.isSuccess && (
-                  <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-sm text-green-600 dark:text-green-400 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4" />
-                      Report saved!
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <Sparkles className="h-3 w-3" />
-                      AI insights generating...
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
@@ -396,8 +358,9 @@ export default function EODReportsPage() {
 
 function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report: EODReport; onRetryAI?: () => void; isRetrying?: boolean; retryError?: string }) {
   const rawData = report.raw_data as EODRawData;
-  const callsWithErrors = rawData?.calls?.filter(c => c.sentry.errors.length > 0) || [];
-  const callsWithoutErrors = rawData?.calls?.filter(c => c.sentry.errors.length === 0) || [];
+  // Count errors based on Cekura status (status !== 'success' means error)
+  const callsWithErrors = rawData?.calls?.filter(c => c.cekura?.status !== 'success') || [];
+  const callsWithoutErrors = rawData?.calls?.filter(c => c.cekura?.status === 'success') || [];
   const markdownRef = useRef<HTMLDivElement>(null);
 
   const hasAIReport = report.report !== null && report.report !== undefined;
@@ -418,7 +381,7 @@ function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report
               {report.errors ?? callsWithErrors.length}
             </div>
             <div className="text-sm text-muted-foreground">
-              {report.errors !== null ? 'AI-Detected Errors' : 'Calls with Errors'}
+              {report.errors !== null ? 'AI-Detected Errors' : 'Failed Calls'}
             </div>
           </CardContent>
         </Card>
@@ -555,7 +518,7 @@ function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-red-500">
-                  Calls with Sentry Errors ({callsWithErrors.length})
+                  Failed Calls ({callsWithErrors.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 max-h-96 overflow-y-auto">
@@ -568,14 +531,20 @@ function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report
                       <span className="font-mono text-xs truncate max-w-[200px]">
                         {call.correlation_id}
                       </span>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="destructive" className="text-xs">
                         {call.cekura.status}
                       </Badge>
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {call.sentry.errors.length} error(s):{' '}
-                      {call.sentry.errors.map(e => e.title).join(', ')}
-                    </div>
+                    {call.cekura.error_message && (
+                      <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+                        {call.cekura.error_message}
+                      </div>
+                    )}
+                    {call.sentry.errors.length > 0 && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Sentry: {call.sentry.errors.map(e => e.title).join(', ')}
+                      </div>
+                    )}
                   </div>
                 ))}
               </CardContent>
@@ -584,7 +553,7 @@ function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report
             <Card>
               <CardContent className="p-8 text-center">
                 <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-4" />
-                <p className="text-muted-foreground">No errors detected in this report.</p>
+                <p className="text-muted-foreground">No failed calls in this report.</p>
               </CardContent>
             </Card>
           )}

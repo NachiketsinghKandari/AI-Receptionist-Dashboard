@@ -8,39 +8,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { after } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { errorResponse, parseIntOrDefault, clamp } from '@/lib/api/utils';
+import { generateAIReportForEOD } from '@/lib/eod/generate-ai-report';
 import type { Environment } from '@/lib/constants';
 import { MAX_PAGE_LIMIT, DEFAULT_PAGE_LIMIT } from '@/lib/constants';
-
-/**
- * Trigger AI generation in background (fire-and-forget)
- * Uses internal fetch to call the ai-generate endpoint
- */
-async function triggerAIGeneration(
-  reportId: string,
-  rawData: unknown,
-  environment: string,
-  baseUrl: string
-) {
-  try {
-    const response = await fetch(
-      `${baseUrl}/api/eod-reports/ai-generate?env=${environment}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportId, rawData }),
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('AI generation failed:', error);
-    } else {
-      console.log('AI generation completed for report:', reportId);
-    }
-  } catch (error) {
-    console.error('AI generation error:', error);
-  }
-}
+import type { EODRawData } from '@/types/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,12 +60,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const { searchParams } = url;
+    const { searchParams } = new URL(request.url);
     const environment = (searchParams.get('env') || 'production') as Environment;
-
-    // Build base URL for internal API calls
-    const baseUrl = `${url.protocol}//${url.host}`;
 
     const body = await request.json();
     const { reportDate, rawData, triggerType = 'manual' } = body;
@@ -136,9 +103,9 @@ export async function POST(request: NextRequest) {
 
       reportId = data.id;
 
-      // Trigger AI generation in background
+      // Trigger AI generation in background (fire-and-forget, continues even if client disconnects)
       after(async () => {
-        await triggerAIGeneration(reportId, rawData, environment, baseUrl);
+        await generateAIReportForEOD(reportId, rawData as EODRawData, environment);
       });
 
       return NextResponse.json({
@@ -170,9 +137,9 @@ export async function POST(request: NextRequest) {
 
     reportId = data.id;
 
-    // Trigger AI generation in background
+    // Trigger AI generation in background (fire-and-forget, continues even if client disconnects)
     after(async () => {
-      await triggerAIGeneration(reportId, rawData, environment, baseUrl);
+      await generateAIReportForEOD(reportId, rawData as EODRawData, environment);
     });
 
     return NextResponse.json({

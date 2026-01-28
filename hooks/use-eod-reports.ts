@@ -46,7 +46,7 @@ async function generateEODReport(
 }
 
 interface SaveEODReportResponse {
-  report: unknown;
+  report: { id: string; [key: string]: unknown };
   updated: boolean;
   ai_generating: boolean;
   message: string;
