@@ -25,6 +25,7 @@ import type { CallListItem } from '@/types/database';
 import type { SortOrder, FlaggedCallListItem } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { format, subDays } from 'date-fns';
+import { getTodayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 // Helper to create columns with error, important, mismatch, and Cekura state access
 function createColumns(
@@ -182,29 +183,11 @@ export default function CallsPage() {
       return { startDate: null, endDate: null };
     }
     if (dateFilterMode === 'today') {
-      // Get today's date in US Eastern timezone
-      const now = new Date();
-      const usDateFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
-      const parts = usDateFormatter.formatToParts(now);
-      const year = parts.find(p => p.type === 'year')?.value;
-      const month = parts.find(p => p.type === 'month')?.value;
-      const day = parts.find(p => p.type === 'day')?.value;
-      const todayStr = `${year}-${month}-${day}`;
-      return {
-        startDate: `${todayStr}T00:00:00`,
-        endDate: `${todayStr}T23:59:59`,
-      };
+      // Get today's date range in UTC (based on Eastern timezone day)
+      return getTodayRangeUTC();
     }
-    // Custom mode
-    return {
-      startDate: `${startDate}T00:00:00`,
-      endDate: `${endDate}T23:59:59`,
-    };
+    // Custom mode - convert Eastern dates to UTC
+    return getDateRangeUTC(startDate, endDate);
   }, [dateFilterMode, startDate, endDate]);
 
   // Fetch Cekura call data (progressive loading - recent day first, then full range)
@@ -215,8 +198,8 @@ export default function CallsPage() {
     isFullyLoaded: cekuraIsFullyLoaded,
     hasError: cekuraHasError,
   } = useCekuraCallMapping(
-    effectiveDateRange.startDate ? `${effectiveDateRange.startDate.split('T')[0]}T00:00:00Z` : null,
-    effectiveDateRange.endDate ? `${effectiveDateRange.endDate.split('T')[0]}T23:59:59Z` : null
+    effectiveDateRange.startDate,
+    effectiveDateRange.endDate
   );
 
   // Compute correlation IDs to filter by based on Cekura status
@@ -516,6 +499,11 @@ export default function CallsPage() {
             </div>
             <div className="text-sm">
               <span className="font-medium">Filtered:</span> {data?.total ?? 0}
+              {dateOnlyData?.total ? (
+                <span className="text-muted-foreground ml-1">
+                  ({Math.round(((data?.total ?? 0) / dateOnlyData.total) * 100)}%)
+                </span>
+              ) : null}
             </div>
             <div className="text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}

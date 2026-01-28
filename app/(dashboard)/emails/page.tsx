@@ -16,6 +16,7 @@ import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import type { SortOrder } from '@/types/api';
 import { format, subDays } from 'date-fns';
+import { getTodayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 const columns: ColumnDef<Email>[] = [
   {
@@ -95,28 +96,16 @@ export default function EmailsPage() {
 
   const debouncedSearch = useDebounce(search, 300);
 
-  // Compute effective date range based on filter mode
+  // Compute effective date range based on filter mode (in UTC)
   const effectiveDateRange = useMemo(() => {
     if (dateFilterMode === 'all') {
       return { startDate: null, endDate: null };
     }
     if (dateFilterMode === 'today') {
-      const now = new Date();
-      const usDateFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
-      const parts = usDateFormatter.formatToParts(now);
-      const year = parts.find(p => p.type === 'year')?.value;
-      const month = parts.find(p => p.type === 'month')?.value;
-      const day = parts.find(p => p.type === 'day')?.value;
-      const todayStr = `${year}-${month}-${day}`;
-      return { startDate: `${todayStr}T00:00:00`, endDate: `${todayStr}T23:59:59` };
+      return getTodayRangeUTC();
     }
-    // custom mode
-    return { startDate: `${startDate}T00:00:00`, endDate: `${endDate}T23:59:59` };
+    // Custom mode - convert Eastern dates to UTC
+    return getDateRangeUTC(startDate, endDate);
   }, [dateFilterMode, startDate, endDate]);
 
   // Date-only filters for total count (no other filters applied)
@@ -207,6 +196,11 @@ export default function EmailsPage() {
             </div>
             <div className="text-sm">
               <span className="font-medium">Filtered:</span> {data?.total ?? 0}
+              {dateOnlyData?.total ? (
+                <span className="text-muted-foreground ml-1">
+                  ({Math.round(((data?.total ?? 0) / dateOnlyData.total) * 100)}%)
+                </span>
+              ) : null}
             </div>
             <div className="text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}
