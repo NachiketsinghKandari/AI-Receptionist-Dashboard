@@ -148,3 +148,83 @@ export interface FlaggedCountResponse {
 }
 
 export type FlaggedCallsResponse = PaginatedResponse<FlaggedCallListItem>;
+
+// EOD Reports types
+export interface EODReportFilters extends BaseFilters {
+  reportDate?: string | null;
+}
+
+// Filtered metric structure for EOD reports
+// Only includes essential fields, excludes: extra, vocera_defined_metric_code
+export interface CekuraMetricFiltered {
+  id: number;
+  name: string;
+  type: string;
+  score: number | null;
+  score_normalized: number | null;
+  explanation: string | null;
+  function_name: string | null;
+}
+
+export interface CekuraEvaluationFiltered {
+  metrics: CekuraMetricFiltered[];
+}
+
+export interface CekuraCallRawData {
+  id: number;
+  call_id: string;
+  call_ended_reason: string | null;
+  status: string;
+  success: boolean;
+  agent: string | null;
+  dropoff_point: string | null;
+  error_message: string | null;
+  critical_categories: string[];
+  evaluation: CekuraEvaluationFiltered | null;
+  duration: number | null;
+}
+
+export interface SentryErrorRawData {
+  id: string;
+  title: string;
+  message: string;
+  level: string;
+  timestamp: string;
+  environment: string;
+}
+
+export interface EODCallRawData {
+  correlation_id: string;
+  cekura: CekuraCallRawData;
+  sentry: {
+    errors: SentryErrorRawData[];
+  };
+}
+
+export interface EODRawData {
+  count: number;
+  calls: EODCallRawData[];
+  generated_at: string;
+  environment: string;
+}
+
+export interface EODReport {
+  id: string;
+  report_date: string;
+  raw_data: EODRawData;
+  ai_insights: string;
+  report: string | null; // AI-generated markdown report
+  errors: number | null; // Error count computed by AI
+  generated_at: string;
+  trigger_type: 'scheduled' | 'manual';
+}
+
+export type EODReportsResponse = PaginatedResponse<EODReport>;
+
+export interface GenerateEODReportRequest {
+  reportDate: string; // YYYY-MM-DD format
+}
+
+export interface GenerateEODReportResponse {
+  raw_data: EODRawData;
+}

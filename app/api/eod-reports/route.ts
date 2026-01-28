@@ -1,0 +1,188 @@
+/**
+ * EOD Reports API route
+ * GET: List all EOD reports
+ * POST: Save a new EOD report (triggers AI generation in background)
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
+import { getSupabaseClient } from '@/lib/supabase/client';
+import { errorResponse, parseIntOrDefault, clamp } from '@/lib/api/utils';
+import type { Environment } from '@/lib/constants';
+import { MAX_PAGE_LIMIT, DEFAULT_PAGE_LIMIT } from '@/lib/constants';
+
+/**
+ * Trigger AI generation in background (fire-and-forget)
+ * Uses internal fetch to call the ai-generate endpoint
+ */
+async function triggerAIGeneration(
+  reportId: string,
+  rawData: unknown,
+  environment: string,
+  baseUrl: string
+) {
+  try {
+    const response = await fetch(
+      `${baseUrl}/api/eod-reports/ai-generate?env=${environment}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId, rawData }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('AI generation failed:', error);
+    } else {
+      console.log('AI generation completed for report:', reportId);
+    }
+  } catch (error) {
+    console.error('AI generation error:', error);
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const environment = (searchParams.get('env') || 'production') as Environment;
+    const limit = clamp(parseIntOrDefault(searchParams.get('limit'), DEFAULT_PAGE_LIMIT), 1, MAX_PAGE_LIMIT);
+    const offset = parseIntOrDefault(searchParams.get('offset'), 0);
+    const sortBy = searchParams.get('sortBy') || 'report_date';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+    const supabase = getSupabaseClient(environment);
+
+    // Get total count
+    const { count: totalCount, error: countError } = await supabase
+      .from('eod_reports')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error('Error fetching EOD reports count:', countError);
+      return errorResponse('Failed to fetch reports count', 500, 'DB_ERROR');
+    }
+
+    // Fetch reports with pagination
+    const { data, error } = await supabase
+      .from('eod_reports')
+      .select('*')
+      .order(sortBy, { ascending: sortOrder === 'asc' })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error('Error fetching EOD reports:', error);
+      return errorResponse('Failed to fetch reports', 500, 'DB_ERROR');
+    }
+
+    return NextResponse.json({
+      data: data || [],
+      total: totalCount || 0,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error('EOD reports API error:', error);
+    return errorResponse('Internal server error', 500, 'INTERNAL_ERROR');
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const url = new URL(request.url);
+    const { searchParams } = url;
+    const environment = (searchParams.get('env') || 'production') as Environment;
+
+    // Build base URL for internal API calls
+    const baseUrl = `${url.protocol}//${url.host}`;
+
+    const body = await request.json();
+    const { reportDate, rawData, triggerType = 'manual' } = body;
+
+    if (!reportDate || !rawData) {
+      return errorResponse('reportDate and rawData are required', 400, 'MISSING_PARAMS');
+    }
+
+    const supabase = getSupabaseClient(environment);
+
+    // Check if report already exists for this date
+    const { data: existing } = await supabase
+      .from('eod_reports')
+      .select('id')
+      .eq('report_date', reportDate)
+      .single();
+
+    let reportId: string;
+
+    if (existing) {
+      // Update existing report - clear AI fields for regeneration
+      const { data, error } = await supabase
+        .from('eod_reports')
+        .update({
+          raw_data: rawData,
+          generated_at: new Date().toISOString(),
+          trigger_type: triggerType,
+          report: null, // Clear for regeneration
+          errors: null, // Clear for regeneration
+        })
+        .eq('report_date', reportDate)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating EOD report:', error);
+        return errorResponse('Failed to update report', 500, 'DB_ERROR');
+      }
+
+      reportId = data.id;
+
+      // Trigger AI generation in background
+      after(async () => {
+        await triggerAIGeneration(reportId, rawData, environment, baseUrl);
+      });
+
+      return NextResponse.json({
+        report: data,
+        updated: true,
+        ai_generating: true,
+        message: 'Report saved! AI insights generating in background...',
+      });
+    }
+
+    // Insert new report
+    const { data, error } = await supabase
+      .from('eod_reports')
+      .insert({
+        report_date: reportDate,
+        raw_data: rawData,
+        ai_insights: '',
+        trigger_type: triggerType,
+        report: null,
+        errors: null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting EOD report:', error);
+      return errorResponse('Failed to save report', 500, 'DB_ERROR');
+    }
+
+    reportId = data.id;
+
+    // Trigger AI generation in background
+    after(async () => {
+      await triggerAIGeneration(reportId, rawData, environment, baseUrl);
+    });
+
+    return NextResponse.json({
+      report: data,
+      updated: false,
+      ai_generating: true,
+      message: 'Report saved! AI insights generating in background...',
+    });
+  } catch (error) {
+    console.error('EOD reports API error:', error);
+    return errorResponse('Internal server error', 500, 'INTERNAL_ERROR');
+  }
+}
