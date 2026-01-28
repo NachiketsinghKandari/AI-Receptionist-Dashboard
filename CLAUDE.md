@@ -84,3 +84,6 @@ Required:
 
 Optional (for Sentry integration):
 - `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`
+
+Optional (for Cekura integration):
+- `CEKURA_API_KEY` - API key for Cekura call observability

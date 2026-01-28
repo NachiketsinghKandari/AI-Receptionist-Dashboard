@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCallDetail } from '@/hooks/use-calls';
 import { useWebhooksForCall } from '@/hooks/use-webhooks';
 import { useSentryEventsForCall } from '@/hooks/use-sentry-events';
+import { useCekuraCallMapping, buildCekuraUrl } from '@/hooks/use-cekura';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { formatDuration } from '@/lib/formatting';
 import type { Transfer, Email, Webhook, SentryEvent } from '@/types/database';
@@ -45,7 +46,7 @@ import {
   Loader2,
   Wrench,
 } from 'lucide-react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
 
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
@@ -69,6 +70,10 @@ export interface HighlightReasons {
 interface CallDetailPanelProps {
   callId: number;
   highlightReasons?: HighlightReasons;
+  dateRange?: {
+    startDate: string | null;
+    endDate: string | null;
+  };
 }
 
 function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -958,7 +963,7 @@ function SectionBadge({ count, color, isLoading }: { count: number; color: strin
   );
 }
 
-export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelProps) {
+export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDetailPanelProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const { environment } = useEnvironment();
   const platformCallId = data?.call?.platform_call_id;
@@ -966,15 +971,20 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
   // Map dashboard environment to Sentry environment for URL
   const sentryEnv = SENTRY_ENV_MAP[environment] || environment;
 
-  // Track which highlight-related tabs have been acknowledged (clicked)
-  const [logsAcknowledged, setLogsAcknowledged] = useState(false);
-  const [activityAcknowledged, setActivityAcknowledged] = useState(false);
+  // Fetch Cekura call mapping for the date range (progressive loading)
+  const { data: cekuraData, isLoading: cekuraLoading, isFullyLoaded: cekuraFullyLoaded } = useCekuraCallMapping(
+    dateRange?.startDate || null,
+    dateRange?.endDate || null
+  );
+  const cekuraCallId = platformCallId ? cekuraData?.mapping.get(platformCallId) : undefined;
 
-  // Reset acknowledged state when callId changes (modal reopened for different call)
-  useEffect(() => {
-    setLogsAcknowledged(false);
-    setActivityAcknowledged(false);
-  }, [callId]);
+  // Track which callId has been acknowledged for each tab (avoids useEffect reset)
+  const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | null>(null);
+  const [activityAcknowledgedFor, setActivityAcknowledgedFor] = useState<number | null>(null);
+
+  // Derive acknowledged state by comparing against current callId
+  const logsAcknowledged = logsAcknowledgedFor === callId;
+  const activityAcknowledged = activityAcknowledgedFor === callId;
 
   // Fetch webhooks and sentry events in parallel once we have platformCallId
   const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
@@ -1037,6 +1047,25 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
             </a>
           </Button>
         )}
+        {call.platform_call_id && (
+          cekuraCallId ? (
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href={buildCekuraUrl(cekuraCallId, environment)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                Cekura
+              </a>
+            </Button>
+          ) : cekuraLoading || !cekuraFullyLoaded ? (
+            <Button variant="outline" size="sm" disabled>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              Cekura
+            </Button>
+          ) : null
+        )}
       </div>
 
       {/* Recording */}
@@ -1059,8 +1088,8 @@ export function CallDetailPanel({ callId, highlightReasons }: CallDetailPanelPro
         defaultValue="overview"
         className="w-full"
         onValueChange={(value) => {
-          if (value === 'logs') setLogsAcknowledged(true);
-          if (value === 'activity') setActivityAcknowledged(true);
+          if (value === 'logs') setLogsAcknowledgedFor(callId);
+          if (value === 'activity') setActivityAcknowledgedFor(callId);
         }}
       >
         <TabsList className="w-full grid grid-cols-4">

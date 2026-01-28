@@ -421,6 +421,10 @@ export default function CallsPage() {
         onNext={handleNext}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
+        dateRange={{
+          startDate: showAll ? null : `${startDate}T00:00:00Z`,
+          endDate: showAll ? null : `${endDate}T23:59:59Z`,
+        }}
       />
     </div>
   );
@@ -434,6 +438,7 @@ function CallDetailDrawer({
   onNext,
   hasPrevious,
   hasNext,
+  dateRange,
 }: {
   callId: number | null;
   highlightReasons: HighlightReasons;
@@ -442,6 +447,7 @@ function CallDetailDrawer({
   onNext: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
+  dateRange: { startDate: string | null; endDate: string | null };
 }) {
   const { data } = useCallDetail(callId);
   const call = data?.call;
@@ -462,7 +468,7 @@ function CallDetailDrawer({
       }
       subtitle={call ? `${call.caller_name} - ${call.phone_number}` : undefined}
     >
-      {callId && <CallDetailPanel callId={callId} highlightReasons={highlightReasons} />}
+      {callId && <CallDetailPanel callId={callId} highlightReasons={highlightReasons} dateRange={dateRange} />}
     </DetailDialog>
   );
 }
