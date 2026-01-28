@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -19,6 +19,7 @@ interface CekuraStatusProps {
   callData: CekuraCallData | undefined;
   isLoading: boolean;
   isFullyLoaded: boolean;
+  hasError?: boolean;
 }
 
 function getStatusColor(status: string): string {
@@ -86,11 +87,24 @@ function MetricItem({ metric }: { metric: CekuraMetric }) {
   );
 }
 
-export function CekuraStatus({ callData, isLoading, isFullyLoaded }: CekuraStatusProps) {
+export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: CekuraStatusProps) {
   // Stop propagation to prevent row click from opening the detail modal
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
+
+  // Error state - API not configured or failed
+  if (hasError) {
+    return (
+      <div
+        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
+        title="Cekura API error - check if CEKURA_API_KEY is configured"
+      >
+        <AlertCircle className="h-3 w-3" />
+        <span>Error</span>
+      </div>
+    );
+  }
 
   // Loading state
   if (isLoading) {

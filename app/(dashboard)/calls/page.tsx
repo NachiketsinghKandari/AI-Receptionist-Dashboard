@@ -35,6 +35,7 @@ function createColumns(
     calls: Map<string, CekuraCallData>;
     isLoading: boolean;
     isFullyLoaded: boolean;
+    hasError: boolean;
   }
 ): ColumnDef<CallListItem>[] {
   return [
@@ -118,6 +119,7 @@ function createColumns(
             callData={callData}
             isLoading={cekuraData.isLoading}
             isFullyLoaded={cekuraData.isFullyLoaded}
+            hasError={cekuraData.hasError}
           />
         );
       },
@@ -240,6 +242,7 @@ export default function CallsPage() {
     data: cekuraCallsData,
     isLoading: cekuraIsLoading,
     isFullyLoaded: cekuraIsFullyLoaded,
+    hasError: cekuraHasError,
   } = useCekuraCallMapping(
     showAll ? null : `${startDate}T00:00:00Z`,
     showAll ? null : `${endDate}T23:59:59Z`
@@ -250,7 +253,8 @@ export default function CallsPage() {
     calls: cekuraCallsData?.calls || new Map<string, CekuraCallData>(),
     isLoading: cekuraIsLoading,
     isFullyLoaded: cekuraIsFullyLoaded,
-  }), [cekuraCallsData, cekuraIsLoading, cekuraIsFullyLoaded]);
+    hasError: cekuraHasError,
+  }), [cekuraCallsData, cekuraIsLoading, cekuraIsFullyLoaded, cekuraHasError]);
 
   // Memoize columns with Sentry error, important call, mismatch, and Cekura data
   const columns = useMemo(

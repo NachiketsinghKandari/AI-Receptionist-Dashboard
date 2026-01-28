@@ -109,11 +109,17 @@ export function useCekuraCallMapping(startDate: string | null, endDate: string |
   const isBackfilling = needsFullFetch && fullQuery.isLoading;
   const isFullyLoaded = !isInitialLoading && (!needsFullFetch || !fullQuery.isLoading);
 
+  // Error state - helps debug API issues
+  const hasError = recentQuery.isError || fullQuery.isError;
+  const error = recentQuery.error || fullQuery.error;
+
   return {
     data: mergedData,
     isLoading: isInitialLoading,
     isBackfilling,
     isFullyLoaded,
+    hasError,
+    error,
   };
 }
 
