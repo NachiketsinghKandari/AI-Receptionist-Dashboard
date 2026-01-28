@@ -9,7 +9,7 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { FilterSidebar } from '@/components/filters/filter-sidebar';
+import { FilterSidebar, type DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { CallDetailPanel } from '@/components/details/call-detail-panel';
@@ -149,7 +149,7 @@ export default function CallsPage() {
   const [flaggedOnly, setFlaggedOnly] = useState(searchParams.get('flaggedOnly') === 'true');
 
   // Filter state
-  const [showAll, setShowAll] = useState(false);
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('today');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), DEFAULT_DAYS_BACK), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [search, setSearch] = useState('');
@@ -157,6 +157,7 @@ export default function CallsPage() {
   const [callType, setCallType] = useState('All');
   const [transferType, setTransferType] = useState('Off');
   const [multipleTransfers, setMultipleTransfers] = useState(false);
+  const [cekuraStatusFilter, setCekuraStatusFilter] = useState<'all' | 'success' | 'failure' | 'other'>('all');
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
   const [selectedCallId, setSelectedCallId] = useState<number | null>(null);
@@ -175,6 +176,83 @@ export default function CallsPage() {
     window.history.replaceState(null, '', url);
   };
 
+  // Compute effective date range based on filter mode
+  const effectiveDateRange = useMemo(() => {
+    if (dateFilterMode === 'all') {
+      return { startDate: null, endDate: null };
+    }
+    if (dateFilterMode === 'today') {
+      // Get today's date in US Eastern timezone
+      const now = new Date();
+      const usDateFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = usDateFormatter.formatToParts(now);
+      const year = parts.find(p => p.type === 'year')?.value;
+      const month = parts.find(p => p.type === 'month')?.value;
+      const day = parts.find(p => p.type === 'day')?.value;
+      const todayStr = `${year}-${month}-${day}`;
+      return {
+        startDate: `${todayStr}T00:00:00`,
+        endDate: `${todayStr}T23:59:59`,
+      };
+    }
+    // Custom mode
+    return {
+      startDate: `${startDate}T00:00:00`,
+      endDate: `${endDate}T23:59:59`,
+    };
+  }, [dateFilterMode, startDate, endDate]);
+
+  // Fetch Cekura call data (progressive loading - recent day first, then full range)
+  // This needs to be before callFilters so we can use it for Cekura status filtering
+  const {
+    data: cekuraCallsData,
+    isLoading: cekuraIsLoading,
+    isFullyLoaded: cekuraIsFullyLoaded,
+    hasError: cekuraHasError,
+  } = useCekuraCallMapping(
+    effectiveDateRange.startDate ? `${effectiveDateRange.startDate.split('T')[0]}T00:00:00Z` : null,
+    effectiveDateRange.endDate ? `${effectiveDateRange.endDate.split('T')[0]}T23:59:59Z` : null
+  );
+
+  // Compute correlation IDs to filter by based on Cekura status
+  const cekuraFilteredCorrelationIds = useMemo(() => {
+    if (cekuraStatusFilter === 'all' || !cekuraCallsData?.calls) {
+      return null; // No filtering
+    }
+
+    const matchingIds: string[] = [];
+    cekuraCallsData.calls.forEach((callData, correlationId) => {
+      const status = callData.status?.toLowerCase() || '';
+      if (cekuraStatusFilter === 'success' && (status === 'success' || status === 'completed')) {
+        matchingIds.push(correlationId);
+      } else if (cekuraStatusFilter === 'failure' && (status === 'failure' || status === 'failed' || status === 'error')) {
+        matchingIds.push(correlationId);
+      } else if (cekuraStatusFilter === 'other' &&
+                 status !== 'success' && status !== 'completed' &&
+                 status !== 'failure' && status !== 'failed' && status !== 'error') {
+        matchingIds.push(correlationId);
+      }
+    });
+
+    return matchingIds;
+  }, [cekuraStatusFilter, cekuraCallsData]);
+
+  // Date-only filters for total count (no other filters applied)
+  const dateOnlyFilters = useMemo(
+    () => ({
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
+      limit: 1, // Only need count, not data
+      offset: 0,
+    }),
+    [effectiveDateRange]
+  );
+
   // Build filters for regular calls
   const callFilters = useMemo(
     () => ({
@@ -182,30 +260,31 @@ export default function CallsPage() {
       callType: callType !== 'All' ? callType : null,
       transferType: transferType !== 'Off' ? transferType : null,
       multipleTransfers,
-      startDate: showAll ? null : `${startDate}T00:00:00`,
-      endDate: showAll ? null : `${endDate}T23:59:59`,
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
       limit,
       offset,
       sortBy,
       sortOrder,
+      correlationIds: cekuraFilteredCorrelationIds,
     }),
-    [firmId, callType, transferType, multipleTransfers, startDate, endDate, showAll, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [firmId, callType, transferType, multipleTransfers, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds]
   );
 
   // Build filters for flagged calls
   const flaggedFilters = useMemo(
     () => ({
       firmId,
-      startDate: showAll ? null : `${startDate}T00:00:00`,
-      endDate: showAll ? null : `${endDate}T23:59:59`,
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
       limit,
       offset,
       sortBy,
       sortOrder,
     }),
-    [firmId, startDate, endDate, showAll, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [firmId, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder]
   );
 
   // Handle column sorting
@@ -220,6 +299,9 @@ export default function CallsPage() {
     }
     setOffset(0); // Reset to first page when sorting changes
   };
+
+  // Date-only count query (for "Total" display)
+  const { data: dateOnlyData } = useCalls(dateOnlyFilters);
 
   // Use appropriate hook based on flaggedOnly mode
   const regularCallsQuery = useCalls(callFilters);
@@ -236,17 +318,6 @@ export default function CallsPage() {
 
   // Fetch transfer-email mismatch call IDs (runs in background)
   const { data: transferMismatchIds } = useTransferEmailMismatchIds();
-
-  // Fetch Cekura call data (progressive loading - recent day first, then full range)
-  const {
-    data: cekuraCallsData,
-    isLoading: cekuraIsLoading,
-    isFullyLoaded: cekuraIsFullyLoaded,
-    hasError: cekuraHasError,
-  } = useCekuraCallMapping(
-    showAll ? null : `${startDate}T00:00:00Z`,
-    showAll ? null : `${endDate}T23:59:59Z`
-  );
 
   // Memoize Cekura data for columns
   const cekuraData = useMemo(() => ({
@@ -313,8 +384,8 @@ export default function CallsPage() {
     <div className="flex h-full">
       {/* Filter Sidebar */}
       <FilterSidebar
-        showAll={showAll}
-        onShowAllChange={setShowAll}
+        dateFilterMode={dateFilterMode}
+        onDateFilterModeChange={setDateFilterMode}
         startDate={startDate}
         onStartDateChange={setStartDate}
         endDate={endDate}
@@ -360,6 +431,27 @@ export default function CallsPage() {
                     {type}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Cekura Status Filter - only show when not in flagged mode */}
+        {!flaggedOnly && (
+          <div>
+            <Label className="text-sm">Cekura Status</Label>
+            <Select
+              value={cekuraStatusFilter}
+              onValueChange={(v) => setCekuraStatusFilter(v as typeof cekuraStatusFilter)}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                <SelectItem value="failure">Failure</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -420,7 +512,10 @@ export default function CallsPage() {
           {/* Stats */}
           <div className="flex gap-4 mb-2">
             <div className="text-sm">
-              <span className="font-medium">Total:</span> {data?.total ?? 0}
+              <span className="font-medium">Total:</span> {dateOnlyData?.total ?? 0}
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Filtered:</span> {data?.total ?? 0}
             </div>
             <div className="text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}
@@ -466,8 +561,8 @@ export default function CallsPage() {
         hasPrevious={hasPrevious}
         hasNext={hasNext}
         dateRange={{
-          startDate: showAll ? null : `${startDate}T00:00:00Z`,
-          endDate: showAll ? null : `${endDate}T23:59:59Z`,
+          startDate: effectiveDateRange.startDate ? `${effectiveDateRange.startDate.split('T')[0]}T00:00:00Z` : null,
+          endDate: effectiveDateRange.endDate ? `${effectiveDateRange.endDate.split('T')[0]}T23:59:59Z` : null,
         }}
       />
     </div>

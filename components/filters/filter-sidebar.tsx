@@ -4,13 +4,15 @@ import { Search } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFirms } from '@/hooks/use-firms';
 import type { Firm } from '@/types/database';
 
+export type DateFilterMode = 'custom' | 'today' | 'all';
+
 interface FilterSidebarProps {
-  showAll: boolean;
-  onShowAllChange: (value: boolean) => void;
+  dateFilterMode: DateFilterMode;
+  onDateFilterModeChange: (value: DateFilterMode) => void;
   startDate: string;
   onStartDateChange: (value: string) => void;
   endDate: string;
@@ -26,8 +28,8 @@ interface FilterSidebarProps {
 }
 
 export function FilterSidebar({
-  showAll,
-  onShowAllChange,
+  dateFilterMode,
+  onDateFilterModeChange,
   startDate,
   onStartDateChange,
   endDate,
@@ -50,20 +52,31 @@ export function FilterSidebar({
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         <h2 className="font-semibold text-lg">Filters</h2>
 
-        {/* Show All */}
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="showAll"
-            checked={showAll}
-            onCheckedChange={(checked) => onShowAllChange(checked === true)}
-          />
-          <Label htmlFor="showAll" className="text-sm cursor-pointer">
-            Show all data
-          </Label>
+        {/* Date Filter Mode */}
+        <div className="space-y-2">
+          <Label className="text-sm">Date Filtering</Label>
+          <ToggleGroup
+            type="single"
+            value={dateFilterMode}
+            onValueChange={(value) => {
+              if (value) onDateFilterModeChange(value as DateFilterMode);
+            }}
+            className="justify-start"
+          >
+            <ToggleGroupItem value="today" size="sm" className="text-xs">
+              Today
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" size="sm" className="text-xs">
+              All Data
+            </ToggleGroupItem>
+            <ToggleGroupItem value="custom" size="sm" className="text-xs">
+              Custom
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
-        {/* Date Range */}
-        {!showAll && (
+        {/* Date Range - only show for custom mode */}
+        {dateFilterMode === 'custom' && (
           <div className="space-y-2">
             <div>
               <Label htmlFor="startDate" className="text-sm">

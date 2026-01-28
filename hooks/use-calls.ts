@@ -21,6 +21,9 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   if (filters.sortBy) params.set('sortBy', filters.sortBy);
   if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
   if (filters.multipleTransfers) params.set('multipleTransfers', 'true');
+  if (filters.correlationIds && filters.correlationIds.length > 0) {
+    params.set('correlationIds', filters.correlationIds.join(','));
+  }
 
   const response = await fetch(`/api/calls?${params}`);
   if (!response.ok) throw new Error('Failed to fetch calls');

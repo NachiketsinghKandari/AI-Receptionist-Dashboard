@@ -5,7 +5,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Mail } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FilterSidebar } from '@/components/filters/filter-sidebar';
+import { FilterSidebar, type DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useEmails } from '@/hooks/use-emails';
@@ -82,7 +82,7 @@ const columns: ColumnDef<Email>[] = [
 ];
 
 export default function EmailsPage() {
-  const [showAll, setShowAll] = useState(false);
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('today');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), DEFAULT_DAYS_BACK), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [search, setSearch] = useState('');
@@ -95,18 +95,53 @@ export default function EmailsPage() {
 
   const debouncedSearch = useDebounce(search, 300);
 
+  // Compute effective date range based on filter mode
+  const effectiveDateRange = useMemo(() => {
+    if (dateFilterMode === 'all') {
+      return { startDate: null, endDate: null };
+    }
+    if (dateFilterMode === 'today') {
+      const now = new Date();
+      const usDateFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = usDateFormatter.formatToParts(now);
+      const year = parts.find(p => p.type === 'year')?.value;
+      const month = parts.find(p => p.type === 'month')?.value;
+      const day = parts.find(p => p.type === 'day')?.value;
+      const todayStr = `${year}-${month}-${day}`;
+      return { startDate: `${todayStr}T00:00:00`, endDate: `${todayStr}T23:59:59` };
+    }
+    // custom mode
+    return { startDate: `${startDate}T00:00:00`, endDate: `${endDate}T23:59:59` };
+  }, [dateFilterMode, startDate, endDate]);
+
+  // Date-only filters for total count (no other filters applied)
+  const dateOnlyFilters = useMemo(
+    () => ({
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
+      limit: 1,
+      offset: 0,
+    }),
+    [effectiveDateRange]
+  );
+
   const filters = useMemo(
     () => ({
       firmId,
-      startDate: showAll ? null : `${startDate}T00:00:00`,
-      endDate: showAll ? null : `${endDate}T23:59:59`,
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
       limit,
       offset,
       sortBy,
       sortOrder,
     }),
-    [firmId, startDate, endDate, showAll, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [firmId, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
   );
 
   // Handle column sorting
@@ -119,6 +154,9 @@ export default function EmailsPage() {
     }
     setOffset(0);
   };
+
+  // Date-only count query (for "Total" display)
+  const { data: dateOnlyData } = useEmails(dateOnlyFilters);
 
   const { data, isLoading, isFetching } = useEmails(filters);
 
@@ -140,8 +178,8 @@ export default function EmailsPage() {
   return (
     <div className="flex h-full">
       <FilterSidebar
-        showAll={showAll}
-        onShowAllChange={setShowAll}
+        dateFilterMode={dateFilterMode}
+        onDateFilterModeChange={setDateFilterMode}
         startDate={startDate}
         onStartDateChange={setStartDate}
         endDate={endDate}
@@ -165,7 +203,10 @@ export default function EmailsPage() {
 
           <div className="flex gap-4 mb-2">
             <div className="text-sm">
-              <span className="font-medium">Total:</span> {data?.total ?? 0}
+              <span className="font-medium">Total:</span> {dateOnlyData?.total ?? 0}
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Filtered:</span> {data?.total ?? 0}
             </div>
             <div className="text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}

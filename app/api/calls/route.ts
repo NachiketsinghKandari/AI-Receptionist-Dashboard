@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const search = searchParams.get('search')?.trim() || null;
     const multipleTransfers = searchParams.get('multipleTransfers') === 'true';
+    // Cekura status filter - comma-separated list of correlation IDs
+    const correlationIds = searchParams.get('correlationIds')?.trim() || null;
 
     const { limit, offset } = validatePagination(
       parseIntOrDefault(searchParams.get('limit'), DEFAULT_PAGE_LIMIT),
@@ -147,6 +149,20 @@ export async function GET(request: NextRequest) {
     }
     if (platformCallIdsWithMultipleTransfers) {
       query = query.in('platform_call_id', platformCallIdsWithMultipleTransfers);
+    }
+    // Filter by specific correlation IDs (for Cekura status filtering)
+    if (correlationIds) {
+      const ids = correlationIds.split(',').filter(id => id.length > 0);
+      if (ids.length === 0) {
+        // No matching correlation IDs - return empty result
+        return NextResponse.json({
+          data: [],
+          total: 0,
+          limit,
+          offset,
+        });
+      }
+      query = query.in('platform_call_id', ids);
     }
     if (startDate) {
       query = query.gte('started_at', startDate);

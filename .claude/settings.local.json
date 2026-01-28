@@ -20,7 +20,8 @@
       "Bash(grep:*)",
       "Bash(python3:*)",
       "WebSearch",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(curl:*)"
     ]
   }
 }

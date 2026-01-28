@@ -25,6 +25,7 @@ export interface CallFilters extends BaseFilters {
   transferType?: string | null;
   platformCallId?: string | null;
   multipleTransfers?: boolean;
+  correlationIds?: string[] | null;
 }
 
 export interface EmailFilters extends BaseFilters {
