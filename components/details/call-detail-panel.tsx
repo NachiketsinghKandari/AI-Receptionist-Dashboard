@@ -971,12 +971,13 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
   // Map dashboard environment to Sentry environment for URL
   const sentryEnv = SENTRY_ENV_MAP[environment] || environment;
 
-  // Fetch Cekura call mapping for the date range (progressive loading)
+  // Fetch Cekura call data for the date range (progressive loading)
   const { data: cekuraData, isLoading: cekuraLoading, isFullyLoaded: cekuraFullyLoaded } = useCekuraCallMapping(
     dateRange?.startDate || null,
     dateRange?.endDate || null
   );
-  const cekuraCallId = platformCallId ? cekuraData?.mapping.get(platformCallId) : undefined;
+  const cekuraCallInfo = platformCallId ? cekuraData?.calls.get(platformCallId) : undefined;
+  const cekuraCallId = cekuraCallInfo?.cekuraId;
 
   // Track which callId has been acknowledged for each tab (avoids useEffect reset)
   const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | null>(null);

@@ -1,6 +1,6 @@
 /**
  * Cekura call mapping API route - server-only proxy
- * Fetches call mappings from Cekura API to map correlation_id -> cekura_call_id
+ * Fetches call data from Cekura API including status and evaluation metrics
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,9 +12,22 @@ const CEKURA_AGENT_IDS: Record<string, number> = {
   staging: 11005,
 };
 
+interface CekuraMetric {
+  type: string;
+  name: string;
+  score_normalized: number;
+  explanation: string;
+}
+
+interface CekuraEvaluation {
+  metrics: CekuraMetric[];
+}
+
 interface CekuraCallResult {
   id: number;
   call_id: string; // This is our correlation_id (platform_call_id)
+  status: string;
+  evaluation?: CekuraEvaluation;
 }
 
 interface CekuraApiResponse {
@@ -22,6 +35,17 @@ interface CekuraApiResponse {
   next: string | null;
   previous: string | null;
   results: CekuraCallResult[];
+}
+
+// Simplified call data to return to the client
+export interface CekuraCallData {
+  cekuraId: number;
+  status: string;
+  metrics: Array<{
+    name: string;
+    score: number;
+    explanation: string;
+  }>;
 }
 
 export async function GET(request: NextRequest) {
@@ -64,17 +88,30 @@ export async function GET(request: NextRequest) {
       nextUrl = data.next;
     }
 
-    // Build mapping: correlation_id -> cekura_call_id
-    const mapping: Record<string, number> = {};
+    // Build mapping: correlation_id -> full call data
+    const calls: Record<string, CekuraCallData> = {};
     for (const result of allResults) {
       if (result.call_id) {
-        mapping[result.call_id] = result.id;
+        // Filter metrics to only include binary_ types
+        const binaryMetrics = (result.evaluation?.metrics || [])
+          .filter(m => m.type?.includes('binary_'))
+          .map(m => ({
+            name: m.name,
+            score: m.score_normalized,
+            explanation: m.explanation || '',
+          }));
+
+        calls[result.call_id] = {
+          cekuraId: result.id,
+          status: result.status || 'unknown',
+          metrics: binaryMetrics,
+        };
       }
     }
 
     return NextResponse.json({
-      mapping,
-      count: Object.keys(mapping).length,
+      calls,
+      count: Object.keys(calls).length,
       agentId,
     });
   } catch (error) {

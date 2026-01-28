@@ -5,8 +5,21 @@ import { useQuery } from '@tanstack/react-query';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { CACHE_TTL_DATA } from '@/lib/constants';
 
-interface CekuraCallMappingResponse {
-  mapping: Record<string, number>; // correlation_id -> cekura_call_id
+// Types for Cekura call data
+export interface CekuraMetric {
+  name: string;
+  score: number;
+  explanation: string;
+}
+
+export interface CekuraCallData {
+  cekuraId: number;
+  status: string;
+  metrics: CekuraMetric[];
+}
+
+interface CekuraApiResponse {
+  calls: Record<string, CekuraCallData>; // correlation_id -> call data
   count: number;
   agentId: number;
 }
@@ -17,11 +30,11 @@ const CEKURA_AGENT_IDS: Record<string, number> = {
   staging: 11005,
 };
 
-async function fetchCekuraCallMapping(
+async function fetchCekuraCallData(
   startDate: string,
   endDate: string,
   environment: string
-): Promise<CekuraCallMappingResponse> {
+): Promise<CekuraApiResponse> {
   const params = new URLSearchParams({
     startDate,
     endDate,
@@ -30,36 +43,38 @@ async function fetchCekuraCallMapping(
 
   const response = await fetch(`/api/cekura/call-mapping?${params}`);
   if (!response.ok) {
-    throw new Error('Failed to fetch Cekura call mapping');
+    throw new Error('Failed to fetch Cekura call data');
   }
   return response.json();
 }
 
 /**
- * Get the date string for "yesterday" relative to a given end date.
- * Returns a date 1 day before the end date.
+ * Get the start of the previous day relative to a given end date.
+ * This ensures we fetch a full day's worth of calls, not just 24 hours.
+ * e.g., if endDate is "2026-01-28T23:59:59Z", returns "2026-01-27T00:00:00.000Z"
  */
-function getOneDayBefore(dateStr: string): string {
+function getStartOfPreviousDay(dateStr: string): string {
   const date = new Date(dateStr);
-  date.setDate(date.getDate() - 1);
+  date.setUTCDate(date.getUTCDate() - 1);
+  date.setUTCHours(0, 0, 0, 0);
   return date.toISOString();
 }
 
 /**
- * Hook to fetch Cekura call ID mappings with progressive loading.
+ * Hook to fetch Cekura call data with progressive loading.
  * First fetches the most recent day (fast), then backfills the full range.
  * Returns merged results from both queries.
  */
 export function useCekuraCallMapping(startDate: string | null, endDate: string | null) {
   const { environment } = useEnvironment();
 
-  // Calculate the "recent" date range (last 1 day)
-  const recentStartDate = endDate ? getOneDayBefore(endDate) : null;
+  // Calculate the "recent" date range (yesterday + today)
+  const recentStartDate = endDate ? getStartOfPreviousDay(endDate) : null;
 
   // First query: fetch just the last day (fast initial load)
   const recentQuery = useQuery({
-    queryKey: ['cekura', 'call-mapping', 'recent', recentStartDate, endDate, environment],
-    queryFn: () => fetchCekuraCallMapping(recentStartDate!, endDate!, environment),
+    queryKey: ['cekura', 'call-data', 'recent', recentStartDate, endDate, environment],
+    queryFn: () => fetchCekuraCallData(recentStartDate!, endDate!, environment),
     enabled: !!recentStartDate && !!endDate,
     staleTime: CACHE_TTL_DATA * 1000,
   });
@@ -68,23 +83,23 @@ export function useCekuraCallMapping(startDate: string | null, endDate: string |
   // Only fetch if startDate is different from recentStartDate (i.e., more than 1 day range)
   const needsFullFetch = Boolean(startDate && recentStartDate && startDate < recentStartDate);
   const fullQuery = useQuery({
-    queryKey: ['cekura', 'call-mapping', 'full', startDate, endDate, environment],
-    queryFn: () => fetchCekuraCallMapping(startDate!, endDate!, environment),
+    queryKey: ['cekura', 'call-data', 'full', startDate, endDate, environment],
+    queryFn: () => fetchCekuraCallData(startDate!, endDate!, environment),
     enabled: Boolean(startDate && endDate && needsFullFetch),
     staleTime: CACHE_TTL_DATA * 1000,
   });
 
-  // Merge mappings: full query takes precedence when available
+  // Merge call data: full query takes precedence when available
   const mergedData = useMemo(() => {
-    const recentMapping: Record<string, number> = recentQuery.data?.mapping || {};
-    const fullMapping: Record<string, number> = fullQuery.data?.mapping || {};
+    const recentCalls: Record<string, CekuraCallData> = recentQuery.data?.calls || {};
+    const fullCalls: Record<string, CekuraCallData> = fullQuery.data?.calls || {};
     const agentId = fullQuery.data?.agentId || recentQuery.data?.agentId || CEKURA_AGENT_IDS.production;
 
     // Merge: start with recent, overlay with full (full has complete data)
-    const merged = { ...recentMapping, ...fullMapping };
+    const merged = { ...recentCalls, ...fullCalls };
 
     return {
-      mapping: new Map(Object.entries(merged)),
+      calls: new Map(Object.entries(merged)),
       agentId,
     };
   }, [recentQuery.data, fullQuery.data]);

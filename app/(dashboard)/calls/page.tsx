@@ -13,9 +13,11 @@ import { FilterSidebar } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { CallDetailPanel } from '@/components/details/call-detail-panel';
+import { CekuraStatus } from '@/components/cekura/cekura-status';
 import { useCalls, useCallDetail, useImportantCallIds, useTransferEmailMismatchIds } from '@/hooks/use-calls';
 import { useFlaggedCalls } from '@/hooks/use-flagged-calls';
 import { useSentryErrorCorrelationIds } from '@/hooks/use-sentry-events';
+import { useCekuraCallMapping, type CekuraCallData } from '@/hooks/use-cekura';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants';
 import { formatDuration } from '@/lib/formatting';
@@ -24,11 +26,16 @@ import type { SortOrder, FlaggedCallListItem } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { format, subDays } from 'date-fns';
 
-// Helper to create columns with error, important, and mismatch state access
+// Helper to create columns with error, important, mismatch, and Cekura state access
 function createColumns(
   errorCorrelationIds: Set<string> | undefined,
   importantCallIds: Set<number> | undefined,
-  transferMismatchIds: Set<number> | undefined
+  transferMismatchIds: Set<number> | undefined,
+  cekuraData: {
+    calls: Map<string, CekuraCallData>;
+    isLoading: boolean;
+    isFullyLoaded: boolean;
+  }
 ): ColumnDef<CallListItem>[] {
   return [
     {
@@ -96,6 +103,22 @@ function createColumns(
           <Badge variant={variant} className={className}>
             {status}
           </Badge>
+        );
+      },
+    },
+    {
+      id: 'cekura_status',
+      header: 'Cekura Status',
+      cell: ({ row }) => {
+        const correlationId = row.original.platform_call_id;
+        const callData = correlationId ? cekuraData.calls.get(correlationId) : undefined;
+
+        return (
+          <CekuraStatus
+            callData={callData}
+            isLoading={cekuraData.isLoading}
+            isFullyLoaded={cekuraData.isFullyLoaded}
+          />
         );
       },
     },
@@ -212,10 +235,27 @@ export default function CallsPage() {
   // Fetch transfer-email mismatch call IDs (runs in background)
   const { data: transferMismatchIds } = useTransferEmailMismatchIds();
 
-  // Memoize columns with Sentry error, important call, and mismatch data
+  // Fetch Cekura call data (progressive loading - recent day first, then full range)
+  const {
+    data: cekuraCallsData,
+    isLoading: cekuraIsLoading,
+    isFullyLoaded: cekuraIsFullyLoaded,
+  } = useCekuraCallMapping(
+    showAll ? null : `${startDate}T00:00:00Z`,
+    showAll ? null : `${endDate}T23:59:59Z`
+  );
+
+  // Memoize Cekura data for columns
+  const cekuraData = useMemo(() => ({
+    calls: cekuraCallsData?.calls || new Map<string, CekuraCallData>(),
+    isLoading: cekuraIsLoading,
+    isFullyLoaded: cekuraIsFullyLoaded,
+  }), [cekuraCallsData, cekuraIsLoading, cekuraIsFullyLoaded]);
+
+  // Memoize columns with Sentry error, important call, mismatch, and Cekura data
   const columns = useMemo(
-    () => createColumns(errorCorrelationIds, importantCallIds, transferMismatchIds),
-    [errorCorrelationIds, importantCallIds, transferMismatchIds]
+    () => createColumns(errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData),
+    [errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData]
   );
 
   const handleRowSelect = (row: CallListItem | FlaggedCallListItem | null) => {
@@ -401,7 +441,7 @@ export default function CallsPage() {
             onOffsetChange={setOffset}
             onRowSelect={handleRowSelect}
             selectedRowId={selectedCallId}
-            isLoading={isLoading}
+            isLoading={isLoading || cekuraIsLoading}
             isFetching={isFetching}
             getRowId={(row) => String(row.id)}
             sortBy={sortBy}
