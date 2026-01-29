@@ -28,6 +28,7 @@ export interface FilterSidebarProps {
   onLimitChange: (value: number) => void;
   children?: React.ReactNode;
   className?: string;
+  hideHeader?: boolean;
 }
 
 export function FilterSidebar({
@@ -47,6 +48,7 @@ export function FilterSidebar({
   onLimitChange,
   children,
   className,
+  hideHeader,
 }: FilterSidebarProps) {
   const { data: firmsData } = useFirms();
   // Sort firms by ID (ascending)
@@ -55,7 +57,7 @@ export function FilterSidebar({
   return (
     <div className={cn("w-64 shrink-0 flex flex-col bg-card border-r border-border", className)}>
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-        <h2 className="font-semibold text-lg">Filters</h2>
+        {!hideHeader && <h2 className="font-semibold text-lg">Filters</h2>}
 
         {/* Date Filter Mode */}
         <div className="space-y-2">

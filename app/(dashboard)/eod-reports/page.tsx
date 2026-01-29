@@ -407,16 +407,16 @@ export default function EODReportsPage() {
         </div>
       </div>
 
-      {/* Mobile: Floating Action Button + Drawer */}
+      {/* Mobile: Centered bottom frosted glass tab + Drawer */}
       <Drawer>
         <DrawerTrigger asChild>
-          <Button
-            size="icon"
-            className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg md:hidden"
+          <button
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-gray-900/80 via-gray-800/80 to-gray-900/80 dark:from-white/80 dark:via-gray-100/80 dark:to-white/80 backdrop-blur-xl border border-white/30 dark:border-black/20 shadow-[0_4px_20px_rgba(0,0,0,0.4)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] md:hidden text-white dark:text-gray-900 font-medium ring-1 ring-white/10 dark:ring-black/10"
             aria-label="Generate Report"
           >
-            <CalendarPlus className="h-6 w-6" />
-          </Button>
+            <CalendarPlus className="h-4 w-4" />
+            <span className="text-sm">Generate</span>
+          </button>
         </DrawerTrigger>
         <DrawerContent className="max-h-[85vh]">
           <DrawerHeader>
@@ -469,7 +469,7 @@ export default function EODReportsPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             sortableColumns={['report_date', 'generated_at']}
-            mobileHiddenColumns={['trigger_type', 'generated_at']}
+            mobileHiddenColumns={['call_count', 'error_count', 'trigger_type', 'generated_at']}
           />
         </div>
       </div>
@@ -606,24 +606,24 @@ function EODReportDetailPanel({
       />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 w-full md:w-[calc(100vw-280px)] md:max-w-[1600px] bg-background z-50 flex flex-col border-l shadow-xl">
+      <div className="fixed inset-y-0 right-0 w-full md:w-[calc(100vw-280px)] md:max-w-[1600px] bg-background z-50 flex flex-col border-l shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b bg-muted/50">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onClose}>
+        <div className="shrink-0 flex items-center justify-between px-3 md:px-4 py-3 border-b bg-muted/50 gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
               <X className="h-4 w-4" />
             </Button>
-            <div>
-              <h2 className="font-semibold flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                EOD Report - {report.report_date}
+            <div className="min-w-0">
+              <h2 className="font-semibold flex items-center gap-2 text-sm md:text-base">
+                <FileText className="h-4 w-4 shrink-0" />
+                <span className="truncate">EOD Report - {report.report_date}</span>
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 Generated: {report.generated_at ? format(new Date(report.generated_at), 'PPpp') : 'N/A'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -645,17 +645,17 @@ function EODReportDetailPanel({
 
         {/* Mobile: Tabbed layout */}
         {isMobile && (
-          <Tabs defaultValue="info" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="shrink-0 mx-4 mt-2">
-              <TabsTrigger value="info">Info</TabsTrigger>
-              <TabsTrigger value="reports">AI Reports</TabsTrigger>
+          <Tabs defaultValue="info" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <TabsList className="shrink-0 mx-2 mt-2 w-auto">
+              <TabsTrigger value="info" className="text-xs px-3">Info</TabsTrigger>
+              <TabsTrigger value="reports" className="text-xs px-3">AI Reports</TabsTrigger>
             </TabsList>
-            <TabsContent value="info" className="flex-1 min-h-0 mt-0">
+            <TabsContent value="info" className="flex-1 min-h-0 mt-0 overflow-hidden">
               <ScrollArea className="h-full">
-                <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} />
+                <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} isMobile />
               </ScrollArea>
             </TabsContent>
-            <TabsContent value="reports" className="flex-1 min-h-0 mt-0">
+            <TabsContent value="reports" className="flex-1 min-h-0 mt-0 overflow-hidden">
               <ScrollArea className="h-full">
                 <EODRightPanel
                   report={report}
@@ -668,6 +668,7 @@ function EODReportDetailPanel({
                   successError={successError}
                   failureError={failureError}
                   fullError={fullError}
+                  isMobile
                 />
               </ScrollArea>
             </TabsContent>
@@ -682,7 +683,7 @@ function EODReportDetailPanel({
               className="h-full overflow-hidden"
               style={{ width: `${leftPercent}%` }}
             >
-              <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} />
+              <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} isMobile={false} />
             </div>
 
             {/* Resize Handle */}
@@ -708,6 +709,7 @@ function EODReportDetailPanel({
                 successError={successError}
                 failureError={failureError}
                 fullError={fullError}
+                isMobile={false}
               />
             </div>
           </div>
@@ -756,10 +758,12 @@ function EODLeftPanel({
   report,
   rawData,
   previousReport,
+  isMobile = false,
 }: {
   report: EODReport;
   rawData: EODRawData;
   previousReport: EODReport | null;
+  isMobile?: boolean;
 }) {
   const { environment } = useEnvironment();
 
@@ -802,95 +806,101 @@ function EODLeftPanel({
   const successChange = previousReport ? calcPercentChange(successCount, prevSuccessCount) : null;
 
   return (
-    <div className="p-4 h-full flex flex-col gap-4">
+    <div className={cn(
+      "h-full flex flex-col gap-3 overflow-x-hidden overflow-y-auto w-full max-w-full",
+      isMobile ? "p-2" : "p-4 gap-4"
+    )}>
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-3 shrink-0">
+      <div className="grid grid-cols-3 gap-1.5 md:gap-3 shrink-0">
         <Card>
-          <CardContent className="p-3">
+          <CardContent className="p-2 md:p-3">
             <div className="flex items-baseline">
-              <span className="text-xl font-bold">{totalCalls}</span>
+              <span className="text-base md:text-xl font-bold">{totalCalls}</span>
               <ChangeIndicator change={totalChange} />
             </div>
-            <div className="text-xs text-muted-foreground">Total Calls</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">Total</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-3">
+          <CardContent className="p-2 md:p-3">
             <div className="flex items-baseline">
-              <span className="text-xl font-bold text-red-500">{errorCount}</span>
+              <span className="text-base md:text-xl font-bold text-red-500">{errorCount}</span>
               <ChangeIndicator change={errorChange} inverted />
             </div>
-            <div className="text-xs text-muted-foreground">Failed</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">Failed</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-3">
+          <CardContent className="p-2 md:p-3">
             <div className="flex items-baseline">
-              <span className="text-xl font-bold text-green-500">{successCount}</span>
+              <span className="text-base md:text-xl font-bold text-green-500">{successCount}</span>
               <ChangeIndicator change={successChange} />
             </div>
-            <div className="text-xs text-muted-foreground">Success</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">Success</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Metadata */}
       <Card className="shrink-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Report Metadata</CardTitle>
+        <CardHeader className="pb-2 px-2 md:px-4 pt-2 md:pt-4">
+          <CardTitle className="text-xs md:text-sm">Report Metadata</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <span className="text-muted-foreground">Report Date:</span>{' '}
+        <CardContent className={cn(
+          "gap-1.5 text-xs md:text-sm px-2 md:px-4 pb-2 md:pb-4",
+          isMobile ? "flex flex-col" : "grid grid-cols-2 gap-2"
+        )}>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Date:</span>
             <span className="font-medium">{report.report_date}</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Environment:</span>{' '}
-            <Badge variant="outline">{rawData?.environment}</Badge>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Env:</span>
+            <Badge variant="outline" className="text-[10px] md:text-xs h-5">{rawData?.environment}</Badge>
           </div>
-          <div>
-            <span className="text-muted-foreground">Trigger:</span>{' '}
-            <Badge variant="outline">{report.trigger_type}</Badge>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Trigger:</span>
+            <Badge variant="outline" className="text-[10px] md:text-xs h-5">{report.trigger_type}</Badge>
           </div>
-          <div>
-            <span className="text-muted-foreground">Generated:</span>{' '}
-            <span>{rawData?.generated_at ? format(new Date(rawData.generated_at), 'PP HH:mm') : 'N/A'}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Generated:</span>
+            <span className="truncate">{rawData?.generated_at ? format(new Date(rawData.generated_at), isMobile ? 'PP' : 'PP HH:mm') : 'N/A'}</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Tabs for Raw Data and Errors - fills remaining space */}
-      <Tabs defaultValue="errors" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="shrink-0">
-          <TabsTrigger value="errors">
-            <AlertCircle className="h-4 w-4 mr-1" />
+      <Tabs defaultValue="errors" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <TabsList className="shrink-0 w-full">
+          <TabsTrigger value="errors" className="text-xs flex-1">
+            <AlertCircle className="h-3 w-3 mr-1" />
             Errors ({failureCalls.length})
           </TabsTrigger>
-          <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
+          <TabsTrigger value="raw-data" className="text-xs flex-1">Raw</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="errors" className="mt-3 flex-1 min-h-0 flex flex-col">
+        <TabsContent value="errors" className="mt-2 flex-1 min-h-0 flex flex-col overflow-hidden">
           {failureCalls.length > 0 ? (
-            <Card className="flex-1 flex flex-col min-h-0">
-              <CardContent className="p-3 space-y-2 flex-1 overflow-y-auto">
+            <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <CardContent className="p-2 space-y-1.5 flex-1 overflow-y-auto overflow-x-hidden">
                 {failureCalls.map((call) => (
                   <div
                     key={call.correlation_id}
-                    className="p-2 bg-red-50 dark:bg-red-900/10 rounded-md text-sm"
+                    className="p-2 bg-red-50 dark:bg-red-900/10 rounded-md text-sm overflow-hidden"
                   >
                     {/* Single row: Status | Correlation ID | Copy | VAPI | Cekura */}
-                    <div className="flex items-center gap-2">
-                      <Badge variant="destructive" className="text-xs shrink-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Badge variant="destructive" className="text-[10px] shrink-0">
                         {call.cekura.status}
                       </Badge>
-                      <span className="font-mono text-xs truncate flex-1" title={call.correlation_id}>
+                      <span className="font-mono text-[10px] truncate min-w-0 flex-1" title={call.correlation_id}>
                         {call.correlation_id}
                       </span>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <CopyButton value={call.correlation_id} className="h-6 w-6" />
+                      <div className="flex items-center shrink-0">
+                        <CopyButton value={call.correlation_id} className="h-5 w-5" />
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" asChild>
                               <a
                                 href={`https://dashboard.vapi.ai/calls/${call.correlation_id}`}
                                 target="_blank"
@@ -905,7 +915,7 @@ function EODLeftPanel({
                         {call.cekura?.id && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" asChild>
                                 <a
                                   href={buildCekuraUrl(call.cekura.id, environment)}
                                   target="_blank"
@@ -923,14 +933,14 @@ function EODLeftPanel({
 
                     {/* Error message (if any) */}
                     {call.cekura.error_message && (
-                      <div className="mt-1 text-xs text-red-600 dark:text-red-400 pl-1">
+                      <div className="mt-1 text-[10px] text-red-600 dark:text-red-400 pl-1 break-words">
                         {call.cekura.error_message}
                       </div>
                     )}
 
                     {/* Sentry errors (if any) */}
                     {call.sentry.errors.length > 0 && (
-                      <div className="mt-1 text-xs text-muted-foreground pl-1">
+                      <div className="mt-1 text-[10px] text-muted-foreground pl-1 break-words">
                         <span className="font-medium">Sentry:</span> {call.sentry.errors.map((e) => e.title).join(', ')}
                       </div>
                     )}
@@ -948,14 +958,16 @@ function EODLeftPanel({
           )}
         </TabsContent>
 
-        <TabsContent value="raw-data" className="mt-3 flex-1 min-h-0 flex flex-col">
-          <Card className="flex-1 flex flex-col min-h-0">
+        <TabsContent value="raw-data" className="mt-3 flex-1 min-h-0 flex flex-col overflow-hidden">
+          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <CardHeader className="pb-2 flex flex-row items-center justify-between shrink-0">
-              <CardTitle className="text-sm">Raw Data (JSON)</CardTitle>
+              <CardTitle className="text-xs md:text-sm">Raw Data</CardTitle>
               <CopyButton value={JSON.stringify(rawData, null, 2)} />
             </CardHeader>
-            <CardContent className="flex-1 min-h-0 overflow-y-auto">
-              <JsonViewer data={rawData} collapsed={false} />
+            <CardContent className="flex-1 min-h-0 overflow-auto p-2">
+              <div className="text-[10px] md:text-xs overflow-x-auto">
+                <JsonViewer data={rawData} collapsed={false} />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -979,6 +991,7 @@ interface EODRightPanelProps {
   successError?: string;
   failureError?: string;
   fullError?: string;
+  isMobile?: boolean;
 }
 
 function EODRightPanel({
@@ -992,6 +1005,7 @@ function EODRightPanel({
   successError,
   failureError,
   fullError,
+  isMobile = false,
 }: EODRightPanelProps) {
   const hasFailureReport = report.failure_report !== null;
   const hasSuccessReport = report.success_report !== null;
@@ -1006,41 +1020,44 @@ function EODRightPanel({
   const defaultTab = hasFailures ? 'failure' : 'full';
 
   return (
-    <div className="p-4 h-full flex flex-col">
-      <h3 className="font-semibold mb-3 flex items-center gap-2 shrink-0">
-        <Sparkles className="h-4 w-4" />
+    <div className={cn(
+      "h-full flex flex-col overflow-hidden w-full max-w-full",
+      isMobile ? "p-2" : "p-4"
+    )}>
+      <h3 className="font-semibold mb-2 md:mb-3 flex items-center gap-2 shrink-0 text-sm md:text-base">
+        <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
         AI Reports
       </h3>
 
-      <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col min-h-0">
+      <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <TabsList className="w-full shrink-0">
-          <TabsTrigger value="failure" className="flex-1">
-            Failure
+          <TabsTrigger value="failure" className="flex-1 text-xs md:text-sm px-2 md:px-3">
+            Fail
             {!hasFailureReport && (
-              <Badge variant="secondary" className="ml-1 text-xs">
-                {isRetryingFailure ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Pending'}
+              <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
+                {isRetryingFailure ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="success" className="flex-1">
-            Success
+          <TabsTrigger value="success" className="flex-1 text-xs md:text-sm px-2 md:px-3">
+            OK
             {!hasSuccessReport && (
-              <Badge variant="secondary" className="ml-1 text-xs">
-                {isRetryingSuccess ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Pending'}
+              <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
+                {isRetryingSuccess ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="full" className="flex-1">
+          <TabsTrigger value="full" className="flex-1 text-xs md:text-sm px-2 md:px-3">
             Full
             {!hasFullReport && (
-              <Badge variant="secondary" className="ml-1 text-xs">
-                {isRetryingFull ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Pending'}
+              <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
+                {isRetryingFull ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
               </Badge>
             )}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="failure" className="mt-3 flex-1 min-h-0 overflow-y-auto">
+        <TabsContent value="failure" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           <ReportContent
             report={report}
             content={report.failure_report}
@@ -1051,7 +1068,7 @@ function EODRightPanel({
           />
         </TabsContent>
 
-        <TabsContent value="success" className="mt-3 flex-1 min-h-0 overflow-y-auto">
+        <TabsContent value="success" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           <ReportContent
             report={report}
             content={report.success_report}
@@ -1062,7 +1079,7 @@ function EODRightPanel({
           />
         </TabsContent>
 
-        <TabsContent value="full" className="mt-3 flex-1 min-h-0 overflow-y-auto">
+        <TabsContent value="full" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           <ReportContent
             report={report}
             content={report.full_report}
@@ -1107,36 +1124,36 @@ function ReportContent({
 
   if (hasReport) {
     return (
-      <Card>
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 px-2 md:px-4">
+          <CardTitle className="text-xs md:text-sm flex items-center gap-1.5 min-w-0">
             <Sparkles className={cn(
-              'h-4 w-4',
+              'h-3 w-3 md:h-4 md:w-4 shrink-0',
               reportType === 'success' && 'text-green-500',
               reportType === 'failure' && 'text-red-500',
               reportType === 'full' && 'text-blue-500'
             )} />
-            {title}
+            <span className="truncate">{title}</span>
           </CardTitle>
-          <div className="flex gap-1">
+          <div className="flex gap-0.5 shrink-0">
             <PDFExportButton
               contentRef={markdownRef}
               filename={`eod-${reportType}-report-${report.report_date}`}
             />
-            <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
-              <Copy className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
+              <Copy className="h-3 w-3 md:h-4 md:w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={onRetry} disabled={isRetrying} title="Regenerate">
+            <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={onRetry} disabled={isRetrying} title="Regenerate">
               {isRetrying ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
               ) : (
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
               )}
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div ref={markdownRef} className="bg-background">
+        <CardContent className="px-2 md:px-4 pb-2 md:pb-4 overflow-hidden">
+          <div ref={markdownRef} className="bg-background overflow-x-auto text-xs md:text-sm">
             <MarkdownReport content={content || ''} />
           </div>
         </CardContent>

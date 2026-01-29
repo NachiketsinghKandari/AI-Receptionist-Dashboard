@@ -97,10 +97,10 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
   if (hasError) {
     return (
       <div
-        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 md:gap-1.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
         title="Cekura API error - check if CEKURA_API_KEY is configured"
       >
-        <AlertCircle className="h-3 w-3" />
+        <AlertCircle className="h-2.5 w-2.5 md:h-3 md:w-3" />
         <span>Error</span>
       </div>
     );
@@ -109,9 +109,10 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
   // Loading state
   if (isLoading) {
     return (
-      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground border border-border">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        <span>Loading</span>
+      <div className="inline-flex items-center gap-1 px-1.5 py-0.5 md:gap-1.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-medium bg-muted/50 text-muted-foreground border border-border">
+        <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" />
+        <span className="hidden md:inline">Loading</span>
+        <span className="md:hidden">...</span>
       </div>
     );
   }
@@ -119,8 +120,9 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
   // No data state (after fully loaded)
   if (!callData && isFullyLoaded) {
     return (
-      <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-black/10 dark:bg-white/10 text-muted-foreground border border-transparent">
-        No Data
+      <div className="inline-flex items-center px-1.5 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-medium bg-black/10 dark:bg-white/10 text-muted-foreground border border-transparent">
+        <span className="hidden md:inline">No Data</span>
+        <span className="md:hidden">N/A</span>
       </div>
     );
   }
@@ -128,9 +130,10 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
   // Still loading full data but no match yet
   if (!callData) {
     return (
-      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground border border-border">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        <span>Loading</span>
+      <div className="inline-flex items-center gap-1 px-1.5 py-0.5 md:gap-1.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-medium bg-muted/50 text-muted-foreground border border-border">
+        <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" />
+        <span className="hidden md:inline">Loading</span>
+        <span className="md:hidden">...</span>
       </div>
     );
   }
@@ -142,11 +145,11 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
     return (
       <div
         className={cn(
-          'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border capitalize',
+          'inline-flex items-center px-1.5 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-medium border capitalize',
           getStatusColor(callData.status)
         )}
       >
-        {callData.status}
+        <span className="truncate max-w-[50px] md:max-w-none">{callData.status}</span>
       </div>
     );
   }
@@ -158,12 +161,12 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
         <button
           onClick={handleClick}
           className={cn(
-            'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border capitalize cursor-pointer hover:opacity-80 transition-opacity',
+            'inline-flex items-center gap-0.5 px-1.5 py-0.5 md:gap-1 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-medium border capitalize cursor-pointer hover:opacity-80 transition-opacity',
             getStatusColor(callData.status)
           )}
         >
-          {callData.status}
-          <ChevronDown className="h-3 w-3" />
+          <span className="truncate max-w-[50px] md:max-w-none">{callData.status}</span>
+          <ChevronDown className="h-2.5 w-2.5 md:h-3 md:w-3 shrink-0" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-2" align="start" onClick={handleClick}>

@@ -16,6 +16,7 @@ import {
   HelpCircle,
   ExternalLink,
   RefreshCw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useSentryBrowse, type SentryGroupedSummary, type SentryParsedEvent } from '@/hooks/use-sentry-events';
@@ -280,10 +288,10 @@ export default function SentryPage() {
           Sentry Events
         </h1>
 
-        {/* Filters */}
-        <Card>
+        {/* Desktop Filters - hidden on mobile */}
+        <Card className="hidden md:block">
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
               {/* Search */}
               <div className="lg:col-span-2">
                 <Label htmlFor="search" className="text-sm flex items-center gap-1.5">
@@ -369,6 +377,108 @@ export default function SentryPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Mobile Filters - Centered bottom frosted glass tab + Drawer */}
+        <Drawer>
+          <DrawerTrigger asChild>
+            <button
+              className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-gray-900/80 via-gray-800/80 to-gray-900/80 dark:from-white/80 dark:via-gray-100/80 dark:to-white/80 backdrop-blur-xl border border-white/30 dark:border-black/20 shadow-[0_4px_20px_rgba(0,0,0,0.4)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] md:hidden text-white dark:text-gray-900 font-medium ring-1 ring-white/10 dark:ring-black/10"
+              aria-label="Open filters"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="text-sm">Filters</span>
+            </button>
+          </DrawerTrigger>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader>
+              <DrawerTitle>Filters</DrawerTitle>
+            </DrawerHeader>
+            <div className="overflow-y-auto px-4 pb-6 space-y-4">
+              {/* Search */}
+              <div>
+                <Label htmlFor="search-mobile" className="text-sm flex items-center gap-1.5">
+                  <Search className="h-3.5 w-3.5" />
+                  Search
+                </Label>
+                <Input
+                  id="search-mobile"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search correlation ID, call ID, message..."
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Event Type */}
+              <div>
+                <Label className="text-sm">Event Type</Label>
+                <Select value={eventType} onValueChange={setEventType}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Level */}
+              <div>
+                <Label className="text-sm">Level</Label>
+                <Select value={level} onValueChange={setLevel}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVELS.map((l) => (
+                      <SelectItem key={l} value={l}>
+                        {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Time Period */}
+              <div>
+                <Label className="text-sm">Time Period</Label>
+                <Select value={statsPeriod} onValueChange={setStatsPeriod}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_PERIODS.map((period) => (
+                      <SelectItem key={period.value} value={period.value}>
+                        {period.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sentry Environment */}
+              <div>
+                <Label className="text-sm">Environment</Label>
+                <Select value={sentryEnv} onValueChange={setSentryEnv}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SENTRY_ENVS.map((env) => (
+                      <SelectItem key={env.value} value={env.value}>
+                        {env.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
 
         {/* Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">

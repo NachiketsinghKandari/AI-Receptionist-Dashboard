@@ -45,7 +45,7 @@ function createColumns(
     {
       accessorKey: 'id',
       header: 'ID',
-      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
+      cell: ({ row }) => <span className="font-mono text-[10px] md:text-sm">{row.getValue('id')}</span>,
     },
     {
       accessorKey: 'platform_call_id',
@@ -65,11 +65,12 @@ function createColumns(
     {
       accessorKey: 'caller_name',
       header: 'Caller',
+      cell: ({ row }) => <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none block">{row.getValue('caller_name')}</span>,
     },
     {
       accessorKey: 'call_duration',
       header: 'Duration',
-      cell: ({ row }) => formatDuration(row.getValue('call_duration')),
+      cell: ({ row }) => <span className="text-[10px] md:text-sm whitespace-nowrap">{formatDuration(row.getValue('call_duration'))}</span>,
     },
     {
       accessorKey: 'call_type',
@@ -574,7 +575,7 @@ export default function CallsPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             sortableColumns={['id', 'started_at', 'call_duration']}
-            mobileHiddenColumns={['platform_call_id', 'call_type', 'cekura_status', 'feedback', 'started_at', 'phone_number']}
+            mobileHiddenColumns={['platform_call_id', 'call_type', 'status', 'feedback', 'started_at', 'phone_number']}
           />
         </div>
       </div>
