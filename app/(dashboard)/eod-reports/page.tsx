@@ -30,6 +30,7 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { MarkdownReport } from '@/components/eod/markdown-report';
 import { PDFExportButton } from '@/components/eod/pdf-export-button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   Drawer,
   DrawerContent,
@@ -264,6 +265,11 @@ export default function EODReportsPage() {
     if (hasNext) setSelectedReport(dataArray[currentIndex + 1]);
   };
 
+  // Get previous report for comparison (older report = next in array since sorted desc)
+  const previousReport = currentIndex >= 0 && currentIndex < dataArray.length - 1
+    ? dataArray[currentIndex + 1]
+    : null;
+
   // Retry handlers for individual reports
   const handleRetrySuccessReport = async () => {
     if (!selectedReport) return;
@@ -472,6 +478,7 @@ export default function EODReportsPage() {
       {selectedReport && (
         <EODReportDetailPanel
           report={selectedReport}
+          previousReport={previousReport}
           onClose={() => setSelectedReport(null)}
           onPrevious={handlePrevious}
           onNext={handleNext}
@@ -498,6 +505,7 @@ export default function EODReportsPage() {
 
 interface EODReportDetailPanelProps {
   report: EODReport;
+  previousReport: EODReport | null;
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -516,6 +524,7 @@ interface EODReportDetailPanelProps {
 
 function EODReportDetailPanel({
   report,
+  previousReport,
   onClose,
   onPrevious,
   onNext,
@@ -643,7 +652,7 @@ function EODReportDetailPanel({
             </TabsList>
             <TabsContent value="info" className="flex-1 min-h-0 mt-0">
               <ScrollArea className="h-full">
-                <EODLeftPanel report={report} rawData={rawData} />
+                <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} />
               </ScrollArea>
             </TabsContent>
             <TabsContent value="reports" className="flex-1 min-h-0 mt-0">
@@ -673,7 +682,7 @@ function EODReportDetailPanel({
               className="h-full overflow-hidden"
               style={{ width: `${leftPercent}%` }}
             >
-              <EODLeftPanel report={report} rawData={rawData} />
+              <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} />
             </div>
 
             {/* Resize Handle */}
@@ -719,7 +728,39 @@ function EODReportDetailPanel({
 // Left Panel: Summary, Metadata, Raw Data, Errors
 // ============================================================================
 
-function EODLeftPanel({ report, rawData }: { report: EODReport; rawData: EODRawData }) {
+// Helper to calculate percentage change
+function calcPercentChange(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? 100 : null;
+  return ((current - previous) / previous) * 100;
+}
+
+// Helper component for displaying change indicator
+function ChangeIndicator({ change, inverted = false }: { change: number | null; inverted?: boolean }) {
+  if (change === null) return null;
+  const isPositive = change > 0;
+  const isNegative = change < 0;
+  // For "Failed" count, positive change is bad (red), negative is good (green)
+  // For "Success" count, positive change is good (green), negative is bad (red)
+  const colorClass = inverted
+    ? (isPositive ? 'text-red-500' : isNegative ? 'text-green-500' : 'text-muted-foreground')
+    : (isPositive ? 'text-green-500' : isNegative ? 'text-red-500' : 'text-muted-foreground');
+  const arrow = isPositive ? '↑' : isNegative ? '↓' : '';
+  return (
+    <span className={cn('text-xs ml-1', colorClass)}>
+      {arrow}{Math.abs(change).toFixed(0)}%
+    </span>
+  );
+}
+
+function EODLeftPanel({
+  report,
+  rawData,
+  previousReport,
+}: {
+  report: EODReport;
+  rawData: EODRawData;
+  previousReport: EODReport | null;
+}) {
   const { environment } = useEnvironment();
 
   // Handle both new structure (success/failure arrays) and old structure (calls array)
@@ -738,6 +779,27 @@ function EODLeftPanel({ report, rawData }: { report: EODReport; rawData: EODRawD
 
   const totalCalls = rawData?.count ?? rawData?.total ?? (successCalls.length + failureCalls.length);
   const errorCount = rawData?.errors ?? failureCalls.length;
+  const successCount = successCalls.length;
+
+  // Calculate previous report stats for comparison
+  const prevRawData = previousReport?.raw_data as EODRawData | undefined;
+  const prevHasNewStructure = prevRawData?.success !== undefined || prevRawData?.failure !== undefined;
+  const prevOldCalls = (prevRawData as unknown as { calls?: typeof rawData.success })?.calls ?? [];
+
+  const prevSuccessCount = prevHasNewStructure
+    ? (prevRawData?.success?.length ?? 0)
+    : prevOldCalls.filter(c => c.cekura?.status === 'success').length;
+
+  const prevErrorCount = prevRawData?.errors ?? (prevHasNewStructure
+    ? (prevRawData?.failure?.length ?? 0)
+    : prevOldCalls.filter(c => c.cekura?.status !== 'success').length);
+
+  const prevTotalCalls = prevRawData?.count ?? prevRawData?.total ?? (prevSuccessCount + prevErrorCount);
+
+  // Calculate percentage changes
+  const totalChange = previousReport ? calcPercentChange(totalCalls, prevTotalCalls) : null;
+  const errorChange = previousReport ? calcPercentChange(errorCount, prevErrorCount) : null;
+  const successChange = previousReport ? calcPercentChange(successCount, prevSuccessCount) : null;
 
   return (
     <div className="p-4 h-full flex flex-col gap-4">
@@ -745,19 +807,28 @@ function EODLeftPanel({ report, rawData }: { report: EODReport; rawData: EODRawD
       <div className="grid grid-cols-3 gap-3 shrink-0">
         <Card>
           <CardContent className="p-3">
-            <div className="text-xl font-bold">{totalCalls}</div>
+            <div className="flex items-baseline">
+              <span className="text-xl font-bold">{totalCalls}</span>
+              <ChangeIndicator change={totalChange} />
+            </div>
             <div className="text-xs text-muted-foreground">Total Calls</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <div className="text-xl font-bold text-red-500">{errorCount}</div>
+            <div className="flex items-baseline">
+              <span className="text-xl font-bold text-red-500">{errorCount}</span>
+              <ChangeIndicator change={errorChange} inverted />
+            </div>
             <div className="text-xs text-muted-foreground">Failed</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <div className="text-xl font-bold text-green-500">{successCalls.length}</div>
+            <div className="flex items-baseline">
+              <span className="text-xl font-bold text-green-500">{successCount}</span>
+              <ChangeIndicator change={successChange} />
+            </div>
             <div className="text-xs text-muted-foreground">Success</div>
           </CardContent>
         </Card>
@@ -817,27 +888,35 @@ function EODLeftPanel({ report, rawData }: { report: EODReport; rawData: EODRawD
                       </span>
                       <div className="flex items-center gap-0.5 shrink-0">
                         <CopyButton value={call.correlation_id} className="h-6 w-6" />
-                        <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                          <a
-                            href={`https://dashboard.vapi.ai/calls/${call.correlation_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Open in VAPI"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                              <a
+                                href={`https://dashboard.vapi.ai/calls/${call.correlation_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Open in VAPI</TooltipContent>
+                        </Tooltip>
                         {call.cekura?.id && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                            <a
-                              href={buildCekuraUrl(call.cekura.id, environment)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Open in Cekura"
-                            >
-                              <BarChart3 className="h-3 w-3" />
-                            </a>
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                <a
+                                  href={buildCekuraUrl(call.cekura.id, environment)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <BarChart3 className="h-3 w-3" />
+                                </a>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Open in Cekura</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </div>
