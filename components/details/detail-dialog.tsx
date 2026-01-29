@@ -68,23 +68,23 @@ export function DetailDialog({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
         className={cn(
-          'w-[calc(100vw-2rem)] max-w-4xl h-[calc(100vh-4rem)] max-h-[800px] rounded-lg flex flex-col p-0 gap-0 overflow-hidden',
+          'w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-4xl h-[calc(100vh-2rem)] sm:h-[calc(100vh-4rem)] max-h-[800px] rounded-lg flex flex-col p-0 gap-0 overflow-hidden',
           className
         )}
       >
         {/* Header - fixed at top */}
-        <div className="px-6 py-4 border-b flex items-start justify-between gap-4 shrink-0 bg-background">
+        <div className="px-4 py-3 md:px-6 md:py-4 border-b flex items-start justify-between gap-2 md:gap-4 shrink-0 bg-background">
           <div className="flex-1 min-w-0">
-            <DialogTitle className="text-lg font-semibold">
+            <DialogTitle className="text-base md:text-lg font-semibold">
               {title}
             </DialogTitle>
             {subtitle && (
-              <DialogDescription className="text-sm text-muted-foreground mt-1">
+              <DialogDescription className="text-xs md:text-sm text-muted-foreground mt-1">
                 {subtitle}
               </DialogDescription>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 md:gap-1 shrink-0">
             {showNavigation && (
               <>
                 <Button
@@ -126,7 +126,7 @@ export function DetailDialog({
 
         {/* Content - scrollable */}
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-          <div className="px-6 py-4">
+          <div className="px-4 py-3 md:px-6 md:py-4">
             {children}
           </div>
         </div>

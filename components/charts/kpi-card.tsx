@@ -19,12 +19,12 @@ export function KPICard({ title, value, delta, deltaLabel = '%', icon, descripti
 
   return (
     <Card className="overflow-hidden">
-      <CardContent className="p-4">
+      <CardContent className="p-3 md:p-4">
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <div className="space-y-0.5 md:space-y-1 min-w-0">
+            <p className="text-xs md:text-sm font-medium text-muted-foreground">{title}</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight">{value}</span>
+              <span className="text-xl md:text-2xl font-bold tracking-tight truncate">{value}</span>
             </div>
             {delta !== undefined && (
               <div className="flex items-center gap-1 text-xs">
@@ -46,7 +46,7 @@ export function KPICard({ title, value, delta, deltaLabel = '%', icon, descripti
                     <span className="text-muted-foreground">0{deltaLabel}</span>
                   </>
                 )}
-                <span className="text-muted-foreground">vs previous</span>
+                <span className="text-muted-foreground hidden sm:inline">vs previous</span>
               </div>
             )}
             {description && (

@@ -482,7 +482,7 @@ function TranscriptTabContent({
       {/* Content */}
       <Card>
         <CardContent className="p-4">
-          <div className="space-y-3 max-h-[400px] overflow-auto">
+          <div className="space-y-3 max-h-[300px] sm:max-h-[400px] overflow-auto">
             {showAdvanced ? (
               <AdvancedTranscript
                 messages={extractedData!.messages}
@@ -553,7 +553,7 @@ function TransferItem({ transfer, highlight }: { transfer: Transfer; highlight?:
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="p-3 pt-0 border-t bg-muted/30">
-            <div className="grid grid-cols-2 gap-2 text-sm pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-3">
               <InfoRow label="Phone" value={transfer.transferred_to_phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
               <InfoRow label="Pickup Time" value={transfer.time_to_pickup_seconds ? `${transfer.time_to_pickup_seconds}s` : '-'} icon={<Clock className="h-3.5 w-3.5" />} />
               <InfoRow label="Started" value={transfer.transfer_started_at} icon={<Calendar className="h-3.5 w-3.5" />} />
@@ -607,7 +607,7 @@ function EmailItem({ email, highlight }: { email: Email; highlight?: boolean }) 
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="p-3 pt-0 border-t bg-muted/30">
-            <div className="grid grid-cols-2 gap-2 text-sm pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-3">
               <div className="flex items-start gap-3 py-2">
                 <div className="text-muted-foreground mt-0.5"><User className="h-3.5 w-3.5" /></div>
                 <div className="flex-1 min-w-0">
@@ -688,7 +688,7 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="p-3 pt-0 border-t bg-muted/30">
-            <div className="grid grid-cols-2 gap-2 text-sm pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-3">
               <InfoRow label="Received" value={webhook.received_at} icon={<Calendar className="h-3.5 w-3.5" />} />
               <div className="flex items-start gap-3 py-2">
                 <div className="text-muted-foreground mt-0.5"><Hash className="h-3.5 w-3.5" /></div>
@@ -895,7 +895,7 @@ function SentryEventItem({ event }: { event: SentryEvent }) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="p-3 pt-0 border-t bg-muted/30">
-            <div className="grid grid-cols-2 gap-2 text-sm pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-3">
               <InfoRow label="Logger" value={event.logger} icon={<Bug className="h-3.5 w-3.5" />} />
               <InfoRow label="Time" value={event.timestamp} icon={<Clock className="h-3.5 w-3.5" />} />
             </div>
@@ -914,9 +914,9 @@ function SentryEventItem({ event }: { event: SentryEvent }) {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="mt-2 p-3 bg-background rounded-md border text-xs">
-                      <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <div><strong>Method:</strong> {event.request.method}</div>
-                        <div><strong>URL:</strong> {event.request.url}</div>
+                        <div className="break-all"><strong>URL:</strong> {event.request.url}</div>
                       </div>
                       {event.request.body && (
                         <div className="mt-2">
@@ -963,6 +963,521 @@ function SectionBadge({ count, color, isLoading }: { count: number; color: strin
   );
 }
 
+// Shared props for left/right panels
+interface CallDetailPanelSharedProps {
+  callId: number;
+  highlightReasons?: HighlightReasons;
+  dateRange?: {
+    startDate: string | null;
+    endDate: string | null;
+  };
+}
+
+/**
+ * Left panel for the two-panel layout:
+ * - Quick Links (VAPI, Sentry, Cekura)
+ * - Call Information card
+ * - Status badges
+ * - Summary section
+ * - Tabs: Info, Activity, Logs
+ */
+export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: CallDetailPanelSharedProps) {
+  const { data, isLoading, error } = useCallDetail(callId);
+  const { environment } = useEnvironment();
+  const platformCallId = data?.call?.platform_call_id;
+  const sentryEnv = SENTRY_ENV_MAP[environment] || environment;
+
+  // Fetch Cekura call data for the date range (progressive loading)
+  const { data: cekuraData, isLoading: cekuraLoading, isFullyLoaded: cekuraFullyLoaded } = useCekuraCallMapping(
+    dateRange?.startDate || null,
+    dateRange?.endDate || null
+  );
+  const cekuraCallInfo = platformCallId ? cekuraData?.calls.get(platformCallId) : undefined;
+  const cekuraCallId = cekuraCallInfo?.cekuraId;
+
+  // Track which callId has been acknowledged for each tab
+  const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | null>(null);
+  const [activityAcknowledgedFor, setActivityAcknowledgedFor] = useState<number | null>(null);
+
+  const logsAcknowledged = logsAcknowledgedFor === callId;
+  const activityAcknowledged = activityAcknowledgedFor === callId;
+
+  // Fetch webhooks and sentry events in parallel
+  const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
+  const { data: sentryData, isLoading: sentryLoading } = useSentryEventsForCall(platformCallId || null);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-4">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 p-4">
+        <div className="p-3 bg-red-500/10 rounded-full mb-3">
+          <XCircle className="h-6 w-6 text-red-500" />
+        </div>
+        <p className="text-red-500 font-medium">Failed to load call details</p>
+        <p className="text-sm text-muted-foreground mt-1">Please try again later</p>
+      </div>
+    );
+  }
+
+  const { call, transfers, emails } = data;
+  const webhooksList = webhooks || [];
+  const sentryEvents = sentryData?.events || [];
+
+  const activityCount = transfers.length + emails.length + webhooksList.length;
+  const hasErrors = sentryEvents.some(e => e.level === 'error');
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Quick Links */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {call.platform_call_id && (
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={`https://dashboard.vapi.ai/calls/${call.platform_call_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              VAPI
+            </a>
+          </Button>
+        )}
+        {call.platform_call_id && (
+          <Button variant="outline" size="sm" asChild>
+            <a
+              href={`https://helloounsil.sentry.io/explore/logs/?environment=${sentryEnv}&logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${call.platform_call_id}&logsSortBys=-timestamp`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Bug className="h-3.5 w-3.5 mr-1.5" />
+              Sentry
+            </a>
+          </Button>
+        )}
+        {call.platform_call_id && (
+          cekuraCallId ? (
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href={buildCekuraUrl(cekuraCallId, environment)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                Cekura
+              </a>
+            </Button>
+          ) : cekuraLoading || !cekuraFullyLoaded ? (
+            <Button variant="outline" size="sm" disabled>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              Cekura
+            </Button>
+          ) : null
+        )}
+      </div>
+
+      {/* Tabs: Info, Activity, Logs */}
+      <Tabs
+        defaultValue="info"
+        className="w-full"
+        onValueChange={(value) => {
+          if (value === 'logs') setLogsAcknowledgedFor(callId);
+          if (value === 'activity') setActivityAcknowledgedFor(callId);
+        }}
+      >
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="info" className="text-xs">
+            <ClipboardList className="h-3.5 w-3.5 mr-1" />
+            Info
+          </TabsTrigger>
+          <TabsTrigger
+            value="activity"
+            className={cn(
+              "text-xs",
+              highlightReasons?.important && !activityAcknowledged && "animate-pulse-orange",
+              highlightReasons?.transferMismatch && !activityAcknowledged && "animate-pulse-yellow"
+            )}
+          >
+            <Activity className="h-3.5 w-3.5 mr-1" />
+            Activity
+            <SectionBadge count={activityCount} color="bg-primary/20 text-primary" isLoading={webhooksLoading} />
+          </TabsTrigger>
+          <TabsTrigger
+            value="logs"
+            className={cn(
+              "text-xs",
+              highlightReasons?.sentry && !logsAcknowledged && "animate-pulse-red"
+            )}
+          >
+            <Bug className="h-3.5 w-3.5 mr-1" />
+            Logs
+            {sentryLoading ? (
+              <span className="ml-1 inline-flex items-center justify-center">
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              </span>
+            ) : hasErrors ? (
+              <span className="ml-1 w-2 h-2 bg-red-500 rounded-full" />
+            ) : null}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Info Tab */}
+        <TabsContent value="info" className="mt-4 space-y-4">
+          {/* Call Information Card */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Call Information</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                <InfoRow label="Caller" value={call.caller_name} icon={<User className="h-3.5 w-3.5" />} />
+                <InfoRow label="Phone" value={call.phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
+                <InfoRow
+                  label="Duration"
+                  value={
+                    <span className={cn(highlightReasons?.duration && "animate-pulse-orange-text")}>
+                      {formatDuration(call.call_duration)}
+                    </span>
+                  }
+                  icon={<Clock className="h-3.5 w-3.5" />}
+                />
+                <InfoRow label="Started" value={call.started_at} icon={<Calendar className="h-3.5 w-3.5" />} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Status Section */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Status</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="px-2 py-1">
+                  <Phone className="h-3 w-3 mr-1" />
+                  {call.call_type || 'Unknown'}
+                </Badge>
+                <Badge variant={getStatusBadgeVariant(call.status)} className="px-2 py-1">
+                  {call.status === 'completed' ? <CheckCircle className="h-3 w-3 mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
+                  {call.status}
+                </Badge>
+                {call.platform && (
+                  <Badge variant="secondary" className="px-2 py-1">
+                    {call.platform}
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Summary */}
+          {call.summary && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <p className="text-sm text-muted-foreground leading-relaxed">{call.summary}</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent value="activity" className="mt-4 space-y-4">
+          {/* Transfers */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowLeftRight className="h-4 w-4 text-orange-500" />
+              <h4 className="text-sm font-medium">Transfers</h4>
+              <Badge variant="secondary" className="text-xs">{transfers.length}</Badge>
+            </div>
+            {transfers.length > 0 ? (
+              <div className="space-y-2">
+                {transfers.map((t) => (
+                  <TransferItem key={t.id} transfer={t} highlight={highlightReasons?.transferMismatch} />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-6">
+                  <p className="text-sm text-muted-foreground text-center">No transfers for this call</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Emails */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Mail className="h-4 w-4 text-green-500" />
+              <h4 className="text-sm font-medium">Emails</h4>
+              <Badge variant="secondary" className="text-xs">{emails.length}</Badge>
+            </div>
+            {emails.length > 0 ? (
+              <div className="space-y-2">
+                {emails.map((e) => (
+                  <EmailItem key={e.id} email={e} highlight={highlightReasons?.transferMismatch} />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-6">
+                  <p className="text-sm text-muted-foreground text-center">No emails for this call</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Webhooks */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <WebhookIcon className="h-4 w-4 text-purple-500" />
+              <h4 className="text-sm font-medium">Webhooks</h4>
+              <Badge variant="secondary" className="text-xs">
+                {webhooksLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  webhooksList.length
+                )}
+              </Badge>
+            </div>
+            {webhooksLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+              </div>
+            ) : webhooksList.length > 0 ? (
+              <div className="space-y-2">
+                {webhooksList.map((w) => (
+                  <WebhookItem
+                    key={w.id}
+                    webhook={w}
+                    callerName={call.caller_name}
+                    dbTransfers={transfers}
+                    highlight={highlightReasons?.transferMismatch}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-6">
+                  <p className="text-sm text-muted-foreground text-center">No webhooks for this call</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Logs Tab */}
+        <TabsContent value="logs" className="mt-4">
+          {!call.platform_call_id ? (
+            <EmptyState
+              icon={<Bug className="h-6 w-6 text-muted-foreground" />}
+              message="No Correlation ID - cannot fetch Sentry logs"
+            />
+          ) : sentryLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+            </div>
+          ) : sentryEvents.length > 0 ? (
+            <div className="space-y-2">
+              {sentryEvents.map((e) => (
+                <SentryEventItem key={e.event_id} event={e} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<CheckCircle className="h-6 w-6 text-green-500" />}
+              message="No logs found for this call"
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/**
+ * Right panel for the two-panel layout:
+ * - Audio player (full width)
+ * - Transcript section (no max-height, uses full available space)
+ * - Mode toggle (Basic/Advanced) at top
+ */
+export function CallDetailRightPanel({ callId }: CallDetailPanelSharedProps) {
+  const { data, isLoading, error } = useCallDetail(callId);
+  const platformCallId = data?.call?.platform_call_id;
+
+  // Fetch webhooks for advanced transcript
+  const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-4">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 p-4">
+        <div className="p-3 bg-red-500/10 rounded-full mb-3">
+          <XCircle className="h-6 w-6 text-red-500" />
+        </div>
+        <p className="text-red-500 font-medium">Failed to load call details</p>
+      </div>
+    );
+  }
+
+  const { call } = data;
+  const webhooksList = webhooks || [];
+
+  return (
+    <div className="flex flex-col h-full p-4 space-y-4">
+      {/* Audio Player */}
+      {call.recording_url && (
+        <Card className="shrink-0">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Play className="h-4 w-4" />
+              Recording
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <audio controls src={call.recording_url} className="w-full" />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Transcript - fills remaining space */}
+      <div className="flex-1 min-h-0">
+        <TranscriptSection
+          transcription={call.transcription}
+          webhooks={webhooksList}
+          webhooksLoading={webhooksLoading}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Full-height transcript section for the right panel
+ */
+function TranscriptSection({
+  transcription,
+  webhooks,
+  webhooksLoading,
+}: {
+  transcription: string | null;
+  webhooks: Webhook[];
+  webhooksLoading: boolean;
+}) {
+  const [mode, setMode] = useState<'basic' | 'advanced'>('advanced');
+
+  const extractedData = useMemo(() => {
+    if (webhooksLoading) return null;
+    return extractOpenAIMessages(webhooks);
+  }, [webhooks, webhooksLoading]);
+
+  const hasAdvancedData = extractedData !== null && extractedData.messages.length > 0;
+  const showAdvanced = mode === 'advanced' && hasAdvancedData;
+
+  if (!transcription && !hasAdvancedData) {
+    return (
+      <Card className="h-full flex items-center justify-center">
+        <EmptyState
+          icon={<FileText className="h-6 w-6 text-muted-foreground" />}
+          message="No transcript available for this call"
+        />
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-2 shrink-0">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Transcript
+          </CardTitle>
+          {hasAdvancedData && (
+            <div className="inline-flex items-center rounded-lg border bg-muted p-0.5">
+              <button
+                onClick={() => setMode('basic')}
+                className={cn(
+                  "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                  mode === 'basic'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Basic
+              </button>
+              <button
+                onClick={() => setMode('advanced')}
+                className={cn(
+                  "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                  mode === 'advanced'
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Advanced
+              </button>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 min-h-0 overflow-y-auto pt-0">
+        {webhooksLoading && mode === 'advanced' ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
+            <span className="text-sm text-muted-foreground">Loading advanced transcript...</span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {showAdvanced ? (
+              <AdvancedTranscript
+                messages={extractedData!.messages}
+                endedReason={extractedData!.endedReason}
+              />
+            ) : transcription ? (
+              parseTranscript(transcription).map((msg, idx) => (
+                <TranscriptBubble key={idx} message={msg} />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No basic transcript available. Switch to Advanced to view tool calls.
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * @deprecated Use CallDetailLeftPanel and CallDetailRightPanel for two-panel layout
+ */
 export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDetailPanelProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const { environment } = useEnvironment();
@@ -1140,7 +1655,7 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
               <CardTitle className="text-sm">Call Information</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                 <InfoRow label="Caller" value={call.caller_name} icon={<User className="h-3.5 w-3.5" />} />
                 <InfoRow label="Phone" value={call.phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
                 <InfoRow

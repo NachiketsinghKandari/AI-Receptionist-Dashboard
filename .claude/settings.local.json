@@ -23,7 +23,9 @@
       "Bash(ls:*)",
       "Bash(curl:*)",
       "WebFetch(domain:ai.google.dev)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(npx shadcn@latest add resizable --yes)"
     ]
   }
 }

@@ -177,7 +177,7 @@ function EventCard({ event }: { event: SentryParsedEvent }) {
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="p-3 bg-muted/30 rounded-md space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div><strong>Level:</strong> {event.level}</div>
           <div><strong>Type:</strong> {event.event_type}</div>
           <div><strong>Time:</strong> {event.timestamp}</div>
@@ -272,18 +272,18 @@ export default function SentryPage() {
     : null;
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-hidden">
+    <div className="h-full flex flex-col p-4 md:p-6 overflow-hidden">
       {/* Header - fixed */}
-      <div className="shrink-0 space-y-4">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Bug className="h-6 w-6" />
+      <div className="shrink-0 space-y-3 md:space-y-4">
+        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+          <Bug className="h-5 w-5 md:h-6 md:w-6" />
           Sentry Events
         </h1>
 
         {/* Filters */}
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
               {/* Search */}
               <div className="lg:col-span-2">
                 <Label htmlFor="search" className="text-sm flex items-center gap-1.5">
@@ -371,23 +371,23 @@ export default function SentryPage() {
         </Card>
 
         {/* Metrics */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Total Events</p>
-              <p className="text-2xl font-bold">{accumulatedData?.totalEvents ?? 0}</p>
+            <CardContent className="p-3 md:p-4">
+              <p className="text-xs md:text-sm text-muted-foreground">Total Events</p>
+              <p className="text-xl md:text-2xl font-bold">{accumulatedData?.totalEvents ?? 0}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Unique Calls</p>
-              <p className="text-2xl font-bold">{accumulatedData?.summary?.length ?? 0}</p>
+            <CardContent className="p-3 md:p-4">
+              <p className="text-xs md:text-sm text-muted-foreground">Unique Calls</p>
+              <p className="text-xl md:text-2xl font-bold">{accumulatedData?.summary?.length ?? 0}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Mapped to DB</p>
-              <p className="text-2xl font-bold">
+            <CardContent className="p-3 md:p-4">
+              <p className="text-xs md:text-sm text-muted-foreground">Mapped to DB</p>
+              <p className="text-xl md:text-2xl font-bold">
                 {accumulatedData?.summary?.filter((s: SentryGroupedSummary) => s.call_id !== null).length ?? 0}
               </p>
             </CardContent>
@@ -397,8 +397,8 @@ export default function SentryPage() {
         {/* Table Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Summary by Call</h2>
-            <p className="text-sm text-muted-foreground">Click a row to view events</p>
+            <h2 className="text-base md:text-lg font-semibold">Summary by Call</h2>
+            <p className="text-xs md:text-sm text-muted-foreground">Tap a row to view events</p>
           </div>
           <Button
             variant="outline"
@@ -429,6 +429,7 @@ export default function SentryPage() {
               selectedRowId={selectedCorrelationId}
               isLoading={isLoading}
               getRowId={(row) => row.correlation_id}
+              mobileHiddenColumns={['correlation_id', 'types', 'last_timestamp']}
             />
           )}
         </div>
@@ -475,7 +476,7 @@ export default function SentryPage() {
 
             {/* Summary */}
             {selectedSummary && (
-              <div className="grid grid-cols-2 gap-2 text-sm p-3 bg-muted/30 rounded-md">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm p-3 bg-muted/30 rounded-md">
                 <div><strong>Call ID:</strong> {selectedSummary.call_id ?? 'Not mapped'}</div>
                 <div><strong>Events:</strong> {selectedSummary.event_count}</div>
                 <div className="flex items-center gap-1">

@@ -112,11 +112,11 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-full items-center px-4 md:px-6">
-        {/* Branding section - matches filter sidebar width */}
-        <div className="w-64 shrink-0 flex items-center">
+        {/* Branding section - matches filter sidebar width on desktop */}
+        <div className="md:w-64 shrink-0 flex items-center">
           <Link href="/" className="flex items-center gap-2">
             <HelloCounselLogo className="h-6 w-auto text-foreground" />
-            <span className="text-muted-foreground text-sm font-medium">Dashboard</span>
+            <span className="text-muted-foreground text-sm font-medium hidden sm:inline">Dashboard</span>
           </Link>
         </div>
 

@@ -16,7 +16,7 @@ export function EnvironmentSwitcher() {
 
   return (
     <Select value={environment} onValueChange={(value) => setEnvironment(value as Environment)}>
-      <SelectTrigger className="w-[160px] h-8 text-xs">
+      <SelectTrigger className="w-[120px] sm:w-[160px] h-8 text-xs">
         <Database className="h-3 w-3 mr-1.5" />
         <SelectValue />
       </SelectTrigger>

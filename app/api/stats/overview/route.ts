@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { type Environment } from '@/lib/constants';
 import { errorResponse } from '@/lib/api/utils';
+import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
 
 type Period = 'Today' | 'This Month';
 
@@ -14,19 +15,47 @@ function getPeriodDates(period: Period) {
   const now = new Date();
 
   if (period === 'Today') {
-    const currentStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const currentEnd = now;
-    const prevStart = new Date(currentStart.getTime() - 24 * 60 * 60 * 1000);
-    const prevEnd = new Date(currentStart);
-    return { currentStart, currentEnd, prevStart, prevEnd };
+    const current = getTodayRangeUTC();
+    const previous = getYesterdayRangeUTC();
+    return {
+      currentStart: current.startDate,
+      currentEnd: current.endDate,
+      prevStart: previous.startDate,
+      prevEnd: previous.endDate,
+    };
   }
 
-  // This Month
-  const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const currentEnd = now;
-  const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { currentStart, currentEnd, prevStart, prevEnd };
+  // This Month — compute month boundaries in Eastern timezone
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => parts.find(p => p.type === type)!.value;
+  const year = parseInt(get('year'), 10);
+  const month = parseInt(get('month'), 10);
+  const todayStr = `${get('year')}-${get('month')}-${get('day')}`;
+
+  // Current month: 1st of this month → today (Eastern)
+  const currentMonthStart = `${get('year')}-${get('month')}-01`;
+  const currentRange = getDateRangeUTC(currentMonthStart, todayStr);
+
+  // Previous month: 1st of prev month → last day of prev month (Eastern)
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevMonthStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+  // Day 0 of current month = last day of previous month
+  const lastDayPrev = new Date(Date.UTC(year, month - 1, 0)).getUTCDate();
+  const prevMonthEnd = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(lastDayPrev).padStart(2, '0')}`;
+  const prevRange = getDateRangeUTC(prevMonthStart, prevMonthEnd);
+
+  return {
+    currentStart: currentRange.startDate,
+    currentEnd: currentRange.endDate,
+    prevStart: prevRange.startDate,
+    prevEnd: prevRange.endDate,
+  };
 }
 
 function calculateAverage(values: (number | null)[]): number {
@@ -49,18 +78,18 @@ export async function GET(request: NextRequest) {
       client
         .from('calls')
         .select('id, call_duration')
-        .gte('started_at', currentStart.toISOString())
-        .lte('started_at', currentEnd.toISOString()),
+        .gte('started_at', currentStart)
+        .lte('started_at', currentEnd),
       client
         .from('email_logs')
         .select('id')
-        .gte('sent_at', currentStart.toISOString())
-        .lte('sent_at', currentEnd.toISOString()),
+        .gte('sent_at', currentStart)
+        .lte('sent_at', currentEnd),
       client
         .from('transfers_details')
         .select('call_id')
-        .gte('created_at', currentStart.toISOString())
-        .lte('created_at', currentEnd.toISOString()),
+        .gte('created_at', currentStart)
+        .lte('created_at', currentEnd),
     ]);
 
     // Fetch previous period data in parallel
@@ -68,18 +97,18 @@ export async function GET(request: NextRequest) {
       client
         .from('calls')
         .select('id, call_duration')
-        .gte('started_at', prevStart.toISOString())
-        .lte('started_at', prevEnd.toISOString()),
+        .gte('started_at', prevStart)
+        .lte('started_at', prevEnd),
       client
         .from('email_logs')
         .select('id')
-        .gte('sent_at', prevStart.toISOString())
-        .lte('sent_at', prevEnd.toISOString()),
+        .gte('sent_at', prevStart)
+        .lte('sent_at', prevEnd),
       client
         .from('transfers_details')
         .select('call_id')
-        .gte('created_at', prevStart.toISOString())
-        .lte('created_at', prevEnd.toISOString()),
+        .gte('created_at', prevStart)
+        .lte('created_at', prevEnd),
     ]);
 
     const currentCalls = currentCallsRes.data || [];

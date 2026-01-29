@@ -5,7 +5,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Mail } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FilterSidebar, type DateFilterMode } from '@/components/filters/filter-sidebar';
+import { ResponsiveFilterSidebar } from '@/components/filters/responsive-filter-sidebar';
+import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useEmails } from '@/hooks/use-emails';
@@ -16,7 +17,7 @@ import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import type { SortOrder } from '@/types/api';
 import { format, subDays } from 'date-fns';
-import { getTodayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
+import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 const columns: ColumnDef<Email>[] = [
   {
@@ -104,6 +105,9 @@ export default function EmailsPage() {
     if (dateFilterMode === 'today') {
       return getTodayRangeUTC();
     }
+    if (dateFilterMode === 'yesterday') {
+      return getYesterdayRangeUTC();
+    }
     // Custom mode - convert Eastern dates to UTC
     return getDateRangeUTC(startDate, endDate);
   }, [dateFilterMode, startDate, endDate]);
@@ -166,7 +170,7 @@ export default function EmailsPage() {
 
   return (
     <div className="flex h-full">
-      <FilterSidebar
+      <ResponsiveFilterSidebar
         dateFilterMode={dateFilterMode}
         onDateFilterModeChange={setDateFilterMode}
         startDate={startDate}
@@ -182,19 +186,19 @@ export default function EmailsPage() {
         onLimitChange={setLimit}
       />
 
-      <div className="flex-1 flex flex-col p-6 overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
         {/* Header - fixed */}
         <div className="shrink-0">
-          <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
-            <Mail className="h-6 w-6" />
+          <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 flex items-center gap-2">
+            <Mail className="h-5 w-5 md:h-6 md:w-6" />
             Emails
           </h1>
 
-          <div className="flex gap-4 mb-2">
-            <div className="text-sm">
+          <div className="flex flex-wrap gap-2 md:gap-4 mb-2">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Total:</span> {dateOnlyData?.total ?? 0}
             </div>
-            <div className="text-sm">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Filtered:</span> {data?.total ?? 0}
               {dateOnlyData?.total ? (
                 <span className="text-muted-foreground ml-1">
@@ -202,13 +206,13 @@ export default function EmailsPage() {
                 </span>
               ) : null}
             </div>
-            <div className="text-sm">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-4">
-            Click a row to view email details
+          <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
+            Tap a row to view email details
           </p>
         </div>
 
@@ -230,6 +234,7 @@ export default function EmailsPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             sortableColumns={['id', 'sent_at']}
+            mobileHiddenColumns={['call_id', 'email_type', 'recipients', 'sent_at']}
           />
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { FileText, Loader2, Plus, CheckCircle, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { FileText, Loader2, Plus, CheckCircle, AlertCircle, RefreshCw, Sparkles, CalendarPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,13 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { MarkdownReport } from '@/components/eod/markdown-report';
 import { PDFExportButton } from '@/components/eod/pdf-export-button';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
 import { useEODReports, useGenerateEODReport, useSaveEODReport, useGenerateAIReport } from '@/hooks/use-eod-reports';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/constants';
 import { JsonViewer } from '@/components/ui/json-viewer';
@@ -196,112 +203,139 @@ export default function EODReportsPage() {
     }
   };
 
+  // Sidebar content component to avoid duplication
+  const sidebarContent = (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="reportDate" className="text-sm">
+          Report Date
+        </Label>
+        <Input
+          id="reportDate"
+          type="date"
+          value={reportDate}
+          onChange={(e) => setReportDate(e.target.value)}
+          className="mt-1"
+        />
+      </div>
+
+      <Button
+        onClick={handleGenerate}
+        disabled={generateMutation.isPending || saveMutation.isPending || aiGenerateMutation.isPending || !reportDate}
+        className="w-full"
+      >
+        {generateMutation.isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Fetching data...
+          </>
+        ) : saveMutation.isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Saving report...
+          </>
+        ) : aiGenerateMutation.isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Generating AI report...
+          </>
+        ) : (
+          <>
+            <Plus className="h-4 w-4 mr-2" />
+            Generate Report
+          </>
+        )}
+      </Button>
+
+      {(generateMutation.isError || saveMutation.isError || aiGenerateMutation.isError) && (
+        <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          {generateMutation.error?.message || saveMutation.error?.message || aiGenerateMutation.error?.message || 'Failed to generate'}
+        </div>
+      )}
+
+      {/* Success message after full pipeline completes */}
+      {aiGenerateMutation.isSuccess && !generateMutation.isPending && !saveMutation.isPending && !aiGenerateMutation.isPending && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">Report generated!</span>
+            </div>
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <Sparkles className="h-3 w-3" />
+              <span className="text-xs">AI insights ready</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Results per page */}
+      <div className="pt-4 border-t">
+        <Label className="text-sm">Results per page</Label>
+        <Input
+          type="number"
+          min={10}
+          max={100}
+          value={limit}
+          onChange={(e) => setLimit(parseInt(e.target.value) || 25)}
+          className="mt-1"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-full">
-      {/* Sidebar for generating reports */}
-      <div className="w-64 shrink-0 flex flex-col bg-card border-r border-border">
+      {/* Desktop Sidebar for generating reports */}
+      <div className="hidden md:flex w-64 shrink-0 flex-col bg-card border-r border-border">
         <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
           <h2 className="font-semibold text-lg">Generate Report</h2>
-
-          <div>
-            <Label htmlFor="reportDate" className="text-sm">
-              Report Date
-            </Label>
-            <Input
-              id="reportDate"
-              type="date"
-              value={reportDate}
-              onChange={(e) => setReportDate(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <Button
-            onClick={handleGenerate}
-            disabled={generateMutation.isPending || saveMutation.isPending || aiGenerateMutation.isPending || !reportDate}
-            className="w-full"
-          >
-            {generateMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Fetching data...
-              </>
-            ) : saveMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving report...
-              </>
-            ) : aiGenerateMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating AI report...
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Generate Report
-              </>
-            )}
-          </Button>
-
-          {(generateMutation.isError || saveMutation.isError || aiGenerateMutation.isError) && (
-            <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              {generateMutation.error?.message || saveMutation.error?.message || aiGenerateMutation.error?.message || 'Failed to generate'}
-            </div>
-          )}
-
-          {/* Success message after full pipeline completes */}
-          {aiGenerateMutation.isSuccess && !generateMutation.isPending && !saveMutation.isPending && !aiGenerateMutation.isPending && (
-            <Card>
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">Report generated!</span>
-                </div>
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <Sparkles className="h-3 w-3" />
-                  <span className="text-xs">AI insights ready</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Results per page */}
-          <div className="pt-4 border-t">
-            <Label className="text-sm">Results per page</Label>
-            <Input
-              type="number"
-              min={10}
-              max={100}
-              value={limit}
-              onChange={(e) => setLimit(parseInt(e.target.value) || 25)}
-              className="mt-1"
-            />
-          </div>
+          {sidebarContent}
         </div>
       </div>
 
+      {/* Mobile: Floating Action Button + Drawer */}
+      <Drawer>
+        <DrawerTrigger asChild>
+          <Button
+            size="icon"
+            className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg md:hidden"
+            aria-label="Generate Report"
+          >
+            <CalendarPlus className="h-6 w-6" />
+          </Button>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader>
+            <DrawerTitle>Generate Report</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-6">
+            {sidebarContent}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col p-6 overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
         {/* Header */}
         <div className="shrink-0">
-          <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
-            <FileText className="h-6 w-6" />
+          <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 flex items-center gap-2">
+            <FileText className="h-5 w-5 md:h-6 md:w-6" />
             EOD Reports
           </h1>
 
-          <div className="flex gap-4 mb-2">
-            <div className="text-sm">
+          <div className="flex flex-wrap gap-2 md:gap-4 mb-2">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Total:</span> {data?.total ?? 0}
             </div>
-            <div className="text-sm">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-4">
-            Click a row to view full report details
+          <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
+            Tap a row to view full report details
           </p>
         </div>
 
@@ -323,6 +357,7 @@ export default function EODReportsPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             sortableColumns={['report_date', 'generated_at']}
+            mobileHiddenColumns={['trigger_type', 'generated_at']}
           />
         </div>
       </div>
@@ -368,27 +403,27 @@ function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report
   return (
     <div className="space-y-4">
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{rawData?.count ?? 0}</div>
-            <div className="text-sm text-muted-foreground">Total Calls</div>
+          <CardContent className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold">{rawData?.count ?? 0}</div>
+            <div className="text-xs md:text-sm text-muted-foreground">Total Calls</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-500">
+          <CardContent className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-red-500">
               {report.errors ?? callsWithErrors.length}
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs md:text-sm text-muted-foreground">
               {report.errors !== null ? 'AI-Detected Errors' : 'Failed Calls'}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-500">{callsWithoutErrors.length}</div>
-            <div className="text-sm text-muted-foreground">Clean Calls</div>
+          <CardContent className="p-3 md:p-4">
+            <div className="text-xl md:text-2xl font-bold text-green-500">{callsWithoutErrors.length}</div>
+            <div className="text-xs md:text-sm text-muted-foreground">Clean Calls</div>
           </CardContent>
         </Card>
       </div>
@@ -398,7 +433,7 @@ function EODReportDetail({ report, onRetryAI, isRetrying, retryError }: { report
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Report Metadata</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2 text-sm">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div>
             <span className="text-muted-foreground">Report Date:</span>{' '}
             <span className="font-medium">{report.report_date}</span>

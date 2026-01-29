@@ -6,6 +6,7 @@ import {
   getCoreRowModel,
   useReactTable,
   Row,
+  VisibilityState,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -17,8 +18,9 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowUp, ArrowDown, ArrowUpDown, Loader2 } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowUpDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 export type SortOrder = 'asc' | 'desc' | null;
 
@@ -39,6 +41,9 @@ interface DataTableProps<TData, TValue> {
   sortOrder?: SortOrder;
   onSort?: (column: string) => void;
   sortableColumns?: string[];
+  // Column visibility for responsive design
+  columnVisibility?: VisibilityState;
+  mobileHiddenColumns?: string[];
 }
 
 export function DataTable<TData, TValue>({
@@ -57,14 +62,26 @@ export function DataTable<TData, TValue>({
   sortOrder,
   onSort,
   sortableColumns = [],
+  columnVisibility: explicitColumnVisibility,
+  mobileHiddenColumns = [],
 }: DataTableProps<TData, TValue>) {
+  const isMobile = useIsMobile();
+
+  // Compute column visibility based on mobile state and explicit visibility
+  const computedColumnVisibility: VisibilityState = isMobile
+    ? mobileHiddenColumns.reduce((acc, col) => ({ ...acc, [col]: false }), explicitColumnVisibility || {})
+    : (explicitColumnVisibility || {});
+
   // Show refetching state when we have data but are fetching new data
   const isRefetching = isFetching && !isLoading && data.length > 0;
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getRowId: getRowId || ((row, index) => String(index)),
+    getRowId: getRowId || ((_row, index) => String(index)),
+    state: {
+      columnVisibility: computedColumnVisibility,
+    },
   });
 
   const currentPage = Math.floor(offset / limit) + 1;
@@ -104,8 +121,8 @@ export function DataTable<TData, TValue>({
           ))}
         </div>
         <div className="flex items-center justify-between py-4 shrink-0">
-          <Skeleton className="h-4 w-[200px]" />
-          <Skeleton className="h-8 w-[200px]" />
+          <Skeleton className="h-4 w-[120px] sm:w-[200px]" />
+          <Skeleton className="h-8 w-[120px] sm:w-[200px]" />
         </div>
       </div>
     );
@@ -194,8 +211,11 @@ export function DataTable<TData, TValue>({
 
       {/* Pagination - fixed at bottom */}
       <div className="flex items-center justify-between py-4 shrink-0">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground hidden sm:block">
           Showing {Math.min(offset + 1, total)} to {Math.min(offset + limit, total)} of {total} results
+        </div>
+        <div className="text-sm text-muted-foreground sm:hidden">
+          {Math.min(offset + 1, total)}-{Math.min(offset + limit, total)} of {total}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -203,19 +223,41 @@ export function DataTable<TData, TValue>({
             size="sm"
             onClick={() => onOffsetChange(Math.max(0, offset - limit))}
             disabled={offset === 0}
+            className="hidden sm:inline-flex"
           >
             Previous
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+            disabled={offset === 0}
+            className="sm:hidden h-9 w-9"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="sr-only">Previous</span>
+          </Button>
           <span className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
+            {currentPage}/{totalPages}
           </span>
           <Button
             variant="outline"
             size="sm"
             onClick={() => onOffsetChange(offset + limit)}
             disabled={offset + limit >= total}
+            className="hidden sm:inline-flex"
           >
             Next
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onOffsetChange(offset + limit)}
+            disabled={offset + limit >= total}
+            className="sm:hidden h-9 w-9"
+          >
+            <ChevronRight className="h-4 w-4" />
+            <span className="sr-only">Next</span>
           </Button>
         </div>
       </div>

@@ -9,23 +9,24 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { FilterSidebar, type DateFilterMode } from '@/components/filters/filter-sidebar';
+import { ResponsiveFilterSidebar } from '@/components/filters/responsive-filter-sidebar';
+import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
-import { DetailDialog } from '@/components/details/detail-dialog';
-import { CallDetailPanel } from '@/components/details/call-detail-panel';
+import { CallDetailSheet } from '@/components/details/call-detail-sheet';
 import { CekuraStatus } from '@/components/cekura/cekura-status';
-import { useCalls, useCallDetail, useImportantCallIds, useTransferEmailMismatchIds } from '@/hooks/use-calls';
+import { useCalls, useImportantCallIds, useTransferEmailMismatchIds } from '@/hooks/use-calls';
 import { useFlaggedCalls } from '@/hooks/use-flagged-calls';
 import { useSentryErrorCorrelationIds } from '@/hooks/use-sentry-events';
 import { useCekuraCallMapping, type CekuraCallData } from '@/hooks/use-cekura';
+import { useFirms } from '@/hooks/use-firms';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants';
 import { formatDuration } from '@/lib/formatting';
-import type { CallListItem } from '@/types/database';
+import type { CallListItem, Firm } from '@/types/database';
 import type { SortOrder, FlaggedCallListItem } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { format, subDays } from 'date-fns';
-import { getTodayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
+import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 // Helper to create columns with error, important, mismatch, and Cekura state access
 function createColumns(
@@ -168,6 +169,10 @@ export default function CallsPage() {
 
   const debouncedSearch = useDebounce(search, 300);
 
+  // Firms for the grid filter
+  const { data: firmsData } = useFirms();
+  const firms = useMemo(() => [...(firmsData?.firms ?? [])].sort((a, b) => a.id - b.id), [firmsData]);
+
   // Update URL when flaggedOnly changes (without causing re-render loops)
   const handleFlaggedOnlyChange = (checked: boolean) => {
     setFlaggedOnly(checked);
@@ -183,8 +188,10 @@ export default function CallsPage() {
       return { startDate: null, endDate: null };
     }
     if (dateFilterMode === 'today') {
-      // Get today's date range in UTC (based on Eastern timezone day)
       return getTodayRangeUTC();
+    }
+    if (dateFilterMode === 'yesterday') {
+      return getYesterdayRangeUTC();
     }
     // Custom mode - convert Eastern dates to UTC
     return getDateRangeUTC(startDate, endDate);
@@ -366,7 +373,7 @@ export default function CallsPage() {
   return (
     <div className="flex h-full">
       {/* Filter Sidebar */}
-      <FilterSidebar
+      <ResponsiveFilterSidebar
         dateFilterMode={dateFilterMode}
         onDateFilterModeChange={setDateFilterMode}
         startDate={startDate}
@@ -378,83 +385,97 @@ export default function CallsPage() {
         searchHelpText="ID, caller name, phone, correlation ID, summary"
         firmId={firmId}
         onFirmIdChange={setFirmId}
+        hideFirmFilter={!flaggedOnly}
         limit={limit}
         onLimitChange={setLimit}
       >
-        {/* Call Type Filter - only show when not in flagged mode */}
+        {/* Call-specific filters in compact 2x2 grid - only show when not in flagged mode */}
         {!flaggedOnly && (
-          <div>
-            <Label className="text-sm">Call Type</Label>
-            <Select value={callType} onValueChange={setCallType}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CALL_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-sm">Firm</Label>
+                <Select
+                  value={firmId ? String(firmId) : 'all'}
+                  onValueChange={(v) => setFirmId(v === 'all' ? null : parseInt(v))}
+                >
+                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Firms</SelectItem>
+                    {firms.map((firm: Firm) => (
+                      <SelectItem key={firm.id} value={String(firm.id)}>
+                        {firm.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Call Type</Label>
+                <Select value={callType} onValueChange={setCallType}>
+                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CALL_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Transfer</Label>
+                <Select value={transferType} onValueChange={setTransferType}>
+                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRANSFER_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Cekura</Label>
+                <Select
+                  value={cekuraStatusFilter}
+                  onValueChange={(v) => setCekuraStatusFilter(v as typeof cekuraStatusFilter)}
+                >
+                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="success">Success</SelectItem>
+                    <SelectItem value="failure">Failure</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        {/* Transfer Type Filter - only show when not in flagged mode */}
-        {!flaggedOnly && (
-          <div>
-            <Label className="text-sm">Transfer Type</Label>
-            <Select value={transferType} onValueChange={setTransferType}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRANSFER_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Cekura Status Filter - only show when not in flagged mode */}
-        {!flaggedOnly && (
-          <div>
-            <Label className="text-sm">Cekura Status</Label>
-            <Select
-              value={cekuraStatusFilter}
-              onValueChange={(v) => setCekuraStatusFilter(v as typeof cekuraStatusFilter)}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="failure">Failure</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Multiple Transfers Filter - only show when not in flagged mode */}
-        {!flaggedOnly && (
-          <div className="flex items-center justify-between">
-            <Label htmlFor="multiple-transfers" className="text-sm flex items-center gap-1.5">
-              Multiple Transfers
-              {multipleTransfers && isLoading && (
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-              )}
-            </Label>
-            <Switch
-              id="multiple-transfers"
-              checked={multipleTransfers}
-              onCheckedChange={setMultipleTransfers}
-            />
-          </div>
+            {/* Multiple Transfers - below grid */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="multiple-transfers" className="text-sm flex items-center gap-1.5">
+                Multiple Transfers
+                {multipleTransfers && isLoading && (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                )}
+              </Label>
+              <Switch
+                id="multiple-transfers"
+                checked={multipleTransfers}
+                onCheckedChange={setMultipleTransfers}
+              />
+            </div>
+          </>
         )}
 
         {/* Flagged Only Filter */}
@@ -472,32 +493,32 @@ export default function CallsPage() {
             onCheckedChange={handleFlaggedOnlyChange}
           />
         </div>
-      </FilterSidebar>
+      </ResponsiveFilterSidebar>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col p-6 overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
         {/* Header - fixed */}
         <div className="shrink-0">
-          <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 flex items-center gap-2">
             {flaggedOnly ? (
               <>
-                <Flag className="h-6 w-6 text-red-500" />
+                <Flag className="h-5 w-5 md:h-6 md:w-6 text-red-500" />
                 Flagged Calls
               </>
             ) : (
               <>
-                <Phone className="h-6 w-6" />
+                <Phone className="h-5 w-5 md:h-6 md:w-6" />
                 Calls
               </>
             )}
           </h1>
 
           {/* Stats */}
-          <div className="flex gap-4 mb-2">
-            <div className="text-sm">
+          <div className="flex flex-wrap gap-2 md:gap-4 mb-2">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Total:</span> {dateOnlyData?.total ?? 0}
             </div>
-            <div className="text-sm">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Filtered:</span> {data?.total ?? 0}
               {dateOnlyData?.total ? (
                 <span className="text-muted-foreground ml-1">
@@ -505,15 +526,15 @@ export default function CallsPage() {
                 </span>
               ) : null}
             </div>
-            <div className="text-sm">
+            <div className="text-xs md:text-sm">
               <span className="font-medium">Showing:</span> {data?.data?.length ?? 0}
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
             {flaggedOnly
               ? 'Calls flagged by: Sentry errors, long duration (>5 min), important emails, or transfer mismatches'
-              : 'Click a row to view call details'}
+              : 'Tap a row to view call details'}
           </p>
         </div>
 
@@ -535,12 +556,13 @@ export default function CallsPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             sortableColumns={['id', 'started_at', 'call_duration']}
+            mobileHiddenColumns={['platform_call_id', 'call_type', 'cekura_status', 'started_at', 'phone_number']}
           />
         </div>
       </div>
 
-      {/* Detail Drawer */}
-      <CallDetailDrawer
+      {/* Detail Sheet - Two-panel resizable layout */}
+      <CallDetailSheet
         callId={selectedCallId}
         highlightReasons={highlightReasons}
         onClose={() => setSelectedCallId(null)}
@@ -554,48 +576,5 @@ export default function CallsPage() {
         }}
       />
     </div>
-  );
-}
-
-function CallDetailDrawer({
-  callId,
-  highlightReasons,
-  onClose,
-  onPrevious,
-  onNext,
-  hasPrevious,
-  hasNext,
-  dateRange,
-}: {
-  callId: number | null;
-  highlightReasons: HighlightReasons;
-  onClose: () => void;
-  onPrevious: () => void;
-  onNext: () => void;
-  hasPrevious: boolean;
-  hasNext: boolean;
-  dateRange: { startDate: string | null; endDate: string | null };
-}) {
-  const { data } = useCallDetail(callId);
-  const call = data?.call;
-
-  return (
-    <DetailDialog
-      open={callId !== null}
-      onClose={onClose}
-      onPrevious={onPrevious}
-      onNext={onNext}
-      hasPrevious={hasPrevious}
-      hasNext={hasNext}
-      title={
-        <span className="flex items-center gap-2">
-          <Phone className="h-5 w-5" />
-          Call #{callId}
-        </span>
-      }
-      subtitle={call ? `${call.caller_name} - ${call.phone_number}` : undefined}
-    >
-      {callId && <CallDetailPanel callId={callId} highlightReasons={highlightReasons} dateRange={dateRange} />}
-    </DetailDialog>
   );
 }

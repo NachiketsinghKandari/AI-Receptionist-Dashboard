@@ -115,6 +115,26 @@ function easternToUTC(dateStr: string, timeStr: string): string {
 }
 
 /**
+ * Get yesterday's date boundaries in UTC, based on Eastern timezone
+ * Returns ISO strings with Z suffix for database queries
+ */
+export function getYesterdayRangeUTC(): { startDate: string; endDate: string } {
+  const now = new Date();
+  // Subtract one day
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const yesterdayStr = formatter.format(yesterday); // Format: YYYY-MM-DD
+
+  return getDateRangeUTC(yesterdayStr, yesterdayStr);
+}
+
+/**
  * Format a UTC ISO string for display in Eastern timezone
  */
 export function formatEasternDateTime(isoString: string, formatStr: string): string {

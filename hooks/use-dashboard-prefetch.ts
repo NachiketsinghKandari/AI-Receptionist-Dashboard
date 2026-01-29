@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useEnvironment } from '@/components/providers/environment-provider';
-import { startOfDay, endOfDay, subDays } from 'date-fns';
+import { getTodayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
 
 /**
  * Prefetches all dashboard chart and overview data on mount.
@@ -16,24 +16,42 @@ export function useDashboardPrefetch() {
   useEffect(() => {
     const now = new Date();
 
+    // Get today's date in Eastern timezone (same as page.tsx)
+    const todayStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BUSINESS_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+
+    const subtractDays = (dateStr: string, days: number): string => {
+      const d = new Date(dateStr + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() - days);
+      return d.toISOString().slice(0, 10);
+    };
+
+    const todayRange = getTodayRangeUTC();
+    const weekRange = getDateRangeUTC(subtractDays(todayStr, 6), todayStr);
+    const monthRange = getDateRangeUTC(subtractDays(todayStr, 29), todayStr);
+
     // Define all chart date ranges to prefetch
     const chartRanges = [
       // Today (hourly)
       {
-        startDate: startOfDay(now).toISOString(),
-        endDate: endOfDay(now).toISOString(),
+        startDate: todayRange.startDate,
+        endDate: todayRange.endDate,
         isHourly: true,
       },
       // 7 Days
       {
-        startDate: startOfDay(subDays(now, 6)).toISOString(),
-        endDate: endOfDay(now).toISOString(),
+        startDate: weekRange.startDate,
+        endDate: weekRange.endDate,
         isHourly: false,
       },
       // 30 Days
       {
-        startDate: startOfDay(subDays(now, 29)).toISOString(),
-        endDate: endOfDay(now).toISOString(),
+        startDate: monthRange.startDate,
+        endDate: monthRange.endDate,
         isHourly: false,
       },
       // All Time (no date params)

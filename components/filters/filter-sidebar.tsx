@@ -1,6 +1,7 @@
 'use client';
 
 import { Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,9 +9,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFirms } from '@/hooks/use-firms';
 import type { Firm } from '@/types/database';
 
-export type DateFilterMode = 'custom' | 'today' | 'all';
+export type DateFilterMode = 'today' | 'yesterday' | 'custom' | 'all';
 
-interface FilterSidebarProps {
+export interface FilterSidebarProps {
   dateFilterMode: DateFilterMode;
   onDateFilterModeChange: (value: DateFilterMode) => void;
   startDate: string;
@@ -22,9 +23,11 @@ interface FilterSidebarProps {
   searchHelpText?: string;
   firmId: number | null;
   onFirmIdChange: (value: number | null) => void;
+  hideFirmFilter?: boolean;
   limit: number;
   onLimitChange: (value: number) => void;
   children?: React.ReactNode;
+  className?: string;
 }
 
 export function FilterSidebar({
@@ -39,16 +42,18 @@ export function FilterSidebar({
   searchHelpText,
   firmId,
   onFirmIdChange,
+  hideFirmFilter,
   limit,
   onLimitChange,
   children,
+  className,
 }: FilterSidebarProps) {
   const { data: firmsData } = useFirms();
   // Sort firms by ID (ascending)
   const firms = [...(firmsData?.firms ?? [])].sort((a, b) => a.id - b.id);
 
   return (
-    <div className="w-64 shrink-0 flex flex-col bg-card border-r border-border">
+    <div className={cn("w-64 shrink-0 flex flex-col bg-card border-r border-border", className)}>
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         <h2 className="font-semibold text-lg">Filters</h2>
 
@@ -61,16 +66,19 @@ export function FilterSidebar({
             onValueChange={(value) => {
               if (value) onDateFilterModeChange(value as DateFilterMode);
             }}
-            className="justify-start"
+            className="w-full"
           >
-            <ToggleGroupItem value="today" size="sm" className="text-xs">
+            <ToggleGroupItem value="today" size="sm" className="flex-1 text-xs px-1">
               Today
             </ToggleGroupItem>
-            <ToggleGroupItem value="all" size="sm" className="text-xs">
-              All Data
+            <ToggleGroupItem value="yesterday" size="sm" className="flex-1 text-xs px-1">
+              Yesterday
             </ToggleGroupItem>
-            <ToggleGroupItem value="custom" size="sm" className="text-xs">
+            <ToggleGroupItem value="custom" size="sm" className="flex-1 text-xs px-1">
               Custom
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" size="sm" className="flex-1 text-xs px-1">
+              All
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
@@ -126,25 +134,27 @@ export function FilterSidebar({
         </div>
 
         {/* Firm Filter */}
-        <div>
-          <Label className="text-sm">Firm</Label>
-          <Select
-            value={firmId ? String(firmId) : 'all'}
-            onValueChange={(v) => onFirmIdChange(v === 'all' ? null : parseInt(v))}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="All Firms" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Firms</SelectItem>
-              {firms.map((firm: Firm) => (
-                <SelectItem key={firm.id} value={String(firm.id)}>
-                  {firm.name} (ID: {firm.id})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!hideFirmFilter && (
+          <div>
+            <Label className="text-sm">Firm</Label>
+            <Select
+              value={firmId ? String(firmId) : 'all'}
+              onValueChange={(v) => onFirmIdChange(v === 'all' ? null : parseInt(v))}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All Firms" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Firms</SelectItem>
+                {firms.map((firm: Firm) => (
+                  <SelectItem key={firm.id} value={String(firm.id)}>
+                    {firm.name} (ID: {firm.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Page-specific filters */}
         {children}
