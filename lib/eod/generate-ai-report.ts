@@ -26,9 +26,9 @@ interface PromptRow {
 
 // Map report type to prompt type in database
 const PROMPT_TYPE_MAP: Record<EODReportType, string> = {
-  success: 'eod_success_report_prompt',
-  failure: 'eod_failure_report_prompt',
-  full: 'eod_report_prompt',
+  success: 'eod_success_report',
+  failure: 'eod_failure_report',
+  full: 'eod_full_report',
 };
 
 // Map report type to database column
