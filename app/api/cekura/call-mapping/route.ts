@@ -27,6 +27,7 @@ interface CekuraCallResult {
   id: number;
   call_id: string; // This is our correlation_id (platform_call_id)
   status: string;
+  feedback?: string | null;
   evaluation?: CekuraEvaluation;
 }
 
@@ -41,6 +42,7 @@ interface CekuraApiResponse {
 export interface CekuraCallData {
   cekuraId: number;
   status: string;
+  feedback: string | null;
   metrics: Array<{
     name: string;
     score: number;
@@ -104,6 +106,7 @@ export async function GET(request: NextRequest) {
         calls[result.call_id] = {
           cekuraId: result.id,
           status: result.status || 'unknown',
+          feedback: result.feedback || null,
           metrics: binaryMetrics,
         };
       }

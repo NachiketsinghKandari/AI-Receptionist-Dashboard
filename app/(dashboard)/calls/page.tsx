@@ -14,6 +14,7 @@ import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { CallDetailSheet } from '@/components/details/call-detail-sheet';
 import { CekuraStatus } from '@/components/cekura/cekura-status';
+import { CekuraFeedback } from '@/components/cekura/cekura-feedback';
 import { useCalls, useImportantCallIds, useTransferEmailMismatchIds } from '@/hooks/use-calls';
 import { useFlaggedCalls } from '@/hooks/use-flagged-calls';
 import { useSentryErrorCorrelationIds } from '@/hooks/use-sentry-events';
@@ -122,6 +123,23 @@ function createColumns(
             isLoading={cekuraData.isLoading}
             isFullyLoaded={cekuraData.isFullyLoaded}
             hasError={cekuraData.hasError}
+          />
+        );
+      },
+    },
+    {
+      id: 'feedback',
+      header: 'Feedback',
+      cell: ({ row }) => {
+        const correlationId = row.original.platform_call_id;
+        const callData = correlationId ? cekuraData.calls.get(correlationId) : undefined;
+
+        return (
+          <CekuraFeedback
+            callData={callData}
+            correlationId={correlationId}
+            isLoading={cekuraData.isLoading}
+            isFullyLoaded={cekuraData.isFullyLoaded}
           />
         );
       },
@@ -556,7 +574,7 @@ export default function CallsPage() {
             sortOrder={sortOrder}
             onSort={handleSort}
             sortableColumns={['id', 'started_at', 'call_duration']}
-            mobileHiddenColumns={['platform_call_id', 'call_type', 'cekura_status', 'started_at', 'phone_number']}
+            mobileHiddenColumns={['platform_call_id', 'call_type', 'cekura_status', 'feedback', 'started_at', 'phone_number']}
           />
         </div>
       </div>

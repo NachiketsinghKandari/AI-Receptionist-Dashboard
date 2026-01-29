@@ -278,12 +278,17 @@ export function CallDetailSheet({
               </ScrollArea>
             </div>
 
-            {/* Resize Handle */}
+            {/* Resize Handle with Separator Line */}
             <div
-              className="relative flex items-center justify-center w-1.5 shrink-0 cursor-col-resize group hover:bg-primary/10 transition-colors"
+              className="relative flex items-center justify-center w-3 shrink-0 cursor-col-resize group"
               onMouseDown={handleMouseDown}
             >
-              <div className="absolute z-10 flex h-8 w-3 items-center justify-center rounded-sm border bg-muted shadow-sm group-hover:bg-muted-foreground/20 transition-colors">
+              {/* Vertical separator line */}
+              <div className="absolute inset-y-0 left-1/2 w-px bg-border -translate-x-1/2" />
+              {/* Hover highlight area */}
+              <div className="absolute inset-0 group-hover:bg-primary/5 transition-colors" />
+              {/* Grip handle */}
+              <div className="absolute z-10 flex h-8 w-4 items-center justify-center rounded-sm border bg-background shadow-sm group-hover:bg-muted transition-colors">
                 <GripVertical className="size-3 text-muted-foreground" />
               </div>
             </div>

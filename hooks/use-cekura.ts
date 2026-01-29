@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { CACHE_TTL_DATA } from '@/lib/constants';
 
@@ -15,6 +15,7 @@ export interface CekuraMetric {
 export interface CekuraCallData {
   cekuraId: number;
   status: string;
+  feedback: string | null;
   metrics: CekuraMetric[];
 }
 
@@ -129,4 +130,71 @@ export function useCekuraCallMapping(startDate: string | null, endDate: string |
 export function buildCekuraUrl(cekuraCallId: number, environment: string): string {
   const agentId = CEKURA_AGENT_IDS[environment] || CEKURA_AGENT_IDS.production;
   return `https://dashboard.cekura.ai/dashboard/1939/3184/${agentId}/calls?page=1&pageSize=30&callId=${cekuraCallId}`;
+}
+
+/**
+ * Update feedback for a Cekura call
+ */
+async function updateCekuraFeedback(cekuraId: number, feedback: string): Promise<void> {
+  const response = await fetch('/api/cekura/feedback', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ cekuraId, feedback }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update feedback');
+  }
+}
+
+/**
+ * Hook to update feedback for a Cekura call.
+ * Optimistically updates the local cache and invalidates on success.
+ */
+export function useCekuraFeedbackMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ cekuraId, feedback }: { cekuraId: number; feedback: string; correlationId: string }) =>
+      updateCekuraFeedback(cekuraId, feedback),
+    onMutate: async ({ feedback, correlationId }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['cekura', 'call-data'] });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueriesData({ queryKey: ['cekura', 'call-data'] });
+
+      // Optimistically update all matching queries
+      queryClient.setQueriesData<CekuraApiResponse>(
+        { queryKey: ['cekura', 'call-data'] },
+        (old) => {
+          if (!old?.calls) return old;
+          const updatedCalls = { ...old.calls };
+          if (updatedCalls[correlationId]) {
+            updatedCalls[correlationId] = {
+              ...updatedCalls[correlationId],
+              feedback,
+            };
+          }
+          return { ...old, calls: updatedCalls };
+        }
+      );
+
+      return { previousData };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
+      // Invalidate to refetch
+      queryClient.invalidateQueries({ queryKey: ['cekura', 'call-data'] });
+    },
+  });
 }

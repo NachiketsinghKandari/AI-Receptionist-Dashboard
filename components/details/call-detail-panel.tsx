@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { useCallDetail } from '@/hooks/use-calls';
 import { useWebhooksForCall } from '@/hooks/use-webhooks';
 import { useSentryEventsForCall } from '@/hooks/use-sentry-events';
-import { useCekuraCallMapping, buildCekuraUrl } from '@/hooks/use-cekura';
+import { useCekuraCallMapping, buildCekuraUrl, useCekuraFeedbackMutation } from '@/hooks/use-cekura';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { formatDuration } from '@/lib/formatting';
 import type { Transfer, Email, Webhook, SentryEvent } from '@/types/database';
@@ -45,8 +45,12 @@ import {
   BarChart3,
   Loader2,
   Wrench,
+  Pencil,
+  Check,
+  X,
+  MessageSquareText,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
 
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
@@ -974,6 +978,201 @@ interface CallDetailPanelSharedProps {
 }
 
 /**
+ * Feedback section component with inline editing
+ */
+function FeedbackSection({
+  feedback,
+  cekuraId,
+  correlationId,
+  isLoading,
+}: {
+  feedback: string | null | undefined;
+  cekuraId: number | undefined;
+  correlationId: string | null | undefined;
+  isLoading: boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mutation = useCekuraFeedbackMutation();
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current && isEditing) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [editValue, isEditing]);
+
+  // Focus textarea when entering edit mode
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, [isEditing]);
+
+  const handleStartEdit = () => {
+    setEditValue(feedback || '');
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!cekuraId || !correlationId) return;
+
+    try {
+      await mutation.mutateAsync({
+        cekuraId,
+        feedback: editValue,
+        correlationId,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to save feedback:', error);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
+
+  const hasFeedback = feedback && feedback.trim().length > 0;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <MessageSquareText className="h-4 w-4" />
+            Feedback
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // No Cekura data available
+  if (!cekuraId) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <MessageSquareText className="h-4 w-4" />
+            Feedback
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <p className="text-sm text-muted-foreground italic">
+            No Cekura data available for this call
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <MessageSquareText className="h-4 w-4" />
+            Feedback
+          </CardTitle>
+          {!isEditing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleStartEdit}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              {hasFeedback ? 'Edit' : 'Add'}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {isEditing ? (
+          <div className="space-y-2">
+            <textarea
+              ref={textareaRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Enter your feedback about this call..."
+              className={cn(
+                "w-full min-h-[80px] max-h-[200px] px-3 py-2 text-sm rounded-md resize-none",
+                "border border-input bg-background",
+                "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+                "placeholder:text-muted-foreground"
+              )}
+              disabled={mutation.isPending}
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Enter to save, Shift+Enter for new line
+              </p>
+              <div className="flex items-center gap-1">
+                {mutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                      onClick={handleSave}
+                    >
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      Save
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                      onClick={handleCancel}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1" />
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : hasFeedback ? (
+          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+            {feedback}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">
+            No feedback yet. Click &quot;Add&quot; to add your notes.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * Left panel for the two-panel layout:
  * - Quick Links (VAPI, Sentry, Cekura)
  * - Call Information card
@@ -1083,6 +1282,14 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
           ) : null
         )}
       </div>
+
+      {/* Feedback Section */}
+      <FeedbackSection
+        feedback={cekuraCallInfo?.feedback}
+        cekuraId={cekuraCallId}
+        correlationId={platformCallId}
+        isLoading={cekuraLoading && !cekuraFullyLoaded}
+      />
 
       {/* Tabs: Info, Activity, Logs */}
       <Tabs
