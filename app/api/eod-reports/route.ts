@@ -1,17 +1,14 @@
 /**
  * EOD Reports API route
  * GET: List all EOD reports
- * POST: Save a new EOD report (triggers AI generation in background)
+ * POST: Save a new EOD report (frontend triggers AI generation separately)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { after } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { errorResponse, parseIntOrDefault, clamp } from '@/lib/api/utils';
-import { generateAIReportForEOD } from '@/lib/eod/generate-ai-report';
 import type { Environment } from '@/lib/constants';
 import { MAX_PAGE_LIMIT, DEFAULT_PAGE_LIMIT } from '@/lib/constants';
-import type { EODRawData } from '@/types/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,8 +76,6 @@ export async function POST(request: NextRequest) {
       .eq('report_date', reportDate)
       .single();
 
-    let reportId: string;
-
     if (existing) {
       // Update existing report - clear AI fields for regeneration
       const { data, error } = await supabase
@@ -89,8 +84,10 @@ export async function POST(request: NextRequest) {
           raw_data: rawData,
           generated_at: new Date().toISOString(),
           trigger_type: triggerType,
-          report: null, // Clear for regeneration
+          full_report: null, // Clear for regeneration
           errors: null, // Clear for regeneration
+          success_report: null, // Clear for regeneration
+          failure_report: null, // Clear for regeneration
         })
         .eq('report_date', reportDate)
         .select()
@@ -101,18 +98,11 @@ export async function POST(request: NextRequest) {
         return errorResponse('Failed to update report', 500, 'DB_ERROR');
       }
 
-      reportId = data.id;
-
-      // Trigger AI generation in background (fire-and-forget, continues even if client disconnects)
-      after(async () => {
-        await generateAIReportForEOD(reportId, rawData as EODRawData, environment);
-      });
-
+      // Frontend will trigger AI generation for both success and failure reports in parallel
       return NextResponse.json({
         report: data,
         updated: true,
-        ai_generating: true,
-        message: 'Report saved! AI insights generating in background...',
+        message: 'Report saved! Trigger AI generation separately.',
       });
     }
 
@@ -124,8 +114,10 @@ export async function POST(request: NextRequest) {
         raw_data: rawData,
         ai_insights: '',
         trigger_type: triggerType,
-        report: null,
+        full_report: null,
         errors: null,
+        success_report: null,
+        failure_report: null,
       })
       .select()
       .single();
@@ -135,18 +127,11 @@ export async function POST(request: NextRequest) {
       return errorResponse('Failed to save report', 500, 'DB_ERROR');
     }
 
-    reportId = data.id;
-
-    // Trigger AI generation in background (fire-and-forget, continues even if client disconnects)
-    after(async () => {
-      await generateAIReportForEOD(reportId, rawData as EODRawData, environment);
-    });
-
+    // Frontend will trigger AI generation for both success and failure reports in parallel
     return NextResponse.json({
       report: data,
       updated: false,
-      ai_generating: true,
-      message: 'Report saved! AI insights generating in background...',
+      message: 'Report saved! Trigger AI generation separately.',
     });
   } catch (error) {
     console.error('EOD reports API error:', error);

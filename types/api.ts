@@ -202,8 +202,11 @@ export interface EODCallRawData {
 }
 
 export interface EODRawData {
-  count: number;
-  calls: EODCallRawData[];
+  count: number;              // total calls
+  total: number;              // same as count (for clarity)
+  errors: number;             // count of calls where status !== 'success'
+  success: EODCallRawData[];  // calls where cekura.status === 'success'
+  failure: EODCallRawData[];  // calls where cekura.status !== 'success'
   generated_at: string;
   environment: string;
 }
@@ -213,11 +216,15 @@ export interface EODReport {
   report_date: string;
   raw_data: EODRawData;
   ai_insights: string;
-  report: string | null; // AI-generated markdown report
-  errors: number | null; // Error count computed by AI
+  full_report: string | null;     // AI-generated full report (all calls)
+  errors: number | null;          // Error count computed by AI
+  success_report: string | null;  // AI-generated report for successful calls
+  failure_report: string | null;  // AI-generated report for failed calls
   generated_at: string;
   trigger_type: 'scheduled' | 'manual';
 }
+
+export type EODReportType = 'success' | 'failure' | 'full';
 
 export type EODReportsResponse = PaginatedResponse<EODReport>;
 

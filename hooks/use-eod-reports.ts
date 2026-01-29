@@ -7,6 +7,7 @@ import type {
   EODReportsResponse,
   EODRawData,
   GenerateEODReportResponse,
+  EODReportType,
 } from '@/types/api';
 import { CACHE_TTL_DATA } from '@/lib/constants';
 
@@ -48,7 +49,6 @@ async function generateEODReport(
 interface SaveEODReportResponse {
   report: { id: string; [key: string]: unknown };
   updated: boolean;
-  ai_generating: boolean;
   message: string;
 }
 
@@ -74,17 +74,18 @@ async function saveEODReport(
 async function generateAIReport(
   reportId: string,
   rawData: EODRawData,
+  reportType: EODReportType,
   environment: string
-): Promise<{ success: boolean; error_count: number }> {
+): Promise<{ success: boolean; reportType: EODReportType }> {
   const response = await fetch(`/api/eod-reports/ai-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reportId, rawData }),
+    body: JSON.stringify({ reportId, rawData, reportType }),
   });
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to generate AI report');
+    throw new Error(error.error || `Failed to generate ${reportType} AI report`);
   }
 
   return response.json();
@@ -127,13 +128,39 @@ export function useSaveEODReport() {
   });
 }
 
-export function useGenerateAIReport() {
+export function useGenerateSuccessReport() {
   const { environment } = useEnvironment();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
-      generateAIReport(reportId, rawData, environment),
+      generateAIReport(reportId, rawData, 'success', environment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+    },
+  });
+}
+
+export function useGenerateFailureReport() {
+  const { environment } = useEnvironment();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
+      generateAIReport(reportId, rawData, 'failure', environment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+    },
+  });
+}
+
+export function useGenerateFullReport() {
+  const { environment } = useEnvironment();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
+      generateAIReport(reportId, rawData, 'full', environment),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
     },

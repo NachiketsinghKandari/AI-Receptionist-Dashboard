@@ -274,27 +274,39 @@ export async function POST(request: NextRequest) {
       fetchSentryErrors(environment),
     ]);
 
-    // Merge data by correlation_id
-    const calls: EODCallRawData[] = [];
+    // Merge data by correlation_id and separate by status
+    const successCalls: EODCallRawData[] = [];
+    const failureCalls: EODCallRawData[] = [];
 
     for (const [correlationId, cekuraData] of cekuraResult.calls) {
       const sentryErrorsForCall = sentryErrors.get(correlationId) || [];
 
-      calls.push({
+      const callData: EODCallRawData = {
         correlation_id: correlationId,
         cekura: cekuraData,
         sentry: {
           errors: sentryErrorsForCall,
         },
-      });
+      };
+
+      // Separate calls by cekura status
+      if (cekuraData.status === 'success') {
+        successCalls.push(callData);
+      } else {
+        failureCalls.push(callData);
+      }
     }
 
     // Sort by Cekura ID (most recent first)
-    calls.sort((a, b) => b.cekura.id - a.cekura.id);
+    successCalls.sort((a, b) => b.cekura.id - a.cekura.id);
+    failureCalls.sort((a, b) => b.cekura.id - a.cekura.id);
 
     const rawData: EODRawData = {
       count: cekuraResult.count,
-      calls,
+      total: cekuraResult.count,
+      errors: failureCalls.length,
+      success: successCalls,
+      failure: failureCalls,
       generated_at: new Date().toISOString(),
       environment,
     };

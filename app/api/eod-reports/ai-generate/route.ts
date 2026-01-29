@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateAIReportForEOD } from '@/lib/eod/generate-ai-report';
 import { errorResponse } from '@/lib/api/utils';
 import type { Environment } from '@/lib/constants';
+import type { EODReportType } from '@/types/api';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     const environment = (searchParams.get('env') || 'production') as Environment;
 
     const body = await request.json();
-    const { reportId, rawData } = body;
+    const { reportId, rawData, reportType } = body;
 
     if (!reportId) {
       return errorResponse('reportId is required', 400, 'MISSING_PARAMS');
@@ -25,8 +26,12 @@ export async function POST(request: NextRequest) {
       return errorResponse('rawData is required', 400, 'MISSING_PARAMS');
     }
 
-    // Use shared AI generation function
-    const result = await generateAIReportForEOD(reportId, rawData, environment);
+    if (!reportType || (reportType !== 'success' && reportType !== 'failure' && reportType !== 'full')) {
+      return errorResponse('reportType must be "success", "failure", or "full"', 400, 'INVALID_PARAMS');
+    }
+
+    // Use shared AI generation function with reportType
+    const result = await generateAIReportForEOD(reportId, rawData, environment, reportType as EODReportType);
 
     if (!result.success) {
       return errorResponse(result.error || 'AI generation failed', 500, 'AI_ERROR');
@@ -34,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      error_count: result.error_count,
+      reportType,
     });
   } catch (error) {
     console.error('AI generation API error:', error);
