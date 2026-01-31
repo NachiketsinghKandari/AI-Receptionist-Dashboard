@@ -12,7 +12,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useTransfers } from '@/hooks/use-transfers';
 import { useDebounce } from '@/hooks/use-debounce';
-import { DEFAULT_PAGE_LIMIT, TRANSFER_STATUSES } from '@/lib/constants';
+import { DEFAULT_PAGE_LIMIT, TRANSFER_STATUSES, TRANSFER_TYPES } from '@/lib/constants';
 import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Transfer } from '@/types/database';
 import type { SortOrder, DynamicFilter } from '@/types/api';
@@ -81,6 +81,7 @@ export default function TransfersPage() {
   const [search, setSearch] = useState('');
   const [firmId, setFirmId] = useState<number | null>(null);
   const [status, setStatus] = useState('All');
+  const [transferType, setTransferType] = useState('Off');
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
@@ -172,6 +173,7 @@ export default function TransfersPage() {
       firmId: effectiveFirmId,
       callId: extractedFilters.callId,
       status: effectiveStatus,
+      transferType: transferType !== 'Off' ? transferType : undefined,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -181,7 +183,7 @@ export default function TransfersPage() {
       sortOrder,
       dynamicFilters: extractedFilters.standardFilters,
     }),
-    [effectiveFirmId, extractedFilters.callId, effectiveStatus, extractedFilters.standardFilters, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [effectiveFirmId, extractedFilters.callId, effectiveStatus, transferType, extractedFilters.standardFilters, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
   );
 
   // Handle column sorting
@@ -250,6 +252,21 @@ export default function TransfersPage() {
               {TRANSFER_STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
                   {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-sm">Transfer Type</Label>
+          <Select value={transferType} onValueChange={setTransferType}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRANSFER_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t === 'has_conversation' ? 'Has Conversation' : t}
                 </SelectItem>
               ))}
             </SelectContent>

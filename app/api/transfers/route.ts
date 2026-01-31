@@ -13,8 +13,10 @@ import {
   buildSearchOrCondition,
   isValidInt4,
   escapeLikePattern,
+  decodeBase64Payload,
 } from '@/lib/api/utils';
 import type { DynamicFilter } from '@/types/api';
+import { hasConversationTransfer, hasVoicemailTransfer } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest) {
     const callId = parseIntOrNull(searchParams.get('callId'));
     const firmId = parseIntOrNull(searchParams.get('firmId'));
     const status = searchParams.get('status');
+    const transferType = searchParams.get('transferType');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const search = searchParams.get('search')?.trim() || null;
@@ -54,6 +57,57 @@ export async function GET(request: NextRequest) {
 
     const client = getSupabaseClient(env);
 
+    // If filtering by has_conversation or voicemail transfer type, get platform_call_ids from webhooks
+    let platformCallIdsFromWebhook: string[] | null = null;
+    if (transferType && (transferType === 'has_conversation' || transferType === 'voicemail')) {
+      let webhooksQuery = client
+        .from('webhook_dumps')
+        .select('platform_call_id, payload');
+
+      if (startDate) {
+        webhooksQuery = webhooksQuery.gte('received_at', startDate);
+      }
+      if (endDate) {
+        webhooksQuery = webhooksQuery.lte('received_at', endDate);
+      }
+
+      const webhooksResponse = await webhooksQuery;
+
+      if (webhooksResponse.error) {
+        console.error('Error fetching webhooks for transfer type filter:', webhooksResponse.error);
+        return errorResponse('Failed to fetch webhooks', 500, 'WEBHOOK_FETCH_ERROR');
+      }
+
+      if (webhooksResponse.data && webhooksResponse.data.length > 0) {
+        const filterFn = transferType === 'voicemail' ? hasVoicemailTransfer : hasConversationTransfer;
+        const platformCallIds = webhooksResponse.data
+          .filter((w) => {
+            const payload = decodeBase64Payload(w.payload);
+            return filterFn(payload as Record<string, unknown>);
+          })
+          .map((w) => w.platform_call_id)
+          .filter((id): id is string => id !== null);
+
+        platformCallIdsFromWebhook = [...new Set(platformCallIds)];
+
+        if (platformCallIdsFromWebhook.length === 0) {
+          return NextResponse.json({
+            data: [],
+            total: 0,
+            limit,
+            offset,
+          });
+        }
+      } else {
+        return NextResponse.json({
+          data: [],
+          total: 0,
+          limit,
+          offset,
+        });
+      }
+    }
+
     let query = client
       .from('transfers_details')
       .select(
@@ -69,6 +123,16 @@ export async function GET(request: NextRequest) {
     }
     if (status && status !== 'All') {
       query = query.eq('transfer_status', status);
+    }
+    // Filter by transfer_type - standard DB types or webhook-based filtering
+    if (transferType && transferType !== 'Off' && transferType !== 'All') {
+      if (platformCallIdsFromWebhook) {
+        // Filter by platform_call_id from webhook analysis
+        query = query.in('calls.platform_call_id', platformCallIdsFromWebhook);
+      } else {
+        // Standard transfer_type from database
+        query = query.eq('transfer_type', transferType);
+      }
     }
     if (startDate) {
       query = query.gte('created_at', startDate);

@@ -140,6 +140,29 @@ export function hasVoicemailTransfer(payload: Record<string, unknown>): boolean 
 }
 
 /**
+ * Check if a webhook payload has any transfer with a conversation (non-empty transcript).
+ * This indicates the transfer connected and a conversation happened.
+ */
+export function hasConversationTransfer(payload: Record<string, unknown>): boolean {
+  try {
+    const message = payload?.message as Record<string, unknown> | undefined;
+    const artifact = message?.artifact as Record<string, unknown> | undefined;
+    const transfers = artifact?.transfers as Array<{ transcript?: string }> | undefined;
+
+    if (!transfers || !Array.isArray(transfers)) {
+      return false;
+    }
+
+    return transfers.some((transfer) => {
+      const transcript = transfer.transcript?.trim() || '';
+      return transcript.length > 0;
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Enrich parsed webhook transfers with data from the database.
  * Uses database values (caller_name from call, transferred_to_name from transfers)
  * as the source of truth, falling back to webhook parsed values only when database

@@ -11,6 +11,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -18,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 // Field types determine available conditions
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'boolean';
@@ -117,6 +125,364 @@ interface DynamicFilterBuilderProps {
   className?: string;
 }
 
+// Shared filter row component for mobile layout (stacked)
+function MobileFilterRow({
+  filter,
+  index,
+  fieldDef,
+  conditions,
+  showValueInput,
+  fields,
+  updateFilterRow,
+  removeFilterRow,
+}: {
+  filter: FilterRow;
+  index: number;
+  fieldDef: FilterFieldDefinition | undefined;
+  conditions: { value: ConditionOperator; label: string }[];
+  showValueInput: boolean;
+  fields: FilterFieldDefinition[];
+  updateFilterRow: (id: string, updates: Partial<FilterRow>) => void;
+  removeFilterRow: (id: string) => void;
+}) {
+  return (
+    <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+      {/* Header with label and delete */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">
+          {index === 0 ? 'Where' : 'And'}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={() => removeFilterRow(filter.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Field selector */}
+      <Select
+        value={filter.field}
+        onValueChange={(value) => updateFilterRow(filter.id, { field: value })}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {fields.map((field) => (
+            <SelectItem key={field.key} value={field.key}>
+              {field.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Condition selector */}
+      <Select
+        value={filter.condition}
+        onValueChange={(value) =>
+          updateFilterRow(filter.id, { condition: value as ConditionOperator })
+        }
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {conditions.map((cond) => (
+            <SelectItem key={cond.value} value={cond.value}>
+              {cond.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Value input */}
+      {showValueInput && (
+        <>
+          {fieldDef?.type === 'select' && fieldDef.options ? (
+            <Select
+              value={filter.value}
+              onValueChange={(value) => updateFilterRow(filter.id, { value })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select value..." />
+              </SelectTrigger>
+              <SelectContent>
+                {fieldDef.options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : fieldDef?.type === 'date' ? (
+            <Input
+              type="date"
+              value={filter.value}
+              onChange={(e) =>
+                updateFilterRow(filter.id, { value: e.target.value })
+              }
+              className="w-full"
+            />
+          ) : fieldDef?.type === 'number' ? (
+            <Input
+              type="number"
+              value={filter.value}
+              onChange={(e) =>
+                updateFilterRow(filter.id, { value: e.target.value })
+              }
+              placeholder="Enter value..."
+              className="w-full"
+            />
+          ) : (
+            <Input
+              type="text"
+              value={filter.value}
+              onChange={(e) =>
+                updateFilterRow(filter.id, { value: e.target.value })
+              }
+              placeholder="Enter value..."
+              className="w-full"
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Shared filter row component for desktop layout (inline)
+function DesktopFilterRow({
+  filter,
+  index,
+  fieldDef,
+  conditions,
+  showValueInput,
+  fields,
+  updateFilterRow,
+  removeFilterRow,
+}: {
+  filter: FilterRow;
+  index: number;
+  fieldDef: FilterFieldDefinition | undefined;
+  conditions: { value: ConditionOperator; label: string }[];
+  showValueInput: boolean;
+  fields: FilterFieldDefinition[];
+  updateFilterRow: (id: string, updates: Partial<FilterRow>) => void;
+  removeFilterRow: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {/* Where / And label */}
+      <span className="w-12 text-sm text-muted-foreground shrink-0">
+        {index === 0 ? 'Where' : 'And'}
+      </span>
+
+      {/* Field selector */}
+      <Select
+        value={filter.field}
+        onValueChange={(value) => updateFilterRow(filter.id, { field: value })}
+      >
+        <SelectTrigger className="w-[140px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {fields.map((field) => (
+            <SelectItem key={field.key} value={field.key}>
+              {field.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Condition selector */}
+      <Select
+        value={filter.condition}
+        onValueChange={(value) =>
+          updateFilterRow(filter.id, { condition: value as ConditionOperator })
+        }
+      >
+        <SelectTrigger className="w-[140px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {conditions.map((cond) => (
+            <SelectItem key={cond.value} value={cond.value}>
+              {cond.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Value input */}
+      {showValueInput && (
+        <>
+          {fieldDef?.type === 'select' && fieldDef.options ? (
+            <Select
+              value={filter.value}
+              onValueChange={(value) => updateFilterRow(filter.id, { value })}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Select value..." />
+              </SelectTrigger>
+              <SelectContent>
+                {fieldDef.options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : fieldDef?.type === 'date' ? (
+            <Input
+              type="date"
+              value={filter.value}
+              onChange={(e) =>
+                updateFilterRow(filter.id, { value: e.target.value })
+              }
+              className="flex-1"
+            />
+          ) : fieldDef?.type === 'number' ? (
+            <Input
+              type="number"
+              value={filter.value}
+              onChange={(e) =>
+                updateFilterRow(filter.id, { value: e.target.value })
+              }
+              placeholder="Enter value..."
+              className="flex-1"
+            />
+          ) : (
+            <Input
+              type="text"
+              value={filter.value}
+              onChange={(e) =>
+                updateFilterRow(filter.id, { value: e.target.value })
+              }
+              placeholder="Enter value..."
+              className="flex-1"
+            />
+          )}
+        </>
+      )}
+
+      {/* Spacer when no value input */}
+      {!showValueInput && <div className="flex-1" />}
+
+      {/* Delete button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+        onClick={() => removeFilterRow(filter.id)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// Shared filter content component
+function FilterContent({
+  filters,
+  fieldMap,
+  fields,
+  addFilterRow,
+  updateFilterRow,
+  removeFilterRow,
+  clearAllFilters,
+  handleApply,
+  isMobile,
+}: {
+  filters: FilterRow[];
+  fieldMap: Map<string, FilterFieldDefinition>;
+  fields: FilterFieldDefinition[];
+  addFilterRow: () => void;
+  updateFilterRow: (id: string, updates: Partial<FilterRow>) => void;
+  removeFilterRow: (id: string) => void;
+  clearAllFilters: () => void;
+  handleApply: () => void;
+  isMobile: boolean;
+}) {
+  return (
+    <div className={cn('p-4', isMobile && 'pb-8')}>
+      {/* Filter rows */}
+      <div className={cn('space-y-2', isMobile && 'space-y-3')}>
+        {filters.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            No filters applied. Click &quot;+ Add&quot; to create a filter.
+          </p>
+        ) : (
+          filters.map((filter, index) => {
+            const fieldDef = fieldMap.get(filter.field);
+            const conditions = fieldDef
+              ? CONDITION_OPTIONS[fieldDef.type]
+              : CONDITION_OPTIONS.text;
+            const showValueInput = conditionRequiresValue(filter.condition);
+
+            return isMobile ? (
+              <MobileFilterRow
+                key={filter.id}
+                filter={filter}
+                index={index}
+                fieldDef={fieldDef}
+                conditions={conditions}
+                showValueInput={showValueInput}
+                fields={fields}
+                updateFilterRow={updateFilterRow}
+                removeFilterRow={removeFilterRow}
+              />
+            ) : (
+              <DesktopFilterRow
+                key={filter.id}
+                filter={filter}
+                index={index}
+                fieldDef={fieldDef}
+                conditions={conditions}
+                showValueInput={showValueInput}
+                fields={fields}
+                updateFilterRow={updateFilterRow}
+                removeFilterRow={removeFilterRow}
+              />
+            );
+          })
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addFilterRow}
+            className="gap-1"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </Button>
+          {filters.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="gap-1 text-muted-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </Button>
+          )}
+        </div>
+        <Button size="sm" onClick={handleApply}>
+          Apply Filters
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function DynamicFilterBuilder({
   fields,
   filters,
@@ -125,6 +491,7 @@ export function DynamicFilterBuilder({
   className,
 }: DynamicFilterBuilderProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // Create a field lookup map
   const fieldMap = useMemo(() => {
@@ -196,199 +563,68 @@ export function DynamicFilterBuilder({
     (f) => f.value || !conditionRequiresValue(f.condition)
   ).length;
 
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant={activeFilterCount > 0 ? 'default' : 'outline'}
-          size="sm"
-          className={cn('gap-1.5', className)}
+  const triggerButton = (
+    <Button
+      variant={activeFilterCount > 0 ? 'default' : 'outline'}
+      size="sm"
+      className={cn('gap-1.5', className)}
+    >
+      <Filter className="h-4 w-4" />
+      Filters
+      {activeFilterCount > 0 && (
+        <Badge
+          variant="secondary"
+          className="ml-1 h-5 min-w-5 px-1.5 text-xs bg-primary-foreground text-primary"
         >
-          <Filter className="h-4 w-4" />
-          Filters
-          {activeFilterCount > 0 && (
-            <Badge
-              variant="secondary"
-              className="ml-1 h-5 min-w-5 px-1.5 text-xs bg-primary-foreground text-primary"
-            >
-              {activeFilterCount}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[600px] p-0"
-        align="end"
-        sideOffset={8}
-      >
-        <div className="p-4">
-          {/* Filter rows */}
-          <div className="space-y-2">
-            {filters.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No filters applied. Click &quot;+ Add&quot; to create a filter.
-              </p>
-            ) : (
-              filters.map((filter, index) => {
-                const fieldDef = fieldMap.get(filter.field);
-                const conditions = fieldDef
-                  ? CONDITION_OPTIONS[fieldDef.type]
-                  : CONDITION_OPTIONS.text;
-                const showValueInput = conditionRequiresValue(filter.condition);
+          {activeFilterCount}
+        </Badge>
+      )}
+    </Button>
+  );
 
-                return (
-                  <div
-                    key={filter.id}
-                    className="flex items-center gap-2"
-                  >
-                    {/* Where / And label */}
-                    <span className="w-12 text-sm text-muted-foreground shrink-0">
-                      {index === 0 ? 'Where' : 'And'}
-                    </span>
+  // Desktop: Use Popover
+  if (isDesktop) {
+    return (
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
+        <PopoverContent className="w-[600px] p-0" align="end" sideOffset={8}>
+          <FilterContent
+            filters={filters}
+            fieldMap={fieldMap}
+            fields={fields}
+            addFilterRow={addFilterRow}
+            updateFilterRow={updateFilterRow}
+            removeFilterRow={removeFilterRow}
+            clearAllFilters={clearAllFilters}
+            handleApply={handleApply}
+            isMobile={false}
+          />
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
-                    {/* Field selector */}
-                    <Select
-                      value={filter.field}
-                      onValueChange={(value) =>
-                        updateFilterRow(filter.id, { field: value })
-                      }
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fields.map((field) => (
-                          <SelectItem key={field.key} value={field.key}>
-                            {field.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* Condition selector */}
-                    <Select
-                      value={filter.condition}
-                      onValueChange={(value) =>
-                        updateFilterRow(filter.id, {
-                          condition: value as ConditionOperator,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {conditions.map((cond) => (
-                          <SelectItem key={cond.value} value={cond.value}>
-                            {cond.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* Value input */}
-                    {showValueInput && (
-                      <>
-                        {fieldDef?.type === 'select' && fieldDef.options ? (
-                          <Select
-                            value={filter.value}
-                            onValueChange={(value) =>
-                              updateFilterRow(filter.id, { value })
-                            }
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Select value..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {fieldDef.options.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : fieldDef?.type === 'date' ? (
-                          <Input
-                            type="date"
-                            value={filter.value}
-                            onChange={(e) =>
-                              updateFilterRow(filter.id, { value: e.target.value })
-                            }
-                            className="flex-1"
-                          />
-                        ) : fieldDef?.type === 'number' ? (
-                          <Input
-                            type="number"
-                            value={filter.value}
-                            onChange={(e) =>
-                              updateFilterRow(filter.id, { value: e.target.value })
-                            }
-                            placeholder="Enter value..."
-                            className="flex-1"
-                          />
-                        ) : (
-                          <Input
-                            type="text"
-                            value={filter.value}
-                            onChange={(e) =>
-                              updateFilterRow(filter.id, { value: e.target.value })
-                            }
-                            placeholder="Enter value..."
-                            className="flex-1"
-                          />
-                        )}
-                      </>
-                    )}
-
-                    {/* Spacer when no value input */}
-                    {!showValueInput && <div className="flex-1" />}
-
-                    {/* Delete button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeFilterRow(filter.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addFilterRow}
-                className="gap-1"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add
-              </Button>
-              {filters.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  className="gap-1 text-muted-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear
-                </Button>
-              )}
-            </div>
-            <Button size="sm" onClick={handleApply}>
-              Filter
-            </Button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+  // Mobile: Use Sheet (bottom slide-up)
+  return (
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>{triggerButton}</SheetTrigger>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Complex Filters</SheetTitle>
+        </SheetHeader>
+        <FilterContent
+          filters={filters}
+          fieldMap={fieldMap}
+          fields={fields}
+          addFilterRow={addFilterRow}
+          updateFilterRow={updateFilterRow}
+          removeFilterRow={removeFilterRow}
+          clearAllFilters={clearAllFilters}
+          handleApply={handleApply}
+          isMobile={true}
+        />
+      </SheetContent>
+    </Sheet>
   );
 }
 

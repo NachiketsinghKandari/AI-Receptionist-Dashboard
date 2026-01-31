@@ -41,6 +41,7 @@ export const TRANSFER_TYPES = [
   'two_way_opt_in',
   'live',
   'voicemail',
+  'has_conversation',
 ] as const;
 
 // Transfer statuses

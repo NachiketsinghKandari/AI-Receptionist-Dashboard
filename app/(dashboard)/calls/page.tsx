@@ -603,16 +603,16 @@ export default function CallsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label className="text-sm">Transfer</Label>
                 <Select value={transferType} onValueChange={setTransferType}>
-                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                  <SelectTrigger className="mt-0.5 h-8 text-xs [&>span]:truncate">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {TRANSFER_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>
-                        {type}
+                        {type === 'has_conversation' ? 'Has Conv.' : type}
                       </SelectItem>
                     ))}
                   </SelectContent>

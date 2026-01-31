@@ -16,7 +16,7 @@ import {
   escapeLikePattern,
 } from '@/lib/api/utils';
 import type { DynamicFilter } from '@/types/api';
-import { hasMultipleTransfers, hasVoicemailTransfer } from '@/lib/webhook-utils';
+import { hasMultipleTransfers, hasVoicemailTransfer, hasConversationTransfer } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,10 +68,11 @@ export async function GET(request: NextRequest) {
     // If filtering by transfer_type, get call IDs that have transfers with that type
     let callIdsFilter: number[] | null = null;
     let platformCallIdsWithVoicemail: string[] | null = null;
+    let platformCallIdsWithConversation: string[] | null = null;
 
     if (transferType && transferType !== 'Off' && transferType !== 'All') {
-      if (transferType === 'voicemail') {
-        // Voicemail is detected from webhook payload, not from transfer_type column
+      if (transferType === 'voicemail' || transferType === 'has_conversation') {
+        // Voicemail and has_conversation are detected from webhook payload, not from transfer_type column
         let webhooksQuery = client
           .from('webhook_dumps')
           .select('platform_call_id, payload');
@@ -87,23 +88,30 @@ export async function GET(request: NextRequest) {
         const webhooksResponse = await webhooksQuery;
 
         if (webhooksResponse.error) {
-          console.error('Error fetching webhooks for voicemail filter:', webhooksResponse.error);
+          console.error('Error fetching webhooks for transfer type filter:', webhooksResponse.error);
           return errorResponse('Failed to fetch webhooks', 500, 'WEBHOOK_FETCH_ERROR');
         }
 
         if (webhooksResponse.data && webhooksResponse.data.length > 0) {
-          // Find webhooks with voicemail in their transfer transcripts
+          // Find webhooks matching the filter criteria
+          const filterFn = transferType === 'voicemail' ? hasVoicemailTransfer : hasConversationTransfer;
           const platformCallIds = webhooksResponse.data
             .filter((w) => {
               const payload = decodeBase64Payload(w.payload);
-              return hasVoicemailTransfer(payload as Record<string, unknown>);
+              return filterFn(payload as Record<string, unknown>);
             })
             .map((w) => w.platform_call_id)
             .filter((id): id is string => id !== null);
 
-          platformCallIdsWithVoicemail = [...new Set(platformCallIds)];
+          const uniqueIds = [...new Set(platformCallIds)];
 
-          if (platformCallIdsWithVoicemail.length === 0) {
+          if (transferType === 'voicemail') {
+            platformCallIdsWithVoicemail = uniqueIds;
+          } else {
+            platformCallIdsWithConversation = uniqueIds;
+          }
+
+          if (uniqueIds.length === 0) {
             return NextResponse.json({
               data: [],
               total: 0,
@@ -199,11 +207,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // If excluding a specific transfer type (e.g., voicemail), find platform_call_ids to exclude
+    // If excluding a specific transfer type (e.g., voicemail, has_conversation), find platform_call_ids to exclude
     let platformCallIdsToExcludeByTransferType: string[] | null = null;
     if (excludeTransferType) {
-      if (excludeTransferType === 'voicemail') {
-        // Voicemail detection from webhook payloads
+      if (excludeTransferType === 'voicemail' || excludeTransferType === 'has_conversation') {
+        // Voicemail and has_conversation detection from webhook payloads
         let webhooksQuery = client
           .from('webhook_dumps')
           .select('platform_call_id, payload');
@@ -218,15 +226,16 @@ export async function GET(request: NextRequest) {
         const webhooksResponse = await webhooksQuery;
 
         if (!webhooksResponse.error && webhooksResponse.data) {
-          const voicemailIds = webhooksResponse.data
+          const filterFn = excludeTransferType === 'voicemail' ? hasVoicemailTransfer : hasConversationTransfer;
+          const idsToExclude = webhooksResponse.data
             .filter((w) => {
               const payload = decodeBase64Payload(w.payload);
-              return hasVoicemailTransfer(payload as Record<string, unknown>);
+              return filterFn(payload as Record<string, unknown>);
             })
             .map((w) => w.platform_call_id)
             .filter((id): id is string => id !== null);
 
-          platformCallIdsToExcludeByTransferType = [...new Set(voicemailIds)];
+          platformCallIdsToExcludeByTransferType = [...new Set(idsToExclude)];
         }
       } else {
         // Other transfer types - get call_ids from transfers_details table
@@ -306,6 +315,9 @@ export async function GET(request: NextRequest) {
     }
     if (platformCallIdsWithVoicemail) {
       query = query.in('platform_call_id', platformCallIdsWithVoicemail);
+    }
+    if (platformCallIdsWithConversation) {
+      query = query.in('platform_call_id', platformCallIdsWithConversation);
     }
     // Filter by whether call has transfers (is_empty / is_not_empty for transfer_type)
     if (requireHasTransfer === true && callIdsWithTransfers) {

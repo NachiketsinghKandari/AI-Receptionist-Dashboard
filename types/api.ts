@@ -65,6 +65,7 @@ export interface TransferFilters extends BaseFilters {
   firmId?: number | null;
   callId?: number | null;
   status?: string | null;
+  transferType?: string | null;
   dynamicFilters?: DynamicFilter[] | null;
 }
 

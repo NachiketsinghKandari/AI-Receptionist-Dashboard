@@ -12,6 +12,7 @@ async function fetchTransfers(filters: TransferFilters, environment: string): Pr
   if (filters.firmId) params.set('firmId', String(filters.firmId));
   if (filters.callId) params.set('callId', String(filters.callId));
   if (filters.status && filters.status !== 'All') params.set('status', filters.status);
+  if (filters.transferType && filters.transferType !== 'Off') params.set('transferType', filters.transferType);
   if (filters.startDate) params.set('startDate', filters.startDate);
   if (filters.endDate) params.set('endDate', filters.endDate);
   if (filters.search) params.set('search', filters.search);
