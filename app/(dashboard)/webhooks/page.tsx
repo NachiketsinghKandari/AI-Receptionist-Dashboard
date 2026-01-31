@@ -11,16 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ResponsiveFilterSidebar } from '@/components/filters/responsive-filter-sidebar';
-import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useWebhooks } from '@/hooks/use-webhooks';
 import { useCallDetail } from '@/hooks/use-calls';
 import { useDebounce } from '@/hooks/use-debounce';
-import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, WEBHOOK_PLATFORMS } from '@/lib/constants';
+import { DEFAULT_PAGE_LIMIT, WEBHOOK_PLATFORMS } from '@/lib/constants';
+import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Webhook } from '@/types/database';
 import type { SortOrder } from '@/types/api';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
 
@@ -72,9 +72,16 @@ const columns: ColumnDef<Webhook>[] = [
 ];
 
 export default function WebhooksPage() {
-  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('today');
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), DEFAULT_DAYS_BACK), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Shared date filter state from context
+  const {
+    dateFilterMode,
+    setDateFilterMode,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+  } = useDateFilter();
+
   const [search, setSearch] = useState('');
   const [firmId, setFirmId] = useState<number | null>(null);
   const [platform, setPlatform] = useState('All');

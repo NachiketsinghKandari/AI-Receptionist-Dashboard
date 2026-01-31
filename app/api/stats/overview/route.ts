@@ -9,7 +9,22 @@ import { type Environment } from '@/lib/constants';
 import { errorResponse } from '@/lib/api/utils';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
 
-type Period = 'Today' | 'This Month';
+type Period = 'Today' | 'Yesterday' | 'This Month';
+
+// Helper to get day before yesterday range
+function getDayBeforeYesterdayRangeUTC() {
+  const now = new Date();
+  // Get day before yesterday in Eastern timezone
+  const dayBeforeYesterday = new Date(now);
+  dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
+  const dateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(dayBeforeYesterday);
+  return getDateRangeUTC(dateStr, dateStr);
+}
 
 function getPeriodDates(period: Period) {
   const now = new Date();
@@ -17,6 +32,17 @@ function getPeriodDates(period: Period) {
   if (period === 'Today') {
     const current = getTodayRangeUTC();
     const previous = getYesterdayRangeUTC();
+    return {
+      currentStart: current.startDate,
+      currentEnd: current.endDate,
+      prevStart: previous.startDate,
+      prevEnd: previous.endDate,
+    };
+  }
+
+  if (period === 'Yesterday') {
+    const current = getYesterdayRangeUTC();
+    const previous = getDayBeforeYesterdayRangeUTC();
     return {
       currentStart: current.startDate,
       currentEnd: current.endDate,

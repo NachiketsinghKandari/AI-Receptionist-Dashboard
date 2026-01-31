@@ -6,17 +6,17 @@ import { Mail } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ResponsiveFilterSidebar } from '@/components/filters/responsive-filter-sidebar';
-import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useEmails } from '@/hooks/use-emails';
 import { useDebounce } from '@/hooks/use-debounce';
-import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK } from '@/lib/constants';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/constants';
+import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Email } from '@/types/database';
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import type { SortOrder } from '@/types/api';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 const columns: ColumnDef<Email>[] = [
@@ -84,9 +84,16 @@ const columns: ColumnDef<Email>[] = [
 ];
 
 export default function EmailsPage() {
-  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('today');
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), DEFAULT_DAYS_BACK), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Shared date filter state from context
+  const {
+    dateFilterMode,
+    setDateFilterMode,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+  } = useDateFilter();
+
   const [search, setSearch] = useState('');
   const [firmId, setFirmId] = useState<number | null>(null);
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);

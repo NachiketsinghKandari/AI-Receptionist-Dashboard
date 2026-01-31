@@ -24,13 +24,21 @@ interface CekuraStatusProps {
 
 function getStatusColor(status: string): string {
   const normalizedStatus = status?.toLowerCase();
-  if (normalizedStatus === 'success' || normalizedStatus === 'completed') {
+  if (normalizedStatus === 'success' || normalizedStatus === 'completed' || normalizedStatus === 'reviewed_success') {
     return 'bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30';
   }
-  if (normalizedStatus === 'failure' || normalizedStatus === 'failed' || normalizedStatus === 'error') {
+  if (normalizedStatus === 'failure' || normalizedStatus === 'failed' || normalizedStatus === 'error' || normalizedStatus === 'reviewed_failure') {
     return 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30';
   }
   return 'bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30';
+}
+
+function formatStatusLabel(status: string): string {
+  // Convert snake_case to Title Case (e.g., "reviewed_failure" -> "Reviewed Failure")
+  return status
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
 function getScoreColor(score: number): string {
@@ -149,7 +157,7 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
           getStatusColor(callData.status)
         )}
       >
-        <span className="truncate max-w-[50px] md:max-w-none">{callData.status}</span>
+        <span className="truncate max-w-[50px] md:max-w-none">{formatStatusLabel(callData.status)}</span>
       </div>
     );
   }
@@ -165,7 +173,7 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
             getStatusColor(callData.status)
           )}
         >
-          <span className="truncate max-w-[50px] md:max-w-none">{callData.status}</span>
+          <span className="truncate max-w-[50px] md:max-w-none">{formatStatusLabel(callData.status)}</span>
           <ChevronDown className="h-2.5 w-2.5 md:h-3 md:w-3 shrink-0" />
         </button>
       </PopoverTrigger>

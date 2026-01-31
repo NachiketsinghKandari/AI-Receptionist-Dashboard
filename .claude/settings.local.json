@@ -28,7 +28,8 @@
       "Bash(npx shadcn@latest add resizable --yes)",
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(kill:*)"
     ]
   }
 }

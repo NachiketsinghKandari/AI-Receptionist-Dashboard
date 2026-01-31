@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ResponsiveFilterSidebar } from '@/components/filters/responsive-filter-sidebar';
-import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { CallDetailSheet } from '@/components/details/call-detail-sheet';
 import { CekuraStatus } from '@/components/cekura/cekura-status';
@@ -22,12 +21,13 @@ import { useSentryErrorCorrelationIds } from '@/hooks/use-sentry-events';
 import { useCekuraCallMapping, type CekuraCallData } from '@/hooks/use-cekura';
 import { useFirms } from '@/hooks/use-firms';
 import { useDebounce } from '@/hooks/use-debounce';
-import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants';
+import { DEFAULT_PAGE_LIMIT, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants';
+import { useDateFilter } from '@/components/providers/date-filter-provider';
 import { formatDuration } from '@/lib/formatting';
 import type { CallListItem, Firm } from '@/types/database';
 import type { SortOrder, FlaggedCallListItem } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 // Helper to create columns with error, important, mismatch, and Cekura state access
@@ -170,10 +170,17 @@ export default function CallsPage() {
   // Initialize flaggedOnly from URL param
   const [flaggedOnly, setFlaggedOnly] = useState(searchParams.get('flaggedOnly') === 'true');
 
+  // Shared date filter state from context
+  const {
+    dateFilterMode,
+    setDateFilterMode,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+  } = useDateFilter();
+
   // Filter state
-  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('today');
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), DEFAULT_DAYS_BACK), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [search, setSearch] = useState('');
   const [firmId, setFirmId] = useState<number | null>(null);
   const [callType, setCallType] = useState('All');

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCallDetail } from '@/hooks/use-calls';
 import { usePanelSize } from '@/hooks/use-panel-size';
@@ -240,14 +239,12 @@ export function CallDetailSheet({
                 Transcript
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="details" className="flex-1 min-h-0 mt-0">
-              <ScrollArea className="h-full">
-                <CallDetailLeftPanel
-                  callId={callId}
-                  highlightReasons={highlightReasons}
-                  dateRange={dateRange}
-                />
-              </ScrollArea>
+            <TabsContent value="details" className="flex-1 min-h-0 mt-0 overflow-hidden">
+              <CallDetailLeftPanel
+                callId={callId}
+                highlightReasons={highlightReasons}
+                dateRange={dateRange}
+              />
             </TabsContent>
             <TabsContent value="transcript" className="flex-1 min-h-0 mt-0 overflow-hidden">
               <CallDetailRightPanel
@@ -267,13 +264,11 @@ export function CallDetailSheet({
               className="h-full overflow-hidden"
               style={{ width: `${leftPercent}%` }}
             >
-              <ScrollArea className="h-full">
-                <CallDetailLeftPanel
-                  callId={callId}
-                  highlightReasons={highlightReasons}
-                  dateRange={dateRange}
-                />
-              </ScrollArea>
+              <CallDetailLeftPanel
+                callId={callId}
+                highlightReasons={highlightReasons}
+                dateRange={dateRange}
+              />
             </div>
 
             {/* Resize Handle with Separator Line */}

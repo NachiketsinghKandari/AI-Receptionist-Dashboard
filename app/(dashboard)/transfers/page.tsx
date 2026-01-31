@@ -8,15 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveFilterSidebar } from '@/components/filters/responsive-filter-sidebar';
-import type { DateFilterMode } from '@/components/filters/filter-sidebar';
 import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useTransfers } from '@/hooks/use-transfers';
 import { useDebounce } from '@/hooks/use-debounce';
-import { DEFAULT_PAGE_LIMIT, DEFAULT_DAYS_BACK, TRANSFER_STATUSES } from '@/lib/constants';
+import { DEFAULT_PAGE_LIMIT, TRANSFER_STATUSES } from '@/lib/constants';
+import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Transfer } from '@/types/database';
 import type { SortOrder } from '@/types/api';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 
 const columns: ColumnDef<Transfer>[] = [
@@ -66,9 +66,16 @@ const columns: ColumnDef<Transfer>[] = [
 ];
 
 export default function TransfersPage() {
-  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('today');
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), DEFAULT_DAYS_BACK), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Shared date filter state from context
+  const {
+    dateFilterMode,
+    setDateFilterMode,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+  } = useDateFilter();
+
   const [search, setSearch] = useState('');
   const [firmId, setFirmId] = useState<number | null>(null);
   const [status, setStatus] = useState('All');

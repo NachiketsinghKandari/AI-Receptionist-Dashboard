@@ -13,6 +13,7 @@ import { useCallDetail } from '@/hooks/use-calls';
 import { useWebhooksForCall } from '@/hooks/use-webhooks';
 import { useSentryEventsForCall } from '@/hooks/use-sentry-events';
 import { useCekuraCallMapping, buildCekuraUrl, useCekuraFeedbackMutation } from '@/hooks/use-cekura';
+import { CekuraStatusSelector } from '@/components/cekura/cekura-status-selector';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { formatDuration } from '@/lib/formatting';
 import type { Transfer, Email, Webhook, SentryEvent } from '@/types/database';
@@ -715,9 +716,10 @@ function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode
   );
 }
 
-function TransferItem({ transfer, highlight }: { transfer: Transfer; highlight?: boolean }) {
+function TransferItem({ transfer, highlight, transcript }: { transfer: Transfer; highlight?: boolean; transcript?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -764,6 +766,25 @@ function TransferItem({ transfer, highlight }: { transfer: Transfer; highlight?:
                 <span>{transfer.error_message}</span>
               </div>
             )}
+            {/* Transfer Conversation */}
+            {transcript && (
+              <div className="mt-3">
+                <Collapsible open={showTranscript} onOpenChange={setShowTranscript}>
+                  <CollapsibleTrigger asChild>
+                    <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span>Transfer Conversation</span>
+                      <ChevronDown className={`h-3.5 w-3.5 ml-auto transition-transform ${showTranscript ? 'rotate-180' : ''}`} />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 p-3 bg-background rounded-md border max-h-48 overflow-y-auto">
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{transcript}</p>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
@@ -790,8 +811,8 @@ function EmailItem({ email, highlight }: { email: Email; highlight?: boolean }) 
                 <div className="p-1.5 bg-green-500/10 rounded">
                   <Mail className="h-3.5 w-3.5 text-green-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{email.subject?.slice(0, 40)}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium break-words">{email.subject}</p>
                   <p className="text-xs text-muted-foreground">{email.email_type}</p>
                 </div>
               </div>
@@ -1450,80 +1471,89 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
   const hasErrors = sentryEvents.some(e => e.level === 'error');
 
   return (
-    <div className="space-y-4 p-4">
-      {/* Quick Links */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {call.platform_call_id && (
-          <Button variant="outline" size="sm" asChild>
-            <a
-              href={`https://dashboard.vapi.ai/calls/${call.platform_call_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              VAPI
-            </a>
-          </Button>
-        )}
-        {call.platform_call_id && (
-          <Button variant="outline" size="sm" asChild>
-            <a
-              href={`https://helloounsil.sentry.io/explore/logs/?environment=${sentryEnv}&logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${call.platform_call_id}&logsSortBys=-timestamp`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Bug className="h-3.5 w-3.5 mr-1.5" />
-              Sentry
-            </a>
-          </Button>
-        )}
-        {call.platform_call_id && (
-          cekuraCallId ? (
+    <Tabs
+      defaultValue="info"
+      className="flex flex-col h-full min-h-0 gap-0"
+      onValueChange={(value) => {
+        if (value === 'logs') setLogsAcknowledgedFor(callId);
+        if (value === 'activity') setActivityAcknowledgedFor(callId);
+      }}
+    >
+      {/* Fixed Header: Quick Links, Feedback, Tab Selector */}
+      <div className="shrink-0 p-4 space-y-4 border-b bg-background">
+        {/* Quick Links */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {call.platform_call_id && (
             <Button variant="outline" size="sm" asChild>
               <a
-                href={buildCekuraUrl(cekuraCallId, environment)}
+                href={`https://dashboard.vapi.ai/calls/${call.platform_call_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
-                Cekura
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                VAPI
               </a>
             </Button>
-          ) : cekuraLoading || !cekuraFullyLoaded ? (
-            <Button variant="outline" size="sm" disabled>
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              Cekura
+          )}
+          {call.platform_call_id && (
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href={`https://helloounsil.sentry.io/explore/logs/?environment=${sentryEnv}&logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${call.platform_call_id}&logsSortBys=-timestamp`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Bug className="h-3.5 w-3.5 mr-1.5" />
+                Sentry
+              </a>
             </Button>
-          ) : null
-        )}
-        {/* Correlation ID with copy button */}
-        {call.platform_call_id && (
-          <div className="flex items-center gap-1 ml-auto px-2 py-1 rounded-md bg-muted/50">
-            <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px] md:max-w-[180px]">
-              {call.platform_call_id}
-            </span>
-            <CopyButton value={call.platform_call_id} />
-          </div>
-        )}
-      </div>
+          )}
+          {call.platform_call_id && (
+            cekuraCallId ? (
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={buildCekuraUrl(cekuraCallId, environment)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                  Cekura
+                </a>
+              </Button>
+            ) : cekuraLoading || !cekuraFullyLoaded ? (
+              <Button variant="outline" size="sm" disabled>
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                Cekura
+              </Button>
+            ) : null
+          )}
+          {/* Cekura Status Selector */}
+          {cekuraCallInfo?.status && cekuraCallId && platformCallId && (
+            <CekuraStatusSelector
+              status={cekuraCallInfo.status}
+              cekuraId={cekuraCallId}
+              correlationId={platformCallId}
+            />
+          )}
+          {/* Correlation ID with copy button */}
+          {call.platform_call_id && (
+            <div className="flex items-center gap-1 ml-auto px-2 py-1 rounded-md bg-muted/50">
+              <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px] md:max-w-[180px]">
+                {call.platform_call_id}
+              </span>
+              <CopyButton value={call.platform_call_id} />
+            </div>
+          )}
+        </div>
 
-      {/* Feedback Section */}
-      <FeedbackSection
-        feedback={cekuraCallInfo?.feedback}
-        cekuraId={cekuraCallId}
-        correlationId={platformCallId}
-        isLoading={cekuraLoading && !cekuraFullyLoaded}
-      />
+        {/* Feedback Section */}
+        <FeedbackSection
+          feedback={cekuraCallInfo?.feedback}
+          cekuraId={cekuraCallId}
+          correlationId={platformCallId}
+          isLoading={cekuraLoading && !cekuraFullyLoaded}
+        />
 
-      {/* Tabs: Info, Activity, Logs */}
-      <Tabs
-        defaultValue="info"
-        className="w-full"
-        onValueChange={(value) => {
-          if (value === 'logs') setLogsAcknowledgedFor(callId);
-          if (value === 'activity') setActivityAcknowledgedFor(callId);
-        }}
-      >
+        {/* Tab Selector */}
         <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="info" className="text-xs">
             <ClipboardList className="h-3.5 w-3.5 mr-1" />
@@ -1559,9 +1589,12 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
             ) : null}
           </TabsTrigger>
         </TabsList>
+      </div>
 
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {/* Info Tab */}
-        <TabsContent value="info" className="mt-4 space-y-4">
+        <TabsContent value="info" className="mt-0 space-y-4 flex-none">
           {/* Call Information Card */}
           <Card>
             <CardHeader className="pb-2">
@@ -1611,20 +1644,6 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
                     Voicemail
                   </Badge>
                 )}
-                {cekuraCallInfo?.status && (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "px-2 py-1",
-                      cekuraCallInfo.status === 'success'
-                        ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-                        : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
-                    )}
-                  >
-                    <BarChart3 className="h-3 w-3 mr-1" />
-                    {cekuraCallInfo.status}
-                  </Badge>
-                )}
                 {endedReason && (
                   <Badge variant="outline" className="px-2 py-1">
                     <PhoneOff className="h-3 w-3 mr-1" />
@@ -1649,7 +1668,7 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
         </TabsContent>
 
         {/* Activity Tab */}
-        <TabsContent value="activity" className="mt-4 space-y-4">
+        <TabsContent value="activity" className="mt-4 space-y-4 flex-none">
           {/* Transfers */}
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -1659,9 +1678,21 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
             </div>
             {transfers.length > 0 ? (
               <div className="space-y-2">
-                {transfers.map((t) => (
-                  <TransferItem key={t.id} transfer={t} highlight={highlightReasons?.transferMismatch} />
-                ))}
+                {transfers.map((t, index) => {
+                  // Try to match webhook transfer by phone number or by index
+                  const webhookTransfers = webhookData?.transfers || [];
+                  const matchedWebhookTransfer = webhookTransfers.find(
+                    (wt: TransferAttempt) => wt.destination?.number?.replace(/\D/g, '').slice(-10) === t.transferred_to_phone_number?.replace(/\D/g, '').slice(-10)
+                  ) || webhookTransfers[index];
+                  return (
+                    <TransferItem
+                      key={t.id}
+                      transfer={t}
+                      highlight={highlightReasons?.transferMismatch}
+                      transcript={matchedWebhookTransfer?.transcript}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <Card>
@@ -1739,7 +1770,7 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
         </TabsContent>
 
         {/* Logs Tab */}
-        <TabsContent value="logs" className="mt-4">
+        <TabsContent value="logs" className="mt-4 flex-none">
           {!call.platform_call_id ? (
             <EmptyState
               icon={<Bug className="h-6 w-6 text-muted-foreground" />}
@@ -1764,8 +1795,8 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
             />
           )}
         </TabsContent>
-      </Tabs>
-    </div>
+      </div>
+    </Tabs>
   );
 }
 
@@ -2179,6 +2210,12 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
   const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
   const { data: sentryData, isLoading: sentryLoading } = useSentryEventsForCall(platformCallId || null);
 
+  // Extract transfer data from webhooks
+  const webhookData = useMemo(() => {
+    if (webhooksLoading || !webhooks?.length) return null;
+    return extractWebhookMessages(webhooks);
+  }, [webhooks, webhooksLoading]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -2254,6 +2291,14 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
               Cekura
             </Button>
           ) : null
+        )}
+        {/* Cekura Status Selector */}
+        {cekuraCallInfo?.status && cekuraCallId && platformCallId && (
+          <CekuraStatusSelector
+            status={cekuraCallInfo.status}
+            cekuraId={cekuraCallId}
+            correlationId={platformCallId}
+          />
         )}
       </div>
 
@@ -2400,9 +2445,21 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
             </div>
             {transfers.length > 0 ? (
               <div className="space-y-2">
-                {transfers.map((t) => (
-                  <TransferItem key={t.id} transfer={t} highlight={highlightReasons?.transferMismatch} />
-                ))}
+                {transfers.map((t, index) => {
+                  // Try to match webhook transfer by phone number or by index
+                  const webhookTransfers = webhookData?.transfers || [];
+                  const matchedWebhookTransfer = webhookTransfers.find(
+                    (wt: TransferAttempt) => wt.destination?.number?.replace(/\D/g, '').slice(-10) === t.transferred_to_phone_number?.replace(/\D/g, '').slice(-10)
+                  ) || webhookTransfers[index];
+                  return (
+                    <TransferItem
+                      key={t.id}
+                      transfer={t}
+                      highlight={highlightReasons?.transferMismatch}
+                      transcript={matchedWebhookTransfer?.transcript}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <Card>

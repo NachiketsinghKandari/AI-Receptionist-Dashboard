@@ -130,6 +130,25 @@ export function buildCekuraUrl(cekuraCallId: number, environment: string): strin
   return `https://dashboard.cekura.ai/dashboard/1939/3184/${agentId}/calls?page=1&pageSize=30&callId=${cekuraCallId}`;
 }
 
+export type CekuraReviewedStatus = 'reviewed_success' | 'reviewed_failure';
+
+/**
+ * Update status for a Cekura call
+ */
+async function updateCekuraStatus(cekuraId: number, status: CekuraReviewedStatus): Promise<void> {
+  const response = await fetch('/api/cekura/status', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ cekuraId, status }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update status');
+  }
+}
+
 /**
  * Update feedback for a Cekura call
  */
@@ -145,6 +164,56 @@ async function updateCekuraFeedback(cekuraId: number, feedback: string): Promise
   if (!response.ok) {
     throw new Error('Failed to update feedback');
   }
+}
+
+/**
+ * Hook to update status for a Cekura call.
+ * Optimistically updates the local cache and invalidates on success.
+ */
+export function useCekuraStatusMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ cekuraId, status }: { cekuraId: number; status: CekuraReviewedStatus; correlationId: string }) =>
+      updateCekuraStatus(cekuraId, status),
+    onMutate: async ({ status, correlationId }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['cekura', 'call-data'] });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueriesData({ queryKey: ['cekura', 'call-data'] });
+
+      // Optimistically update all matching queries
+      queryClient.setQueriesData<CekuraApiResponse>(
+        { queryKey: ['cekura', 'call-data'] },
+        (old) => {
+          if (!old?.calls) return old;
+          const updatedCalls = { ...old.calls };
+          if (updatedCalls[correlationId]) {
+            updatedCalls[correlationId] = {
+              ...updatedCalls[correlationId],
+              status,
+            };
+          }
+          return { ...old, calls: updatedCalls };
+        }
+      );
+
+      return { previousData };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
+      // Invalidate to refetch
+      queryClient.invalidateQueries({ queryKey: ['cekura', 'call-data'] });
+    },
+  });
 }
 
 /**

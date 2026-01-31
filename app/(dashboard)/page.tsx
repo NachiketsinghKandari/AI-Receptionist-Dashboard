@@ -28,10 +28,10 @@ import { useDashboardPrefetch } from '@/hooks/use-dashboard-prefetch';
 import { formatDuration } from '@/lib/formatting';
 import { useUser } from '@/hooks/use-user';
 import { useEnvironment } from '@/components/providers/environment-provider';
-import { getTodayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
+import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
 
-type TimeRange = 'day' | 'week' | 'month' | 'all';
-type StatsPeriod = 'Today' | 'This Month';
+type TimeRange = 'yesterday' | 'day' | 'week' | 'month' | 'all';
+type StatsPeriod = 'Yesterday' | 'Today' | 'This Month';
 
 const quickLinks = [
   {
@@ -85,8 +85,8 @@ const quickLinks = [
 ];
 
 export default function HomePage() {
-  const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('Today');
-  const [timeRange, setTimeRange] = useState<TimeRange>('day');
+  const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('Yesterday');
+  const [timeRange, setTimeRange] = useState<TimeRange>('yesterday');
   const { user } = useUser();
   const { environment } = useEnvironment();
 
@@ -115,6 +115,13 @@ export default function HomePage() {
   let isHourly = false;
 
   switch (timeRange) {
+    case 'yesterday': {
+      const range = getYesterdayRangeUTC();
+      chartStartDate = range.startDate;
+      chartEndDate = range.endDate;
+      isHourly = true;
+      break;
+    }
     case 'day': {
       const range = getTodayRangeUTC();
       chartStartDate = range.startDate;
@@ -183,7 +190,14 @@ export default function HomePage() {
     day: 'numeric',
     year: 'numeric',
   });
-  const chartTitle = timeRange === 'day'
+  const yesterdayFormatted = new Date(subtractDays(todayStr, 1) + 'T12:00:00Z').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const chartTitle = timeRange === 'yesterday'
+    ? `Hourly Call Volume - ${yesterdayFormatted}`
+    : timeRange === 'day'
     ? `Hourly Call Volume - ${todayFormatted}`
     : timeRange === 'all'
     ? 'Daily Call Volume (All Time)'
@@ -247,6 +261,7 @@ export default function HomePage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="Yesterday">Yesterday</SelectItem>
               <SelectItem value="Today">Today</SelectItem>
               <SelectItem value="This Month">This Month</SelectItem>
             </SelectContent>
@@ -304,7 +319,8 @@ export default function HomePage() {
               </CardDescription>
             </div>
             <Tabs value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
-              <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+              <TabsList className="grid grid-cols-5 w-full sm:w-auto">
+                <TabsTrigger value="yesterday" className="text-xs sm:text-sm">Yesterday</TabsTrigger>
                 <TabsTrigger value="day" className="text-xs sm:text-sm">Today</TabsTrigger>
                 <TabsTrigger value="week" className="text-xs sm:text-sm">7 Days</TabsTrigger>
                 <TabsTrigger value="month" className="text-xs sm:text-sm">30 Days</TabsTrigger>
@@ -401,7 +417,7 @@ export default function HomePage() {
                     {isHourly ? 'Date' : 'Days'}
                   </p>
                   <p className="text-base md:text-lg font-bold">
-                    {isHourly ? 'Today' : chartData.length}
+                    {isHourly ? (timeRange === 'yesterday' ? 'Yesterday' : 'Today') : chartData.length}
                   </p>
                 </div>
               </div>

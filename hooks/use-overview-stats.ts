@@ -20,7 +20,7 @@ interface OverviewStats {
 }
 
 interface OverviewParams {
-  period: 'Today' | 'This Month';
+  period: 'Today' | 'Yesterday' | 'This Month';
 }
 
 async function fetchOverviewStats(params: OverviewParams, environment: string): Promise<OverviewStats> {
