@@ -30,8 +30,9 @@ export function ResponsiveFilterSidebar(props: ResponsiveFilterSidebarProps) {
           </button>
         </DrawerTrigger>
         <DrawerContent className="max-h-[85vh]">
-          <DrawerHeader>
+          <DrawerHeader className="flex flex-row items-center justify-between">
             <DrawerTitle>Filters</DrawerTitle>
+            {props.headerAction}
           </DrawerHeader>
           <div className="overflow-y-auto px-4 pb-6">
             <FilterSidebar

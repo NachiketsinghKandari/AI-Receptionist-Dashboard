@@ -24,6 +24,18 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   if (filters.correlationIds && filters.correlationIds.length > 0) {
     params.set('correlationIds', filters.correlationIds.join(','));
   }
+  if (filters.dynamicFilters && filters.dynamicFilters.length > 0) {
+    params.set('dynamicFilters', JSON.stringify(filters.dynamicFilters));
+  }
+  if (filters.excludeTransferType) {
+    params.set('excludeTransferType', filters.excludeTransferType);
+  }
+  if (filters.excludeCallType) {
+    params.set('excludeCallType', filters.excludeCallType);
+  }
+  if (filters.requireHasTransfer !== undefined && filters.requireHasTransfer !== null) {
+    params.set('requireHasTransfer', filters.requireHasTransfer ? 'true' : 'false');
+  }
 
   const response = await fetch(`/api/calls?${params}`);
   if (!response.ok) throw new Error('Failed to fetch calls');

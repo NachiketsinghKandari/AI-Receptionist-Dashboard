@@ -29,6 +29,9 @@ import type { SortOrder, FlaggedCallListItem } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
+import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
+import { CALL_FILTER_FIELDS } from '@/lib/filter-fields';
+import type { DynamicFilter } from '@/types/api';
 
 // Helper to create columns with error, important, mismatch, and Cekura state access
 function createColumns(
@@ -193,6 +196,7 @@ export default function CallsPage() {
   const [highlightReasons, setHighlightReasons] = useState<HighlightReasons>({ sentry: false, duration: false, important: false, transferMismatch: false });
   const [sortBy, setSortBy] = useState<string | null>('started_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>([]);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -236,28 +240,154 @@ export default function CallsPage() {
     effectiveDateRange.endDate
   );
 
+  // Extract special filters from dynamic filters and separate standard filters
+  const extractedFilters = useMemo(() => {
+    const validFilters = dynamicFilters.filter(
+      (f) => f.value || !conditionRequiresValue(f.condition)
+    );
+
+    // Special filters that need custom handling
+    let extractedTransferType: string | null = null;
+    let excludeTransferType: string | null = null; // For "not equals" transfer type
+    let requireHasTransfer: boolean | null = null; // true = must have transfer, false = must NOT have transfer
+    let extractedCekuraStatus: 'all' | 'success' | 'failure' | 'other' = 'all';
+    let excludeCekuraStatus: string | null = null; // For "not equals" Cekura status
+    let extractedMultipleTransfers: boolean | null = null; // null = not set, true = only multiple, false = exclude multiple
+    let extractedCallType: string | null = null;
+    let excludeCallType: string | null = null;
+    let extractedFirmId: number | null = null;
+
+    // Standard filters to pass to API
+    const standardFilters: DynamicFilter[] = [];
+
+    for (const filter of validFilters) {
+      // Handle transfer_type specially (includes voicemail detection from webhooks)
+      if (filter.field === 'transfer_type') {
+        if (filter.condition === 'equals') {
+          extractedTransferType = filter.value;
+        } else if (filter.condition === 'not_equals') {
+          excludeTransferType = filter.value;
+        } else if (filter.condition === 'is_not_empty') {
+          // "is not empty" = call must have at least one transfer
+          requireHasTransfer = true;
+        } else if (filter.condition === 'is_empty') {
+          // "is empty" = call must NOT have any transfers
+          requireHasTransfer = false;
+        }
+        // Other conditions for transfer_type are not supported (it's not a column on calls)
+        continue;
+      }
+
+      // Handle cekura_status specially (requires Cekura API data)
+      if (filter.field === 'cekura_status') {
+        if (filter.condition === 'equals') {
+          extractedCekuraStatus = filter.value as 'success' | 'failure' | 'other';
+        } else if (filter.condition === 'not_equals') {
+          excludeCekuraStatus = filter.value;
+        }
+        continue;
+      }
+
+      // Handle multiple_transfers (boolean from webhook analysis)
+      if (filter.field === 'multiple_transfers') {
+        if (filter.condition === 'is_true') {
+          extractedMultipleTransfers = true;
+        } else if (filter.condition === 'is_false') {
+          extractedMultipleTransfers = false;
+        }
+        continue;
+      }
+
+      // Handle call_type - equals goes to dedicated filter, others go to standard
+      if (filter.field === 'call_type') {
+        if (filter.condition === 'equals') {
+          extractedCallType = filter.value;
+        } else if (filter.condition === 'not_equals') {
+          excludeCallType = filter.value;
+        } else {
+          // Other conditions (contains, etc.) go to standard filters
+          standardFilters.push({
+            field: filter.field,
+            condition: filter.condition,
+            value: filter.value,
+          });
+        }
+        continue;
+      }
+
+      // Handle firm_id - equals goes to dedicated filter, others go to standard
+      if (filter.field === 'firm_id' && filter.condition === 'equals') {
+        extractedFirmId = parseInt(filter.value) || null;
+        continue;
+      }
+
+      // All other filters go to standard filters
+      standardFilters.push({
+        field: filter.field,
+        condition: filter.condition,
+        value: filter.value,
+      });
+    }
+
+    return {
+      transferType: extractedTransferType,
+      excludeTransferType,
+      requireHasTransfer,
+      cekuraStatus: extractedCekuraStatus,
+      excludeCekuraStatus,
+      multipleTransfers: extractedMultipleTransfers,
+      callType: extractedCallType,
+      excludeCallType,
+      firmId: extractedFirmId,
+      standardFilters: standardFilters.length > 0 ? standardFilters : null,
+    };
+  }, [dynamicFilters]);
+
+  // Compute effective Cekura status filter (sidebar takes precedence, then dynamic)
+  const effectiveCekuraStatus = cekuraStatusFilter !== 'all' ? cekuraStatusFilter : extractedFilters.cekuraStatus;
+  const effectiveExcludeCekuraStatus = extractedFilters.excludeCekuraStatus;
+
+  // Helper to check if a Cekura status matches a category
+  const matchesCekuraCategory = (status: string, category: 'success' | 'failure' | 'other') => {
+    const s = status.toLowerCase();
+    if (category === 'success') return s === 'success' || s === 'completed';
+    if (category === 'failure') return s === 'failure' || s === 'failed' || s === 'error';
+    if (category === 'other') return s !== 'success' && s !== 'completed' && s !== 'failure' && s !== 'failed' && s !== 'error';
+    return false;
+  };
+
   // Compute correlation IDs to filter by based on Cekura status
   const cekuraFilteredCorrelationIds = useMemo(() => {
-    if (cekuraStatusFilter === 'all' || !cekuraCallsData?.calls) {
-      return null; // No filtering
+    if (!cekuraCallsData?.calls) {
+      return null; // No data yet
+    }
+
+    // If neither include nor exclude is set, no Cekura filtering
+    if (effectiveCekuraStatus === 'all' && !effectiveExcludeCekuraStatus) {
+      return null;
     }
 
     const matchingIds: string[] = [];
     cekuraCallsData.calls.forEach((callData, correlationId) => {
-      const status = callData.status?.toLowerCase() || '';
-      if (cekuraStatusFilter === 'success' && (status === 'success' || status === 'completed')) {
-        matchingIds.push(correlationId);
-      } else if (cekuraStatusFilter === 'failure' && (status === 'failure' || status === 'failed' || status === 'error')) {
-        matchingIds.push(correlationId);
-      } else if (cekuraStatusFilter === 'other' &&
-                 status !== 'success' && status !== 'completed' &&
-                 status !== 'failure' && status !== 'failed' && status !== 'error') {
-        matchingIds.push(correlationId);
+      const status = callData.status || '';
+
+      // If we have an include filter, check if it matches
+      if (effectiveCekuraStatus !== 'all') {
+        if (matchesCekuraCategory(status, effectiveCekuraStatus)) {
+          matchingIds.push(correlationId);
+        }
+      }
+      // If we have an exclude filter, include everything EXCEPT that category
+      else if (effectiveExcludeCekuraStatus) {
+        const excludeCategory = effectiveExcludeCekuraStatus as 'success' | 'failure' | 'other';
+        if (!matchesCekuraCategory(status, excludeCategory)) {
+          matchingIds.push(correlationId);
+        }
       }
     });
 
     return matchingIds;
-  }, [cekuraStatusFilter, cekuraCallsData]);
+  }, [effectiveCekuraStatus, effectiveExcludeCekuraStatus, cekuraCallsData]);
 
   // Date-only filters for total count (no other filters applied)
   const dateOnlyFilters = useMemo(
@@ -270,13 +400,23 @@ export default function CallsPage() {
     [effectiveDateRange]
   );
 
+  // Compute effective filter values (sidebar takes precedence, then dynamic)
+  const effectiveFirmId = firmId ?? extractedFilters.firmId;
+  const effectiveCallType = callType !== 'All' ? callType : extractedFilters.callType;
+  const effectiveTransferType = transferType !== 'Off' ? transferType : extractedFilters.transferType;
+  // For multipleTransfers: sidebar true overrides, dynamic true/false applies, otherwise undefined
+  const effectiveMultipleTransfers = multipleTransfers ? true : (extractedFilters.multipleTransfers ?? undefined);
+
   // Build filters for regular calls
   const callFilters = useMemo(
     () => ({
-      firmId,
-      callType: callType !== 'All' ? callType : null,
-      transferType: transferType !== 'Off' ? transferType : null,
-      multipleTransfers,
+      firmId: effectiveFirmId,
+      callType: effectiveCallType,
+      transferType: effectiveTransferType,
+      multipleTransfers: effectiveMultipleTransfers,
+      excludeTransferType: extractedFilters.excludeTransferType,
+      excludeCallType: extractedFilters.excludeCallType,
+      requireHasTransfer: extractedFilters.requireHasTransfer,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -285,8 +425,9 @@ export default function CallsPage() {
       sortBy,
       sortOrder,
       correlationIds: cekuraFilteredCorrelationIds,
+      dynamicFilters: extractedFilters.standardFilters,
     }),
-    [firmId, callType, transferType, multipleTransfers, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds]
+    [effectiveFirmId, effectiveCallType, effectiveTransferType, effectiveMultipleTransfers, extractedFilters.excludeTransferType, extractedFilters.excludeCallType, extractedFilters.requireHasTransfer, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, extractedFilters.standardFilters]
   );
 
   // Build filters for flagged calls
@@ -415,6 +556,14 @@ export default function CallsPage() {
         hideFirmFilter={!flaggedOnly}
         limit={limit}
         onLimitChange={setLimit}
+        headerAction={
+          <DynamicFilterBuilder
+            fields={CALL_FILTER_FIELDS}
+            filters={dynamicFilters}
+            onFiltersChange={setDynamicFilters}
+            onApply={() => setOffset(0)}
+          />
+        }
       >
         {/* Call-specific filters in compact 2x2 grid - only show when not in flagged mode */}
         {!flaggedOnly && (

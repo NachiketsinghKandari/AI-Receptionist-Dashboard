@@ -29,6 +29,8 @@ export interface FilterSidebarProps {
   children?: React.ReactNode;
   className?: string;
   hideHeader?: boolean;
+  /** Optional action element to show next to the Filters header (e.g., dynamic filter builder) */
+  headerAction?: React.ReactNode;
 }
 
 export function FilterSidebar({
@@ -49,6 +51,7 @@ export function FilterSidebar({
   children,
   className,
   hideHeader,
+  headerAction,
 }: FilterSidebarProps) {
   const { data: firmsData } = useFirms();
   // Sort firms by ID (ascending)
@@ -57,7 +60,12 @@ export function FilterSidebar({
   return (
     <div className={cn("w-64 shrink-0 flex flex-col bg-card border-r border-border", className)}>
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-        {!hideHeader && <h2 className="font-semibold text-lg">Filters</h2>}
+        {!hideHeader && (
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-lg">Filters</h2>
+            {headerAction}
+          </div>
+        )}
 
         {/* Date Filter Mode */}
         <div className="space-y-2">

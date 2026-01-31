@@ -12,7 +12,9 @@ import {
   validatePagination,
   buildSearchOrCondition,
   isValidInt4,
+  escapeLikePattern,
 } from '@/lib/api/utils';
+import type { DynamicFilter } from '@/types/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +27,17 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const search = searchParams.get('search')?.trim() || null;
+
+    // Parse dynamic filters (JSON array)
+    let dynamicFilters: DynamicFilter[] = [];
+    const dynamicFiltersParam = searchParams.get('dynamicFilters');
+    if (dynamicFiltersParam) {
+      try {
+        dynamicFilters = JSON.parse(dynamicFiltersParam);
+      } catch (e) {
+        console.error('Failed to parse dynamicFilters:', e);
+      }
+    }
 
     const { limit, offset } = validatePagination(
       parseIntOrDefault(searchParams.get('limit'), DEFAULT_PAGE_LIMIT),
@@ -70,6 +83,56 @@ export async function GET(request: NextRequest) {
       }
 
       query = query.or(orCondition);
+    }
+
+    // Apply dynamic filters
+    const validFilterColumns = ['id', 'call_id', 'subject', 'email_type', 'status', 'sent_at', 'firm_id'];
+
+    for (const filter of dynamicFilters) {
+      if (!validFilterColumns.includes(filter.field)) {
+        continue;
+      }
+
+      const { field, condition, value } = filter;
+
+      switch (condition) {
+        case 'equals':
+          query = query.eq(field, value);
+          break;
+        case 'not_equals':
+          query = query.neq(field, value);
+          break;
+        case 'contains':
+          query = query.ilike(field, `%${escapeLikePattern(value)}%`);
+          break;
+        case 'not_contains':
+          query = query.not(field, 'ilike', `%${escapeLikePattern(value)}%`);
+          break;
+        case 'starts_with':
+          query = query.ilike(field, `${escapeLikePattern(value)}%`);
+          break;
+        case 'ends_with':
+          query = query.ilike(field, `%${escapeLikePattern(value)}`);
+          break;
+        case 'greater_than':
+          query = query.gt(field, value);
+          break;
+        case 'less_than':
+          query = query.lt(field, value);
+          break;
+        case 'greater_or_equal':
+          query = query.gte(field, value);
+          break;
+        case 'less_or_equal':
+          query = query.lte(field, value);
+          break;
+        case 'is_empty':
+          query = query.is(field, null);
+          break;
+        case 'is_not_empty':
+          query = query.not(field, 'is', null);
+          break;
+      }
     }
 
     query = query.order(sortColumn, { ascending: sortOrder === 'asc' }).range(offset, offset + limit - 1);

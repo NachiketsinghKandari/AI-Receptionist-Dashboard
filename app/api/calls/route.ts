@@ -13,7 +13,9 @@ import {
   buildSearchOrCondition,
   isValidInt4,
   decodeBase64Payload,
+  escapeLikePattern,
 } from '@/lib/api/utils';
+import type { DynamicFilter } from '@/types/api';
 import { hasMultipleTransfers, hasVoicemailTransfer } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
@@ -30,8 +32,24 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const search = searchParams.get('search')?.trim() || null;
     const multipleTransfers = searchParams.get('multipleTransfers') === 'true';
+    const excludeTransferType = searchParams.get('excludeTransferType')?.trim() || null;
+    const excludeCallType = searchParams.get('excludeCallType')?.trim() || null;
+    // requireHasTransfer: 'true' = must have transfer, 'false' = must NOT have transfer, null = no filter
+    const requireHasTransferParam = searchParams.get('requireHasTransfer');
+    const requireHasTransfer = requireHasTransferParam === 'true' ? true : requireHasTransferParam === 'false' ? false : null;
     // Cekura status filter - comma-separated list of correlation IDs
     const correlationIds = searchParams.get('correlationIds')?.trim() || null;
+
+    // Parse dynamic filters (JSON array)
+    let dynamicFilters: DynamicFilter[] = [];
+    const dynamicFiltersParam = searchParams.get('dynamicFilters');
+    if (dynamicFiltersParam) {
+      try {
+        dynamicFilters = JSON.parse(dynamicFiltersParam);
+      } catch (e) {
+        console.error('Failed to parse dynamicFilters:', e);
+      }
+    }
 
     const { limit, offset } = validatePagination(
       parseIntOrDefault(searchParams.get('limit'), DEFAULT_PAGE_LIMIT),
@@ -181,6 +199,87 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If excluding a specific transfer type (e.g., voicemail), find platform_call_ids to exclude
+    let platformCallIdsToExcludeByTransferType: string[] | null = null;
+    if (excludeTransferType) {
+      if (excludeTransferType === 'voicemail') {
+        // Voicemail detection from webhook payloads
+        let webhooksQuery = client
+          .from('webhook_dumps')
+          .select('platform_call_id, payload');
+
+        if (startDate) {
+          webhooksQuery = webhooksQuery.gte('received_at', startDate);
+        }
+        if (endDate) {
+          webhooksQuery = webhooksQuery.lte('received_at', endDate);
+        }
+
+        const webhooksResponse = await webhooksQuery;
+
+        if (!webhooksResponse.error && webhooksResponse.data) {
+          const voicemailIds = webhooksResponse.data
+            .filter((w) => {
+              const payload = decodeBase64Payload(w.payload);
+              return hasVoicemailTransfer(payload as Record<string, unknown>);
+            })
+            .map((w) => w.platform_call_id)
+            .filter((id): id is string => id !== null);
+
+          platformCallIdsToExcludeByTransferType = [...new Set(voicemailIds)];
+        }
+      } else {
+        // Other transfer types - get call_ids from transfers_details table
+        const transfersResponse = await client
+          .from('transfers_details')
+          .select('call_id')
+          .eq('transfer_type', excludeTransferType);
+
+        if (!transfersResponse.error && transfersResponse.data && transfersResponse.data.length > 0) {
+          // We need to convert call_ids to exclude - we'll filter these out in the main query
+          const callIdsToExclude = [...new Set(transfersResponse.data.map((t) => t.call_id))];
+          // Store call IDs to exclude (we'll handle this differently)
+          platformCallIdsToExcludeByTransferType = callIdsToExclude.map(id => `call:${id}`);
+        }
+      }
+    }
+
+    // Track call IDs to exclude by transfer type (for non-voicemail types)
+    let callIdsToExcludeByTransferType: number[] | null = null;
+    if (platformCallIdsToExcludeByTransferType) {
+      const callIdExcludes = platformCallIdsToExcludeByTransferType
+        .filter(id => id.startsWith('call:'))
+        .map(id => parseInt(id.replace('call:', '')));
+      if (callIdExcludes.length > 0) {
+        callIdsToExcludeByTransferType = callIdExcludes;
+      }
+      // Filter to only keep actual platform_call_ids (not call: prefixed ones)
+      platformCallIdsToExcludeByTransferType = platformCallIdsToExcludeByTransferType.filter(id => !id.startsWith('call:'));
+      if (platformCallIdsToExcludeByTransferType.length === 0) {
+        platformCallIdsToExcludeByTransferType = null;
+      }
+    }
+
+    // Handle requireHasTransfer filter (is_empty / is_not_empty for transfer_type)
+    let callIdsWithTransfers: number[] | null = null;
+    let callIdsWithoutTransfers: boolean = false; // Flag to filter for calls without transfers
+
+    if (requireHasTransfer !== null) {
+      // Get all call_ids that have at least one transfer
+      const transfersResponse = await client
+        .from('transfers_details')
+        .select('call_id');
+
+      if (!transfersResponse.error && transfersResponse.data) {
+        callIdsWithTransfers = [...new Set(transfersResponse.data.map((t) => t.call_id))];
+      }
+
+      if (requireHasTransfer === false) {
+        // User wants calls WITHOUT transfers - we'll exclude the ones with transfers
+        callIdsWithoutTransfers = true;
+      }
+    }
+
     // Build base query - select only needed columns for list view
     let query = client
       .from('calls')
@@ -207,6 +306,35 @@ export async function GET(request: NextRequest) {
     }
     if (platformCallIdsWithVoicemail) {
       query = query.in('platform_call_id', platformCallIdsWithVoicemail);
+    }
+    // Filter by whether call has transfers (is_empty / is_not_empty for transfer_type)
+    if (requireHasTransfer === true && callIdsWithTransfers) {
+      // Only show calls that have transfers
+      if (callIdsWithTransfers.length === 0) {
+        return NextResponse.json({
+          data: [],
+          total: 0,
+          limit,
+          offset,
+        });
+      }
+      query = query.in('id', callIdsWithTransfers);
+    } else if (callIdsWithoutTransfers && callIdsWithTransfers && callIdsWithTransfers.length > 0) {
+      // Exclude calls that have transfers (show only calls without transfers)
+      query = query.not('id', 'in', `(${callIdsWithTransfers.join(',')})`);
+    }
+    // Exclude calls by transfer type (for "not equals" transfer type filter)
+    if (platformCallIdsToExcludeByTransferType && platformCallIdsToExcludeByTransferType.length > 0) {
+      // Exclude voicemail-type calls by platform_call_id
+      query = query.not('platform_call_id', 'in', `(${platformCallIdsToExcludeByTransferType.map(id => `"${id}"`).join(',')})`);
+    }
+    if (callIdsToExcludeByTransferType && callIdsToExcludeByTransferType.length > 0) {
+      // Exclude other transfer type calls by call id
+      query = query.not('id', 'in', `(${callIdsToExcludeByTransferType.join(',')})`);
+    }
+    // Exclude calls by call_type
+    if (excludeCallType) {
+      query = query.neq('call_type', excludeCallType);
     }
     // Filter by specific correlation IDs (for Cekura status filtering)
     if (correlationIds) {
@@ -240,6 +368,74 @@ export async function GET(request: NextRequest) {
       }
 
       query = query.or(orCondition);
+    }
+
+    // Apply dynamic filters
+    // Valid columns that can be filtered (security: whitelist approach)
+    const validFilterColumns = [
+      'id',
+      'platform_call_id',
+      'caller_name',
+      'phone_number',
+      'call_type',
+      'status',
+      'call_duration',
+      'started_at',
+      'firm_id',
+    ];
+
+    for (const filter of dynamicFilters) {
+      // Security: Only allow filtering on whitelisted columns
+      if (!validFilterColumns.includes(filter.field)) {
+        continue;
+      }
+
+      const { field, condition, value } = filter;
+
+      switch (condition) {
+        case 'equals':
+          query = query.eq(field, value);
+          break;
+        case 'not_equals':
+          query = query.neq(field, value);
+          break;
+        case 'contains':
+          query = query.ilike(field, `%${escapeLikePattern(value)}%`);
+          break;
+        case 'not_contains':
+          query = query.not(field, 'ilike', `%${escapeLikePattern(value)}%`);
+          break;
+        case 'starts_with':
+          query = query.ilike(field, `${escapeLikePattern(value)}%`);
+          break;
+        case 'ends_with':
+          query = query.ilike(field, `%${escapeLikePattern(value)}`);
+          break;
+        case 'greater_than':
+          query = query.gt(field, value);
+          break;
+        case 'less_than':
+          query = query.lt(field, value);
+          break;
+        case 'greater_or_equal':
+          query = query.gte(field, value);
+          break;
+        case 'less_or_equal':
+          query = query.lte(field, value);
+          break;
+        case 'is_empty':
+          query = query.is(field, null);
+          break;
+        case 'is_not_empty':
+          query = query.not(field, 'is', null);
+          break;
+        case 'is_true':
+          query = query.eq(field, true);
+          break;
+        case 'is_false':
+          query = query.eq(field, false);
+          break;
+      }
     }
 
     // Execute with sorting and pagination

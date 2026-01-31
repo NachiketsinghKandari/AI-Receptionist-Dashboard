@@ -19,6 +19,9 @@ async function fetchTransfers(filters: TransferFilters, environment: string): Pr
   if (filters.offset) params.set('offset', String(filters.offset));
   if (filters.sortBy) params.set('sortBy', filters.sortBy);
   if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+  if (filters.dynamicFilters && filters.dynamicFilters.length > 0) {
+    params.set('dynamicFilters', JSON.stringify(filters.dynamicFilters));
+  }
 
   const response = await fetch(`/api/transfers?${params}`);
   if (!response.ok) throw new Error('Failed to fetch transfers');

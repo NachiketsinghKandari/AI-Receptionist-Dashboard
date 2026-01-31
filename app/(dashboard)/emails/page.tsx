@@ -15,9 +15,11 @@ import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Email } from '@/types/database';
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
-import type { SortOrder } from '@/types/api';
+import type { SortOrder, DynamicFilter } from '@/types/api';
 import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
+import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
+import { EMAIL_FILTER_FIELDS } from '@/lib/filter-fields';
 
 const columns: ColumnDef<Email>[] = [
   {
@@ -101,8 +103,51 @@ export default function EmailsPage() {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [sortBy, setSortBy] = useState<string | null>('sent_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>([]);
 
   const debouncedSearch = useDebounce(search, 300);
+
+  // Extract special filters from dynamic filters and separate standard filters
+  const extractedFilters = useMemo(() => {
+    const validFilters = dynamicFilters.filter(
+      (f) => f.value || !conditionRequiresValue(f.condition)
+    );
+
+    let extractedFirmId: number | null = null;
+    let extractedCallId: number | null = null;
+    const standardFilters: DynamicFilter[] = [];
+
+    for (const filter of validFilters) {
+      if (filter.condition === 'equals') {
+        switch (filter.field) {
+          case 'firm_id':
+            extractedFirmId = parseInt(filter.value) || null;
+            break;
+          case 'call_id':
+            extractedCallId = parseInt(filter.value) || null;
+            break;
+          default:
+            standardFilters.push({
+              field: filter.field,
+              condition: filter.condition,
+              value: filter.value,
+            });
+        }
+      } else {
+        standardFilters.push({
+          field: filter.field,
+          condition: filter.condition,
+          value: filter.value,
+        });
+      }
+    }
+
+    return {
+      firmId: extractedFirmId,
+      callId: extractedCallId,
+      standardFilters: standardFilters.length > 0 ? standardFilters : null,
+    };
+  }, [dynamicFilters]);
 
   // Compute effective date range based on filter mode (in UTC)
   const effectiveDateRange = useMemo(() => {
@@ -130,9 +175,13 @@ export default function EmailsPage() {
     [effectiveDateRange]
   );
 
+  // Compute effective filter values (sidebar takes precedence, then dynamic)
+  const effectiveFirmId = firmId ?? extractedFilters.firmId;
+
   const filters = useMemo(
     () => ({
-      firmId,
+      firmId: effectiveFirmId,
+      callId: extractedFilters.callId,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -140,8 +189,9 @@ export default function EmailsPage() {
       offset,
       sortBy,
       sortOrder,
+      dynamicFilters: extractedFilters.standardFilters,
     }),
-    [firmId, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [effectiveFirmId, extractedFilters.callId, extractedFilters.standardFilters, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
   );
 
   // Handle column sorting
@@ -191,6 +241,14 @@ export default function EmailsPage() {
         onFirmIdChange={setFirmId}
         limit={limit}
         onLimitChange={setLimit}
+        headerAction={
+          <DynamicFilterBuilder
+            fields={EMAIL_FILTER_FIELDS}
+            filters={dynamicFilters}
+            onFiltersChange={setDynamicFilters}
+            onApply={() => setOffset(0)}
+          />
+        }
       />
 
       <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">

@@ -15,9 +15,11 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, TRANSFER_STATUSES } from '@/lib/constants';
 import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Transfer } from '@/types/database';
-import type { SortOrder } from '@/types/api';
+import type { SortOrder, DynamicFilter } from '@/types/api';
 import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
+import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
+import { TRANSFER_FILTER_FIELDS } from '@/lib/filter-fields';
 
 const columns: ColumnDef<Transfer>[] = [
   {
@@ -84,8 +86,56 @@ export default function TransfersPage() {
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
   const [sortBy, setSortBy] = useState<string | null>('transfer_started_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>([]);
 
   const debouncedSearch = useDebounce(search, 300);
+
+  // Extract special filters from dynamic filters and separate standard filters
+  const extractedFilters = useMemo(() => {
+    const validFilters = dynamicFilters.filter(
+      (f) => f.value || !conditionRequiresValue(f.condition)
+    );
+
+    let extractedFirmId: number | null = null;
+    let extractedCallId: number | null = null;
+    let extractedStatus: string | null = null;
+    const standardFilters: DynamicFilter[] = [];
+
+    for (const filter of validFilters) {
+      if (filter.condition === 'equals') {
+        switch (filter.field) {
+          case 'firm_id':
+            extractedFirmId = parseInt(filter.value) || null;
+            break;
+          case 'call_id':
+            extractedCallId = parseInt(filter.value) || null;
+            break;
+          case 'transfer_status':
+            extractedStatus = filter.value;
+            break;
+          default:
+            standardFilters.push({
+              field: filter.field,
+              condition: filter.condition,
+              value: filter.value,
+            });
+        }
+      } else {
+        standardFilters.push({
+          field: filter.field,
+          condition: filter.condition,
+          value: filter.value,
+        });
+      }
+    }
+
+    return {
+      firmId: extractedFirmId,
+      callId: extractedCallId,
+      status: extractedStatus,
+      standardFilters: standardFilters.length > 0 ? standardFilters : null,
+    };
+  }, [dynamicFilters]);
 
   // Compute effective date range based on filter mode (in UTC)
   const effectiveDateRange = useMemo(() => {
@@ -113,10 +163,15 @@ export default function TransfersPage() {
     [effectiveDateRange]
   );
 
+  // Compute effective filter values (sidebar takes precedence, then dynamic)
+  const effectiveFirmId = firmId ?? extractedFilters.firmId;
+  const effectiveStatus = status !== 'All' ? status : extractedFilters.status;
+
   const filters = useMemo(
     () => ({
-      firmId,
-      status: status !== 'All' ? status : null,
+      firmId: effectiveFirmId,
+      callId: extractedFilters.callId,
+      status: effectiveStatus,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -124,8 +179,9 @@ export default function TransfersPage() {
       offset,
       sortBy,
       sortOrder,
+      dynamicFilters: extractedFilters.standardFilters,
     }),
-    [firmId, status, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [effectiveFirmId, extractedFilters.callId, effectiveStatus, extractedFilters.standardFilters, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
   );
 
   // Handle column sorting
@@ -175,6 +231,14 @@ export default function TransfersPage() {
         onFirmIdChange={setFirmId}
         limit={limit}
         onLimitChange={setLimit}
+        headerAction={
+          <DynamicFilterBuilder
+            fields={TRANSFER_FILTER_FIELDS}
+            filters={dynamicFilters}
+            onFiltersChange={setDynamicFilters}
+            onApply={() => setOffset(0)}
+          />
+        }
       >
         <div>
           <Label className="text-sm">Status</Label>

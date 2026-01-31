@@ -19,6 +19,29 @@ export interface BaseFilters {
   sortOrder?: SortOrder | null;
 }
 
+// Dynamic filter types for flexible filtering
+export type DynamicFilterCondition =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'starts_with'
+  | 'ends_with'
+  | 'greater_than'
+  | 'less_than'
+  | 'greater_or_equal'
+  | 'less_or_equal'
+  | 'is_empty'
+  | 'is_not_empty'
+  | 'is_true'
+  | 'is_false';
+
+export interface DynamicFilter {
+  field: string;
+  condition: DynamicFilterCondition;
+  value: string;
+}
+
 export interface CallFilters extends BaseFilters {
   firmId?: number | null;
   callType?: string | null;
@@ -26,17 +49,23 @@ export interface CallFilters extends BaseFilters {
   platformCallId?: string | null;
   multipleTransfers?: boolean;
   correlationIds?: string[] | null;
+  dynamicFilters?: DynamicFilter[] | null;
+  excludeTransferType?: string | null;
+  excludeCallType?: string | null;
+  requireHasTransfer?: boolean | null; // true = must have transfer, false = must NOT have transfer
 }
 
 export interface EmailFilters extends BaseFilters {
   firmId?: number | null;
   callId?: number | null;
+  dynamicFilters?: DynamicFilter[] | null;
 }
 
 export interface TransferFilters extends BaseFilters {
   firmId?: number | null;
   callId?: number | null;
   status?: string | null;
+  dynamicFilters?: DynamicFilter[] | null;
 }
 
 export interface WebhookFilters extends BaseFilters {
