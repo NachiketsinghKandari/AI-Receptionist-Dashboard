@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ColumnDef } from '@tanstack/react-table';
 import { Phone, Loader2, Flag, RotateCcw } from 'lucide-react';
@@ -197,6 +197,7 @@ export default function CallsPage() {
   const [sortBy, setSortBy] = useState<string | null>('started_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>([]);
+  const [pendingNavigation, setPendingNavigation] = useState<'first' | 'last' | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -256,6 +257,7 @@ export default function CallsPage() {
     let extractedCallType: string | null = null;
     let excludeCallType: string | null = null;
     let extractedFirmId: number | null = null;
+    let extractedToolCallResult: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null = null;
 
     // Standard filters to pass to API
     const standardFilters: DynamicFilter[] = [];
@@ -294,6 +296,14 @@ export default function CallsPage() {
           extractedMultipleTransfers = true;
         } else if (filter.condition === 'is_false') {
           extractedMultipleTransfers = false;
+        }
+        continue;
+      }
+
+      // Handle tool_call_result (last transfer result from webhook)
+      if (filter.field === 'tool_call_result') {
+        if (filter.condition === 'equals') {
+          extractedToolCallResult = filter.value as 'transfer_executed' | 'transfer_cancelled' | 'other';
         }
         continue;
       }
@@ -339,6 +349,7 @@ export default function CallsPage() {
       callType: extractedCallType,
       excludeCallType,
       firmId: extractedFirmId,
+      toolCallResult: extractedToolCallResult,
       standardFilters: standardFilters.length > 0 ? standardFilters : null,
     };
   }, [dynamicFilters]);
@@ -417,6 +428,7 @@ export default function CallsPage() {
       excludeTransferType: extractedFilters.excludeTransferType,
       excludeCallType: extractedFilters.excludeCallType,
       requireHasTransfer: extractedFilters.requireHasTransfer,
+      toolCallResult: extractedFilters.toolCallResult,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -427,7 +439,7 @@ export default function CallsPage() {
       correlationIds: cekuraFilteredCorrelationIds,
       dynamicFilters: extractedFilters.standardFilters,
     }),
-    [effectiveFirmId, effectiveCallType, effectiveTransferType, effectiveMultipleTransfers, extractedFilters.excludeTransferType, extractedFilters.excludeCallType, extractedFilters.requireHasTransfer, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, extractedFilters.standardFilters]
+    [effectiveFirmId, effectiveCallType, effectiveTransferType, effectiveMultipleTransfers, extractedFilters.excludeTransferType, extractedFilters.excludeCallType, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, extractedFilters.standardFilters]
   );
 
   // Build filters for flagged calls
@@ -525,18 +537,66 @@ export default function CallsPage() {
 
   // Navigation logic for detail dialog
   const dataArray = data?.data ?? [];
-  const currentIndex = selectedCallId !== null
+  const totalFiltered = data?.total ?? 0;
+  const localIndex = selectedCallId !== null
     ? dataArray.findIndex(c => c.id === selectedCallId)
     : -1;
-  const hasPrevious = currentIndex > 0;
-  const hasNext = currentIndex >= 0 && currentIndex < dataArray.length - 1;
+
+  // Global index across all pages
+  const globalIndex = localIndex >= 0 ? offset + localIndex : -1;
+
+  // Can always navigate if there are multiple items (wrap-around enabled)
+  const hasPrevious = totalFiltered > 1;
+  const hasNext = totalFiltered > 1;
 
   const handlePrevious = () => {
-    if (hasPrevious) setSelectedCallId(dataArray[currentIndex - 1].id);
+    if (totalFiltered <= 1) return;
+
+    if (localIndex > 0) {
+      // Navigate within current page
+      setSelectedCallId(dataArray[localIndex - 1].id);
+    } else if (offset > 0) {
+      // Go to previous page and select last item
+      const newOffset = Math.max(0, offset - limit);
+      setOffset(newOffset);
+      setPendingNavigation('last');
+    } else {
+      // At first item (1/60) - wrap to last page and last item
+      const lastPageOffset = Math.floor((totalFiltered - 1) / limit) * limit;
+      setOffset(lastPageOffset);
+      setPendingNavigation('last');
+    }
   };
+
   const handleNext = () => {
-    if (hasNext) setSelectedCallId(dataArray[currentIndex + 1].id);
+    if (totalFiltered <= 1) return;
+
+    if (localIndex < dataArray.length - 1) {
+      // Navigate within current page
+      setSelectedCallId(dataArray[localIndex + 1].id);
+    } else if (offset + dataArray.length < totalFiltered) {
+      // Go to next page and select first item
+      const newOffset = offset + limit;
+      setOffset(newOffset);
+      setPendingNavigation('first');
+    } else {
+      // At last item (60/60) - wrap to first page and first item
+      setOffset(0);
+      setPendingNavigation('first');
+    }
   };
+
+  // Effect to handle navigation after page data loads
+  useEffect(() => {
+    if (pendingNavigation && dataArray.length > 0) {
+      if (pendingNavigation === 'first') {
+        setSelectedCallId(dataArray[0].id);
+      } else if (pendingNavigation === 'last') {
+        setSelectedCallId(dataArray[dataArray.length - 1].id);
+      }
+      setPendingNavigation(null);
+    }
+  }, [pendingNavigation, dataArray]);
 
   return (
     <div className="flex h-full">
@@ -612,7 +672,7 @@ export default function CallsPage() {
                   <SelectContent>
                     {TRANSFER_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>
-                        {type === 'has_conversation' ? 'Has Conv.' : type}
+                        {type === 'has_conversation' ? 'has_convo' : type}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -683,6 +743,7 @@ export default function CallsPage() {
             setMultipleTransfers(false);
             setFlaggedOnly(false);
             setSearch('');
+            setDynamicFilters([]);
           }}
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
@@ -765,6 +826,8 @@ export default function CallsPage() {
         onNext={handleNext}
         hasPrevious={hasPrevious}
         hasNext={hasNext}
+        currentIndex={globalIndex}
+        totalCount={totalFiltered}
         dateRange={{
           startDate: effectiveDateRange.startDate ? `${effectiveDateRange.startDate.split('T')[0]}T00:00:00Z` : null,
           endDate: effectiveDateRange.endDate ? `${effectiveDateRange.endDate.split('T')[0]}T23:59:59Z` : null,

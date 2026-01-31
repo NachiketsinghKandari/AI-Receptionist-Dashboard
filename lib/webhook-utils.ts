@@ -240,3 +240,87 @@ export function createTransferInfoFromDatabase(
     transferStatus: transfer.transfer_status,
   }));
 }
+
+/**
+ * Tool call result categories for filtering
+ */
+export type ToolCallResultCategory = 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other';
+
+/**
+ * Check if a transfer result indicates failure/cancellation.
+ * Used by both the transfer-email-mismatch API and categorization.
+ */
+export function isFailedTransferResult(result: string): boolean {
+  const lower = result.toLowerCase();
+  return (
+    lower.includes('cancel') ||
+    lower.includes('fail') ||
+    lower.includes('error') ||
+    lower.includes('timeout') ||
+    lower.includes('busy') ||
+    lower.includes('no answer') ||
+    lower.includes('declined') ||
+    lower.includes('rejected')
+  );
+}
+
+/**
+ * Check if a transfer result indicates successful execution.
+ * Matches: "Transfer executed", "transfer executed", etc.
+ */
+export function isExecutedTransferResult(result: string): boolean {
+  const lower = result.toLowerCase();
+  return lower.includes('transfer executed') || lower === 'executed';
+}
+
+/**
+ * Check if a transfer result indicates completion.
+ * Matches: "Transfer completed", "transfer completed", etc.
+ */
+export function isCompletedTransferResult(result: string): boolean {
+  const lower = result.toLowerCase();
+  return lower.includes('transfer completed') || lower === 'completed' || lower === 'success';
+}
+
+/**
+ * Get the last transfer tool call result from a webhook payload.
+ * Returns the result string of the most recent transfer_call tool result.
+ */
+export function getLastTransferResult(payload: Record<string, unknown>): string | null {
+  const parsed = parseWebhookPayload(payload);
+  if (parsed.transfers.length === 0) {
+    return null;
+  }
+  // Return the last transfer's result
+  return parsed.transfers[parsed.transfers.length - 1].result;
+}
+
+/**
+ * Categorize a transfer result into: transfer_executed, transfer_completed, transfer_cancelled, or other
+ */
+export function categorizeTransferResult(result: string): ToolCallResultCategory {
+  if (isExecutedTransferResult(result)) {
+    return 'transfer_executed';
+  }
+  if (isCompletedTransferResult(result)) {
+    return 'transfer_completed';
+  }
+  if (isFailedTransferResult(result)) {
+    return 'transfer_cancelled';
+  }
+  return 'other';
+}
+
+/**
+ * Check if a webhook payload's last transfer matches a specific result category.
+ */
+export function lastTransferMatchesCategory(
+  payload: Record<string, unknown>,
+  category: ToolCallResultCategory
+): boolean {
+  const lastResult = getLastTransferResult(payload);
+  if (!lastResult) {
+    return false;
+  }
+  return categorizeTransferResult(lastResult) === category;
+}

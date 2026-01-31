@@ -16,7 +16,7 @@ import {
   decodeBase64Payload,
 } from '@/lib/api/utils';
 import type { DynamicFilter } from '@/types/api';
-import { hasConversationTransfer, hasVoicemailTransfer } from '@/lib/webhook-utils';
+import { hasConversationTransfer, hasVoicemailTransfer, lastTransferMatchesCategory, type ToolCallResultCategory } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const search = searchParams.get('search')?.trim() || null;
+    // Tool call result filter (last transfer result: transfer_executed, transfer_cancelled, other)
+    const toolCallResult = searchParams.get('toolCallResult') as ToolCallResultCategory | null;
 
     // Parse dynamic filters (JSON array)
     let dynamicFilters: DynamicFilter[] = [];
@@ -108,6 +110,56 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If filtering by tool call result (last transfer result category)
+    let platformCallIdsByToolResult: string[] | null = null;
+    if (toolCallResult) {
+      let webhooksQuery = client
+        .from('webhook_dumps')
+        .select('platform_call_id, payload');
+
+      if (startDate) {
+        webhooksQuery = webhooksQuery.gte('received_at', startDate);
+      }
+      if (endDate) {
+        webhooksQuery = webhooksQuery.lte('received_at', endDate);
+      }
+
+      const webhooksResponse = await webhooksQuery;
+
+      if (webhooksResponse.error) {
+        console.error('Error fetching webhooks for tool call result filter:', webhooksResponse.error);
+        return errorResponse('Failed to fetch webhooks', 500, 'WEBHOOK_FETCH_ERROR');
+      }
+
+      if (webhooksResponse.data && webhooksResponse.data.length > 0) {
+        const platformCallIds = webhooksResponse.data
+          .filter((w) => {
+            const payload = decodeBase64Payload(w.payload);
+            return lastTransferMatchesCategory(payload as Record<string, unknown>, toolCallResult);
+          })
+          .map((w) => w.platform_call_id)
+          .filter((id): id is string => id !== null);
+
+        platformCallIdsByToolResult = [...new Set(platformCallIds)];
+
+        if (platformCallIdsByToolResult.length === 0) {
+          return NextResponse.json({
+            data: [],
+            total: 0,
+            limit,
+            offset,
+          });
+        }
+      } else {
+        return NextResponse.json({
+          data: [],
+          total: 0,
+          limit,
+          offset,
+        });
+      }
+    }
+
     let query = client
       .from('transfers_details')
       .select(
@@ -139,6 +191,10 @@ export async function GET(request: NextRequest) {
     }
     if (endDate) {
       query = query.lte('created_at', endDate);
+    }
+    // Filter by tool call result (last transfer result category)
+    if (platformCallIdsByToolResult) {
+      query = query.in('calls.platform_call_id', platformCallIdsByToolResult);
     }
 
     // Search across multiple columns with properly escaped terms

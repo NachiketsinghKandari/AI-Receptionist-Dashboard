@@ -53,6 +53,7 @@ export interface CallFilters extends BaseFilters {
   excludeTransferType?: string | null;
   excludeCallType?: string | null;
   requireHasTransfer?: boolean | null; // true = must have transfer, false = must NOT have transfer
+  toolCallResult?: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null; // last transfer result category
 }
 
 export interface EmailFilters extends BaseFilters {
@@ -67,6 +68,7 @@ export interface TransferFilters extends BaseFilters {
   status?: string | null;
   transferType?: string | null;
   dynamicFilters?: DynamicFilter[] | null;
+  toolCallResult?: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null; // last transfer result category
 }
 
 export interface WebhookFilters extends BaseFilters {

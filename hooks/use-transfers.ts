@@ -23,6 +23,9 @@ async function fetchTransfers(filters: TransferFilters, environment: string): Pr
   if (filters.dynamicFilters && filters.dynamicFilters.length > 0) {
     params.set('dynamicFilters', JSON.stringify(filters.dynamicFilters));
   }
+  if (filters.toolCallResult) {
+    params.set('toolCallResult', filters.toolCallResult);
+  }
 
   const response = await fetch(`/api/transfers?${params}`);
   if (!response.ok) throw new Error('Failed to fetch transfers');

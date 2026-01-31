@@ -22,6 +22,8 @@ interface CallDetailSheetProps {
   onNext: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
+  currentIndex: number;
+  totalCount: number;
   dateRange: {
     startDate: string | null;
     endDate: string | null;
@@ -39,6 +41,8 @@ export function CallDetailSheet({
   onNext,
   hasPrevious,
   hasNext,
+  currentIndex,
+  totalCount,
   dateRange,
 }: CallDetailSheetProps) {
   const { data } = useCallDetail(callId);
@@ -198,6 +202,11 @@ export function CallDetailSheet({
                 <ChevronLeft className="h-4 w-4" />
                 <span className="sr-only">Previous</span>
               </Button>
+              {totalCount > 0 && (
+                <span className="text-xs text-muted-foreground min-w-[4rem] text-center tabular-nums">
+                  {currentIndex + 1} of {totalCount}
+                </span>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

@@ -8,25 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { errorResponse, decodeBase64Payload } from '@/lib/api/utils';
-import { extractTransfersFromMessages } from '@/lib/webhook-utils';
+import { extractTransfersFromMessages, isFailedTransferResult } from '@/lib/webhook-utils';
 import type { Environment } from '@/lib/constants';
-
-/**
- * Check if a webhook transfer result indicates failure/cancellation
- */
-function isFailedTransferResult(result: string): boolean {
-  const lower = result.toLowerCase();
-  return (
-    lower.includes('cancel') ||
-    lower.includes('fail') ||
-    lower.includes('error') ||
-    lower.includes('timeout') ||
-    lower.includes('busy') ||
-    lower.includes('no answer') ||
-    lower.includes('declined') ||
-    lower.includes('rejected')
-  );
-}
 
 export async function GET(request: NextRequest) {
   try {

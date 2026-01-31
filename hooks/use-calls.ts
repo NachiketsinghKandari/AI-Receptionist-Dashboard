@@ -36,6 +36,9 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   if (filters.requireHasTransfer !== undefined && filters.requireHasTransfer !== null) {
     params.set('requireHasTransfer', filters.requireHasTransfer ? 'true' : 'false');
   }
+  if (filters.toolCallResult) {
+    params.set('toolCallResult', filters.toolCallResult);
+  }
 
   const response = await fetch(`/api/calls?${params}`);
   if (!response.ok) throw new Error('Failed to fetch calls');

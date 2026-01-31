@@ -100,6 +100,7 @@ export default function TransfersPage() {
     let extractedFirmId: number | null = null;
     let extractedCallId: number | null = null;
     let extractedStatus: string | null = null;
+    let extractedToolCallResult: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null = null;
     const standardFilters: DynamicFilter[] = [];
 
     for (const filter of validFilters) {
@@ -113,6 +114,9 @@ export default function TransfersPage() {
             break;
           case 'transfer_status':
             extractedStatus = filter.value;
+            break;
+          case 'tool_call_result':
+            extractedToolCallResult = filter.value as 'transfer_executed' | 'transfer_cancelled' | 'other';
             break;
           default:
             standardFilters.push({
@@ -134,6 +138,7 @@ export default function TransfersPage() {
       firmId: extractedFirmId,
       callId: extractedCallId,
       status: extractedStatus,
+      toolCallResult: extractedToolCallResult,
       standardFilters: standardFilters.length > 0 ? standardFilters : null,
     };
   }, [dynamicFilters]);
@@ -174,6 +179,7 @@ export default function TransfersPage() {
       callId: extractedFilters.callId,
       status: effectiveStatus,
       transferType: transferType !== 'Off' ? transferType : undefined,
+      toolCallResult: extractedFilters.toolCallResult,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -183,7 +189,7 @@ export default function TransfersPage() {
       sortOrder,
       dynamicFilters: extractedFilters.standardFilters,
     }),
-    [effectiveFirmId, extractedFilters.callId, effectiveStatus, transferType, extractedFilters.standardFilters, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
+    [effectiveFirmId, extractedFilters.callId, effectiveStatus, transferType, extractedFilters.toolCallResult, extractedFilters.standardFilters, effectiveDateRange.startDate, effectiveDateRange.endDate, debouncedSearch, limit, offset, sortBy, sortOrder]
   );
 
   // Handle column sorting
@@ -266,7 +272,7 @@ export default function TransfersPage() {
             <SelectContent>
               {TRANSFER_TYPES.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {t === 'has_conversation' ? 'Has Conversation' : t}
+                  {t === 'has_conversation' ? 'has_convo' : t}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -16,7 +16,7 @@ import {
   escapeLikePattern,
 } from '@/lib/api/utils';
 import type { DynamicFilter } from '@/types/api';
-import { hasMultipleTransfers, hasVoicemailTransfer, hasConversationTransfer } from '@/lib/webhook-utils';
+import { hasMultipleTransfers, hasVoicemailTransfer, hasConversationTransfer, lastTransferMatchesCategory, type ToolCallResultCategory } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
     // requireHasTransfer: 'true' = must have transfer, 'false' = must NOT have transfer, null = no filter
     const requireHasTransferParam = searchParams.get('requireHasTransfer');
     const requireHasTransfer = requireHasTransferParam === 'true' ? true : requireHasTransferParam === 'false' ? false : null;
+    // Tool call result filter (last transfer result: transfer_executed, transfer_cancelled, other)
+    const toolCallResult = searchParams.get('toolCallResult') as ToolCallResultCategory | null;
     // Cekura status filter - comma-separated list of correlation IDs
     const correlationIds = searchParams.get('correlationIds')?.trim() || null;
 
@@ -207,6 +209,56 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If filtering by tool call result (last transfer result category)
+    let platformCallIdsByToolResult: string[] | null = null;
+    if (toolCallResult) {
+      let webhooksQuery = client
+        .from('webhook_dumps')
+        .select('platform_call_id, payload');
+
+      if (startDate) {
+        webhooksQuery = webhooksQuery.gte('received_at', startDate);
+      }
+      if (endDate) {
+        webhooksQuery = webhooksQuery.lte('received_at', endDate);
+      }
+
+      const webhooksResponse = await webhooksQuery;
+
+      if (webhooksResponse.error) {
+        console.error('Error fetching webhooks for tool call result filter:', webhooksResponse.error);
+        return errorResponse('Failed to fetch webhooks', 500, 'WEBHOOK_FETCH_ERROR');
+      }
+
+      if (webhooksResponse.data && webhooksResponse.data.length > 0) {
+        const platformCallIds = webhooksResponse.data
+          .filter((w) => {
+            const payload = decodeBase64Payload(w.payload);
+            return lastTransferMatchesCategory(payload as Record<string, unknown>, toolCallResult);
+          })
+          .map((w) => w.platform_call_id)
+          .filter((id): id is string => id !== null);
+
+        platformCallIdsByToolResult = [...new Set(platformCallIds)];
+
+        if (platformCallIdsByToolResult.length === 0) {
+          return NextResponse.json({
+            data: [],
+            total: 0,
+            limit,
+            offset,
+          });
+        }
+      } else {
+        return NextResponse.json({
+          data: [],
+          total: 0,
+          limit,
+          offset,
+        });
+      }
+    }
+
     // If excluding a specific transfer type (e.g., voicemail, has_conversation), find platform_call_ids to exclude
     let platformCallIdsToExcludeByTransferType: string[] | null = null;
     if (excludeTransferType) {
@@ -312,6 +364,9 @@ export async function GET(request: NextRequest) {
     }
     if (platformCallIdsWithMultipleTransfers) {
       query = query.in('platform_call_id', platformCallIdsWithMultipleTransfers);
+    }
+    if (platformCallIdsByToolResult) {
+      query = query.in('platform_call_id', platformCallIdsByToolResult);
     }
     if (platformCallIdsWithVoicemail) {
       query = query.in('platform_call_id', platformCallIdsWithVoicemail);

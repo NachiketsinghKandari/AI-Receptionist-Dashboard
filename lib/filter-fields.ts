@@ -4,7 +4,7 @@
  */
 
 import type { FilterFieldDefinition } from '@/components/filters/dynamic-filter-builder';
-import { CALL_TYPES, TRANSFER_TYPES, TRANSFER_STATUSES } from '@/lib/constants';
+import { CALL_TYPES, TRANSFER_TYPES, TRANSFER_STATUSES, TOOL_CALL_RESULTS } from '@/lib/constants';
 
 // Call fields that can be filtered
 export const CALL_FILTER_FIELDS: FilterFieldDefinition[] = [
@@ -48,6 +48,15 @@ export const CALL_FILTER_FIELDS: FilterFieldDefinition[] = [
   { key: 'started_at', label: 'Started At', type: 'date' },
   { key: 'firm_id', label: 'Firm ID', type: 'number' },
   { key: 'multiple_transfers', label: 'Multiple Transfers', type: 'boolean' },
+  {
+    key: 'tool_call_result',
+    label: 'Transfer Result',
+    type: 'select',
+    options: TOOL_CALL_RESULTS.map((r) => ({
+      value: r,
+      label: r === 'transfer_executed' ? 'Executed' : r === 'transfer_completed' ? 'Completed' : r === 'transfer_cancelled' ? 'Cancelled' : 'Other',
+    })),
+  },
 ];
 
 // Email fields that can be filtered
@@ -94,6 +103,15 @@ export const TRANSFER_FILTER_FIELDS: FilterFieldDefinition[] = [
     label: 'Status',
     type: 'select',
     options: TRANSFER_STATUSES.filter((s) => s !== 'All').map((s) => ({ value: s, label: s })),
+  },
+  {
+    key: 'tool_call_result',
+    label: 'Transfer Result',
+    type: 'select',
+    options: TOOL_CALL_RESULTS.map((r) => ({
+      value: r,
+      label: r === 'transfer_executed' ? 'Executed' : r === 'transfer_completed' ? 'Completed' : r === 'transfer_cancelled' ? 'Cancelled' : 'Other',
+    })),
   },
   { key: 'transferred_to_name', label: 'Recipient Name', type: 'text' },
   { key: 'transferred_to_phone_number', label: 'Recipient Phone', type: 'text' },

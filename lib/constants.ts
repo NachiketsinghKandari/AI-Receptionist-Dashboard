@@ -68,3 +68,11 @@ export const SENTRY_LEVELS = [
   'warning',
   'info',
 ] as const;
+
+// Tool call result categories (from webhook transfer_call results)
+export const TOOL_CALL_RESULTS = [
+  'transfer_executed',
+  'transfer_completed',
+  'transfer_cancelled',
+  'other',
+] as const;
