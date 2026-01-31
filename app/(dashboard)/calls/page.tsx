@@ -81,37 +81,6 @@ function createColumns(
       },
     },
     {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const status = row.getValue('status') as string;
-        const callId = row.original.id;
-        const correlationId = row.original.platform_call_id;
-        const duration = row.original.call_duration;
-        const hasError = correlationId && errorCorrelationIds?.has(correlationId);
-        const isLongCall = duration !== null && duration > 300; // > 5 minutes
-        const isImportant = importantCallIds?.has(callId);
-        const hasTransferMismatch = transferMismatchIds?.has(callId);
-        const variant = status === 'completed' ? 'default' : 'secondary';
-
-        // Priority: Sentry error (red) > Transfer mismatch (yellow) > Long call / important (orange)
-        let className = '';
-        if (hasError) {
-          className = 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
-        } else if (hasTransferMismatch) {
-          className = 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
-        } else if (isLongCall || isImportant) {
-          className = 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800';
-        }
-
-        return (
-          <Badge variant={variant} className={className}>
-            {status}
-          </Badge>
-        );
-      },
-    },
-    {
       id: 'cekura_status',
       header: 'Cekura Status',
       cell: ({ row }) => {
@@ -159,6 +128,37 @@ function createColumns(
       cell: ({ row }) => (
         <span className="font-mono text-sm">{row.getValue('phone_number')}</span>
       ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.getValue('status') as string;
+        const callId = row.original.id;
+        const correlationId = row.original.platform_call_id;
+        const duration = row.original.call_duration;
+        const hasError = correlationId && errorCorrelationIds?.has(correlationId);
+        const isLongCall = duration !== null && duration > 300; // > 5 minutes
+        const isImportant = importantCallIds?.has(callId);
+        const hasTransferMismatch = transferMismatchIds?.has(callId);
+        const variant = status === 'completed' ? 'default' : 'secondary';
+
+        // Priority: Sentry error (red) > Transfer mismatch (yellow) > Long call / important (orange)
+        let className = '';
+        if (hasError) {
+          className = 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
+        } else if (hasTransferMismatch) {
+          className = 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
+        } else if (isLongCall || isImportant) {
+          className = 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800';
+        }
+
+        return (
+          <Badge variant={variant} className={className}>
+            {status}
+          </Badge>
+        );
+      },
     },
   ];
 }

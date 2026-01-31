@@ -158,13 +158,27 @@ interface WebhookMessage {
   name?: string; // Tool name for tool_call_result
 }
 
+// Transfer attempt data from artifact
+interface TransferAttempt {
+  transcript: string;
+  status: string;
+  destination: {
+    type: string;
+    number: string;
+    transferPlan?: {
+      mode: string;
+    };
+  };
+}
+
 interface ExtractedTranscriptData {
   messages: WebhookMessage[];
+  transfers: TransferAttempt[];
   endedReason?: string;
 }
 
 /**
- * Extract messages and endedReason from webhook payload
+ * Extract messages, transfers, and endedReason from webhook payload
  */
 function extractWebhookMessages(webhooks: Webhook[]): ExtractedTranscriptData | null {
   // Find the end-of-call-report webhook which typically has the full transcript
@@ -177,6 +191,10 @@ function extractWebhookMessages(webhooks: Webhook[]): ExtractedTranscriptData | 
     const messages = message?.messages as WebhookMessage[] | undefined;
     const endedReason = message?.endedReason as string | undefined;
 
+    // Extract transfers from artifact
+    const artifact = message?.artifact as Record<string, unknown> | undefined;
+    const transfers = (artifact?.transfers as TransferAttempt[]) || [];
+
     if (!messages || !Array.isArray(messages)) {
       return null;
     }
@@ -184,7 +202,7 @@ function extractWebhookMessages(webhooks: Webhook[]): ExtractedTranscriptData | 
     // Sort by secondsFromStart ascending
     const sortedMessages = [...messages].sort((a, b) => a.secondsFromStart - b.secondsFromStart);
 
-    return { messages: sortedMessages, endedReason };
+    return { messages: sortedMessages, transfers, endedReason };
   } catch {
     return null;
   }
@@ -304,10 +322,15 @@ function ToolCallCard({
             <div className="mt-1 p-3 bg-background border border-t-0 rounded-b-xl space-y-3">
               {/* Request Parameters */}
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Request Parameters</p>
-                <div className="bg-muted/30 rounded-lg p-2 border">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Request Parameters</p>
+                  <CopyButton
+                    value={typeof parsedArgs === 'object' ? JSON.stringify(parsedArgs, null, 2) : String(parsedArgs)}
+                  />
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2 border overflow-hidden">
                   {typeof parsedArgs === 'object' ? (
-                    <JsonViewer data={parsedArgs} className="max-h-48" />
+                    <JsonViewer data={parsedArgs} className="max-h-48 overflow-auto" />
                   ) : (
                     <p className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{String(parsedArgs)}</p>
                   )}
@@ -317,15 +340,102 @@ function ToolCallCard({
               {/* Response Details */}
               {result && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Response Details</p>
-                  <div className="bg-muted/30 rounded-lg p-2 border">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Response Details</p>
+                    <CopyButton
+                      value={typeof parsedResult === 'object' ? JSON.stringify(parsedResult, null, 2) : String(result)}
+                    />
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-2 border overflow-hidden">
                     {typeof parsedResult === 'object' ? (
-                      <JsonViewer data={parsedResult} className="max-h-48" />
+                      <JsonViewer data={parsedResult} className="max-h-48 overflow-auto" />
                     ) : (
                       <p className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{result}</p>
                     )}
                   </div>
                 </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Transfer conversation display - shows the transcript from a transfer attempt
+ */
+function TransferConversationCard({ transfer }: { transfer: TransferAttempt }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const mode = transfer.destination?.transferPlan?.mode || 'unknown';
+  const status = transfer.status || 'unknown';
+
+  // Parse the transcript into lines
+  const transcriptLines = transfer.transcript
+    ? transfer.transcript.split('\n').filter(line => line.trim())
+    : [];
+
+  return (
+    <div className="flex justify-center my-2">
+      <div className="w-[85%] max-w-md">
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center gap-3 p-3 bg-muted/50 border rounded-xl cursor-pointer hover:bg-muted transition-colors">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <ArrowLeftRight className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium">Transfer Conversation</span>
+                  <Badge
+                    variant={status === 'completed' ? 'default' : status === 'cancelled' ? 'secondary' : 'outline'}
+                    className="text-[10px] px-1.5 py-0"
+                  >
+                    {status}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Mode: {mode.replace(/-/g, ' ')}
+                </p>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                isOpen && "rotate-180"
+              )} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-1 p-3 bg-background border border-t-0 rounded-b-xl space-y-2 max-h-48 overflow-auto">
+              {transcriptLines.length > 0 ? (
+                transcriptLines.map((line, idx) => {
+                  const isAI = line.startsWith('AI:');
+                  const isUser = line.startsWith('User:');
+                  const content = line.replace(/^(AI|User):\s*/, '');
+
+                  return (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "text-xs p-2 rounded-lg",
+                        isAI && "bg-muted text-foreground ml-0 mr-4",
+                        isUser && "bg-amber-100 dark:bg-amber-900/30 text-foreground ml-4 mr-0",
+                        !isAI && !isUser && "bg-muted/50 text-muted-foreground"
+                      )}
+                    >
+                      {(isAI || isUser) && (
+                        <span className="font-medium opacity-70 block mb-0.5">
+                          {isAI ? 'Transfer Agent' : 'Recipient'}
+                        </span>
+                      )}
+                      {content}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  No transcript available
+                </p>
               )}
             </div>
           </CollapsibleContent>
@@ -355,20 +465,52 @@ function EndedReasonCard({ reason }: { reason: string }) {
  * Advanced transcript component using webhook messages
  * Shows tool calls as cards with their results, timestamps, and endedReason at the end
  */
-function AdvancedTranscript({ messages, endedReason }: { messages: WebhookMessage[]; endedReason?: string }) {
-  // Build a map of tool_call_id -> result for combining calls with results
-  const toolResults = useMemo(() => {
+function AdvancedTranscript({ messages, transfers, endedReason }: { messages: WebhookMessage[]; transfers: TransferAttempt[]; endedReason?: string }) {
+  // Build maps for tool call results and their timestamps
+  const { toolResults, toolResultTimestamps } = useMemo(() => {
     const results = new Map<string, string>();
+    const timestamps = new Map<string, number>();
     for (const msg of messages) {
-      if (msg.role === 'tool_call_result' && msg.toolCallId && msg.result) {
-        results.set(msg.toolCallId, msg.result);
+      if (msg.role === 'tool_call_result' && msg.toolCallId) {
+        if (msg.result) {
+          results.set(msg.toolCallId, msg.result);
+        }
+        timestamps.set(msg.toolCallId, msg.secondsFromStart);
       }
     }
-    return results;
+    return { toolResults: results, toolResultTimestamps: timestamps };
   }, [messages]);
 
-  // Filter out system and tool_call_result messages (results are shown with their calls)
-  const displayMessages = messages.filter(msg => msg.role !== 'system' && msg.role !== 'tool_call_result');
+  // Filter out system and tool_call_result messages, then adjust timestamps for tool_calls
+  // Tool calls with results should be ordered by the result's timestamp
+  const displayMessages = useMemo(() => {
+    const filtered = messages
+      .filter(msg => msg.role !== 'system' && msg.role !== 'tool_call_result')
+      .map(msg => {
+        // For tool_calls, use the result's timestamp if available
+        if (msg.role === 'tool_calls' && msg.toolCalls && msg.toolCalls.length > 0) {
+          // Find the latest result timestamp among all tool calls in this message
+          let latestResultTime = msg.secondsFromStart;
+          for (const tc of msg.toolCalls) {
+            const resultTime = toolResultTimestamps.get(tc.id);
+            if (resultTime !== undefined && resultTime > latestResultTime) {
+              latestResultTime = resultTime;
+            }
+          }
+          // Return a new object with adjusted timestamp if different
+          if (latestResultTime !== msg.secondsFromStart) {
+            return { ...msg, secondsFromStart: latestResultTime };
+          }
+        }
+        return msg;
+      });
+
+    // Re-sort by the (possibly adjusted) secondsFromStart
+    return filtered.sort((a, b) => a.secondsFromStart - b.secondsFromStart);
+  }, [messages, toolResultTimestamps]);
+
+  // Track transfer_call index to match with transfers array
+  let transferCallIndex = 0;
 
   return (
     <div className="space-y-2">
@@ -377,10 +519,14 @@ function AdvancedTranscript({ messages, endedReason }: { messages: WebhookMessag
 
         // Handle tool calls
         if (msg.role === 'tool_calls' && msg.toolCalls && msg.toolCalls.length > 0) {
+          // Check if any tool call is a transfer_call
+          const transferToolCalls = msg.toolCalls.filter(tc => tc.function.name === 'transfer_call');
+          const otherToolCalls = msg.toolCalls.filter(tc => tc.function.name !== 'transfer_call');
+
           return (
             <div key={idx}>
-              {/* Show tool calls as cards with their results */}
-              {msg.toolCalls.map((tc) => (
+              {/* Show non-transfer tool calls */}
+              {otherToolCalls.map((tc) => (
                 <ToolCallCard
                   key={tc.id}
                   toolCall={tc}
@@ -388,6 +534,26 @@ function AdvancedTranscript({ messages, endedReason }: { messages: WebhookMessag
                   timestamp={timestamp}
                 />
               ))}
+              {/* Show transfer tool calls with their conversation */}
+              {transferToolCalls.map((tc) => {
+                const currentTransferIndex = transferCallIndex;
+                transferCallIndex++;
+                const transfer = transfers[currentTransferIndex];
+
+                return (
+                  <div key={tc.id}>
+                    <ToolCallCard
+                      toolCall={tc}
+                      result={toolResults.get(tc.id)}
+                      timestamp={timestamp}
+                    />
+                    {/* Show transfer conversation if available */}
+                    {transfer && transfer.transcript && (
+                      <TransferConversationCard transfer={transfer} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         }
@@ -515,6 +681,7 @@ function TranscriptTabContent({
             {showAdvanced ? (
               <AdvancedTranscript
                 messages={extractedData!.messages}
+                transfers={extractedData!.transfers}
                 endedReason={extractedData!.endedReason}
               />
             ) : transcription ? (
@@ -716,7 +883,7 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
           </CardHeader>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="p-3 pt-0 border-t bg-muted/30">
+          <CardContent className="p-3 pt-0 border-t bg-muted/30 overflow-hidden">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-3">
               <InfoRow label="Received" value={webhook.received_at} icon={<Calendar className="h-3.5 w-3.5" />} />
               <div className="flex items-start gap-3 py-2">
@@ -731,7 +898,7 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
               </div>
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-2 min-w-0">
               {parsedPayload.squadOverrides && (
                 <details className="group rounded-lg border border-border overflow-hidden">
                   <summary className="flex items-center justify-between gap-2 p-2 bg-muted/50 hover:bg-muted cursor-pointer list-none">
@@ -806,14 +973,14 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                     </div>
                   </summary>
-                  <div className="p-2 bg-background border-t space-y-1.5">
+                  <div className="p-2 bg-background border-t space-y-1.5 max-h-40 overflow-auto">
                     {enrichedTransfers.map((transfer) => (
                       <div key={transfer.toolCallId} className="p-1.5 bg-muted/50 rounded border text-xs">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium">
+                          <span className="font-medium truncate mr-2">
                             {transfer.callerName} → {transfer.staffName}
                           </span>
-                          <Badge variant={transfer.result.toLowerCase().includes('cancelled') ? 'destructive' : 'default'} className="text-[10px] px-1.5 py-0">
+                          <Badge variant={transfer.result.toLowerCase().includes('cancelled') ? 'destructive' : 'default'} className="text-[10px] px-1.5 py-0 shrink-0">
                             {transfer.result}
                           </Badge>
                         </div>
@@ -834,8 +1001,10 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
                     <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
-                <div className="border-t">
-                  <JsonViewer data={webhook.payload} className="max-h-60 rounded-none border-0" />
+                <div className="border-t relative h-60">
+                  <div className="absolute inset-0 overflow-auto">
+                    <JsonViewer data={webhook.payload} className="rounded-none border-0" />
+                  </div>
                 </div>
               </details>
             </div>
@@ -1689,6 +1858,7 @@ function TranscriptSection({
             {showAdvanced ? (
               <AdvancedTranscript
                 messages={extractedData!.messages}
+                transfers={extractedData!.transfers}
                 endedReason={extractedData!.endedReason}
               />
             ) : transcription ? (

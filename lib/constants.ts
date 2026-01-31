@@ -18,7 +18,7 @@ export const MAX_PAGE_LIMIT = 100;
 // Date range defaults
 export const DEFAULT_DAYS_BACK = 7;
 
-// Call types
+// Call types (DB values)
 export const CALL_TYPES = [
   'All',
   'inbound',
@@ -26,7 +26,12 @@ export const CALL_TYPES = [
   'existing_case',
   'insurance',
   'vendor',
+  'spanish',
+  'escalation',
+  'customer_success',
   'other',
+  'medical_provider',
+  'legal_system_caller',
 ] as const;
 
 // Transfer types
