@@ -134,8 +134,8 @@ function TranscriptBubble({ message }: { message: TranscriptMessage }) {
   );
 }
 
-// OpenAI formatted message types for advanced transcript
-interface OpenAIToolCall {
+// Webhook message types for advanced transcript
+interface WebhookToolCall {
   id: string;
   type: 'function';
   function: {
@@ -144,39 +144,47 @@ interface OpenAIToolCall {
   };
 }
 
-interface OpenAIMessage {
-  role: 'system' | 'assistant' | 'user' | 'tool';
-  content?: string;
-  tool_calls?: OpenAIToolCall[];
-  tool_call_id?: string;
+interface WebhookMessage {
+  role: 'system' | 'bot' | 'user' | 'tool_calls' | 'tool_call_result';
+  message: string;
+  time: number;
+  secondsFromStart: number;
+  duration?: number;
+  endTime?: number;
+  source?: string;
+  toolCalls?: WebhookToolCall[];
+  result?: string;
+  toolCallId?: string;
+  name?: string; // Tool name for tool_call_result
 }
 
 interface ExtractedTranscriptData {
-  messages: OpenAIMessage[];
+  messages: WebhookMessage[];
   endedReason?: string;
 }
 
 /**
- * Extract messagesOpenAIFormatted and endedReason from webhook payload
+ * Extract messages and endedReason from webhook payload
  */
-function extractOpenAIMessages(webhooks: Webhook[]): ExtractedTranscriptData | null {
-  // Find the end-of-call-report webhook which typically has the full artifact
+function extractWebhookMessages(webhooks: Webhook[]): ExtractedTranscriptData | null {
+  // Find the end-of-call-report webhook which typically has the full transcript
   const endOfCallWebhook = webhooks.find(w => w.webhook_type === 'end-of-call-report');
   if (!endOfCallWebhook) return null;
 
   try {
     const payload = endOfCallWebhook.payload;
     const message = payload?.message as Record<string, unknown> | undefined;
-    const artifact = message?.artifact as Record<string, unknown> | undefined;
-    const messagesOpenAIFormatted = artifact?.messagesOpenAIFormatted as OpenAIMessage[] | undefined;
-
+    const messages = message?.messages as WebhookMessage[] | undefined;
     const endedReason = message?.endedReason as string | undefined;
 
-    if (!messagesOpenAIFormatted || !Array.isArray(messagesOpenAIFormatted)) {
+    if (!messages || !Array.isArray(messages)) {
       return null;
     }
 
-    return { messages: messagesOpenAIFormatted, endedReason };
+    // Sort by secondsFromStart ascending
+    const sortedMessages = [...messages].sort((a, b) => a.secondsFromStart - b.secondsFromStart);
+
+    return { messages: sortedMessages, endedReason };
   } catch {
     return null;
   }
@@ -193,14 +201,26 @@ function formatFunctionName(name: string): string {
 }
 
 /**
+ * Format seconds to mm:ss format
+ */
+function formatSecondsToTime(seconds: number): string {
+  const roundedSeconds = Math.round(seconds);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const secs = roundedSeconds % 60;
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
  * Tool call card showing function invocation and result
  */
 function ToolCallCard({
   toolCall,
   result,
+  timestamp,
 }: {
-  toolCall: OpenAIToolCall;
+  toolCall: WebhookToolCall;
   result?: string;
+  timestamp?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -269,6 +289,11 @@ function ToolCallCard({
                   {getStatusText()}
                 </p>
               </div>
+              {timestamp && (
+                <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
+                  {timestamp}
+                </span>
+              )}
               <ChevronDown className={cn(
                 "h-4 w-4 text-muted-foreground transition-transform",
                 isOpen && "rotate-180"
@@ -327,71 +352,71 @@ function EndedReasonCard({ reason }: { reason: string }) {
 }
 
 /**
- * Advanced transcript component using OpenAI formatted messages
- * Shows tool calls as cards with their results, and endedReason at the end
+ * Advanced transcript component using webhook messages
+ * Shows tool calls as cards with their results, timestamps, and endedReason at the end
  */
-function AdvancedTranscript({ messages, endedReason }: { messages: OpenAIMessage[]; endedReason?: string }) {
+function AdvancedTranscript({ messages, endedReason }: { messages: WebhookMessage[]; endedReason?: string }) {
   // Build a map of tool_call_id -> result for combining calls with results
   const toolResults = useMemo(() => {
     const results = new Map<string, string>();
     for (const msg of messages) {
-      if (msg.role === 'tool' && msg.tool_call_id && msg.content) {
-        results.set(msg.tool_call_id, msg.content);
+      if (msg.role === 'tool_call_result' && msg.toolCallId && msg.result) {
+        results.set(msg.toolCallId, msg.result);
       }
     }
     return results;
   }, [messages]);
 
-  // Filter out system and tool messages (tool results are shown with their calls)
-  const displayMessages = messages.filter(msg => msg.role !== 'system' && msg.role !== 'tool');
+  // Filter out system and tool_call_result messages (results are shown with their calls)
+  const displayMessages = messages.filter(msg => msg.role !== 'system' && msg.role !== 'tool_call_result');
 
   return (
     <div className="space-y-2">
       {displayMessages.map((msg, idx) => {
-        // Handle tool calls from assistant (combined with result)
-        if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+        const timestamp = formatSecondsToTime(msg.secondsFromStart);
+
+        // Handle tool calls
+        if (msg.role === 'tool_calls' && msg.toolCalls && msg.toolCalls.length > 0) {
           return (
             <div key={idx}>
-              {/* Show any content before tool calls */}
-              {msg.content && (
-                <div className="flex justify-start mb-2">
-                  <div className="max-w-[75%] px-3 py-2 rounded-lg text-sm bg-muted text-foreground rounded-bl-none">
-                    <span className="text-xs font-medium opacity-70 block mb-0.5">Agent</span>
-                    {msg.content}
-                  </div>
-                </div>
-              )}
               {/* Show tool calls as cards with their results */}
-              {msg.tool_calls.map((tc) => (
+              {msg.toolCalls.map((tc) => (
                 <ToolCallCard
                   key={tc.id}
                   toolCall={tc}
                   result={toolResults.get(tc.id)}
+                  timestamp={timestamp}
                 />
               ))}
             </div>
           );
         }
 
-        // Handle regular assistant message
-        if (msg.role === 'assistant' && msg.content) {
+        // Handle bot (agent) message
+        if (msg.role === 'bot' && msg.message) {
           return (
             <div key={idx} className="flex justify-start">
               <div className="max-w-[75%] px-3 py-2 rounded-lg text-sm bg-muted text-foreground rounded-bl-none">
-                <span className="text-xs font-medium opacity-70 block mb-0.5">Agent</span>
-                {msg.content}
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-xs font-medium opacity-70">Agent</span>
+                  <span className="text-[10px] text-muted-foreground font-mono tabular-nums">{timestamp}</span>
+                </div>
+                {msg.message}
               </div>
             </div>
           );
         }
 
-        // Handle user message
-        if (msg.role === 'user' && msg.content) {
+        // Handle user (caller) message
+        if (msg.role === 'user' && msg.message) {
           return (
             <div key={idx} className="flex justify-end">
               <div className="max-w-[75%] px-3 py-2 rounded-lg text-sm bg-primary text-primary-foreground rounded-br-none">
-                <span className="text-xs font-medium opacity-70 block mb-0.5">Caller</span>
-                {msg.content}
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-xs font-medium opacity-70">Caller</span>
+                  <span className="text-[10px] opacity-70 font-mono tabular-nums">{timestamp}</span>
+                </div>
+                {msg.message}
               </div>
             </div>
           );
@@ -424,7 +449,7 @@ function TranscriptTabContent({
   // Extract OpenAI messages and endedReason from webhooks
   const extractedData = useMemo(() => {
     if (webhooksLoading) return null;
-    return extractOpenAIMessages(webhooks);
+    return extractWebhookMessages(webhooks);
   }, [webhooks, webhooksLoading]);
 
   // Check if advanced mode is available
@@ -1600,7 +1625,7 @@ function TranscriptSection({
 
   const extractedData = useMemo(() => {
     if (webhooksLoading) return null;
-    return extractOpenAIMessages(webhooks);
+    return extractWebhookMessages(webhooks);
   }, [webhooks, webhooksLoading]);
 
   const hasAdvancedData = extractedData !== null && extractedData.messages.length > 0;

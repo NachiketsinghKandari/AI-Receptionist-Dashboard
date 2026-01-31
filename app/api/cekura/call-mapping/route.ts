@@ -56,6 +56,9 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')?.trim();
     const endDate = searchParams.get('endDate')?.trim();
     const environment = (searchParams.get('environment')?.trim() || 'production') as 'production' | 'staging';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '25', 10);
+    const fetchAll = searchParams.get('fetchAll') === 'true';
 
     const apiKey = process.env.CEKURA_API_KEY;
     if (!apiKey) {
@@ -68,12 +71,37 @@ export async function GET(request: NextRequest) {
 
     const agentId = CEKURA_AGENT_IDS[environment] || CEKURA_AGENT_IDS.production;
 
-    // Fetch all pages from Cekura API
     const allResults: CekuraCallResult[] = [];
-    let nextUrl: string | null = `https://api.cekura.ai/observability/v1/call-logs/?timestamp_from=${encodeURIComponent(startDate)}&timestamp_to=${encodeURIComponent(endDate)}&agent_id=${agentId}`;
+    let totalCount = 0;
+    let hasMore = false;
 
-    while (nextUrl) {
-      const response = await fetch(nextUrl, {
+    if (fetchAll) {
+      // Fetch all pages (for background loading)
+      let nextUrl: string | null = `https://api.cekura.ai/observability/v1/call-logs/?timestamp_from=${encodeURIComponent(startDate)}&timestamp_to=${encodeURIComponent(endDate)}&agent_id=${agentId}&page_size=${pageSize}`;
+
+      while (nextUrl) {
+        const response = await fetch(nextUrl, {
+          method: 'GET',
+          headers: {
+            'X-CEKURA-API-KEY': apiKey,
+          },
+        });
+
+        if (!response.ok) {
+          console.error('Cekura API error:', response.status, response.statusText);
+          return errorResponse('Failed to fetch from Cekura API', response.status, 'CEKURA_API_ERROR');
+        }
+
+        const data: CekuraApiResponse = await response.json();
+        allResults.push(...data.results);
+        totalCount = data.count;
+        nextUrl = data.next;
+      }
+    } else {
+      // Fetch single page (for fast initial load)
+      const url = `https://api.cekura.ai/observability/v1/call-logs/?timestamp_from=${encodeURIComponent(startDate)}&timestamp_to=${encodeURIComponent(endDate)}&agent_id=${agentId}&page=${page}&page_size=${pageSize}`;
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'X-CEKURA-API-KEY': apiKey,
@@ -87,7 +115,8 @@ export async function GET(request: NextRequest) {
 
       const data: CekuraApiResponse = await response.json();
       allResults.push(...data.results);
-      nextUrl = data.next;
+      totalCount = data.count;
+      hasMore = data.next !== null;
     }
 
     // Build mapping: correlation_id -> full call data
@@ -115,6 +144,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       calls,
       count: Object.keys(calls).length,
+      totalCount,
+      hasMore,
+      page,
+      pageSize,
       agentId,
     });
   } catch (error) {

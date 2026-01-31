@@ -22,6 +22,10 @@ export interface CekuraCallData {
 interface CekuraApiResponse {
   calls: Record<string, CekuraCallData>; // correlation_id -> call data
   count: number;
+  totalCount: number;
+  hasMore: boolean;
+  page: number;
+  pageSize: number;
   agentId: number;
 }
 
@@ -34,13 +38,18 @@ const CEKURA_AGENT_IDS: Record<string, number> = {
 async function fetchCekuraCallData(
   startDate: string,
   endDate: string,
-  environment: string
+  environment: string,
+  options?: { page?: number; pageSize?: number; fetchAll?: boolean }
 ): Promise<CekuraApiResponse> {
   const params = new URLSearchParams({
     startDate,
     endDate,
     environment,
   });
+
+  if (options?.page) params.set('page', options.page.toString());
+  if (options?.pageSize) params.set('pageSize', options.pageSize.toString());
+  if (options?.fetchAll) params.set('fetchAll', 'true');
 
   const response = await fetch(`/api/cekura/call-mapping?${params}`);
   if (!response.ok) {
@@ -49,70 +58,57 @@ async function fetchCekuraCallData(
   return response.json();
 }
 
-/**
- * Get the start of the previous day relative to a given end date.
- * This ensures we fetch a full day's worth of calls, not just 24 hours.
- * e.g., if endDate is "2026-01-28T23:59:59Z", returns "2026-01-27T00:00:00.000Z"
- */
-function getStartOfPreviousDay(dateStr: string): string {
-  const date = new Date(dateStr);
-  date.setUTCDate(date.getUTCDate() - 1);
-  date.setUTCHours(0, 0, 0, 0);
-  return date.toISOString();
-}
+const PAGE_SIZE = 25;
 
 /**
  * Hook to fetch Cekura call data with progressive loading.
- * First fetches the most recent day (fast), then backfills the full range.
+ * First fetches page 1 (fast), then background fetches all remaining data.
  * Returns merged results from both queries.
  */
 export function useCekuraCallMapping(startDate: string | null, endDate: string | null) {
   const { environment } = useEnvironment();
 
-  // Calculate the "recent" date range (yesterday + today)
-  const recentStartDate = endDate ? getStartOfPreviousDay(endDate) : null;
-
-  // First query: fetch just the last day (fast initial load)
-  const recentQuery = useQuery({
-    queryKey: ['cekura', 'call-data', 'recent', recentStartDate, endDate, environment],
-    queryFn: () => fetchCekuraCallData(recentStartDate!, endDate!, environment),
-    enabled: !!recentStartDate && !!endDate,
+  // First query: fetch just page 1 (fast initial load - 25 items)
+  const firstPageQuery = useQuery({
+    queryKey: ['cekura', 'call-data', 'page1', startDate, endDate, environment],
+    queryFn: () => fetchCekuraCallData(startDate!, endDate!, environment, { page: 1, pageSize: PAGE_SIZE }),
+    enabled: !!startDate && !!endDate,
     staleTime: CACHE_TTL_DATA * 1000,
   });
 
-  // Second query: fetch the full date range (background load)
-  // Only fetch if startDate is different from recentStartDate (i.e., more than 1 day range)
-  const needsFullFetch = Boolean(startDate && recentStartDate && startDate < recentStartDate);
+  // Second query: fetch all data (background load)
+  // Only fetch if page 1 indicates there's more data
+  const hasMoreData = firstPageQuery.data?.hasMore === true;
   const fullQuery = useQuery({
     queryKey: ['cekura', 'call-data', 'full', startDate, endDate, environment],
-    queryFn: () => fetchCekuraCallData(startDate!, endDate!, environment),
-    enabled: Boolean(startDate && endDate && needsFullFetch),
+    queryFn: () => fetchCekuraCallData(startDate!, endDate!, environment, { fetchAll: true, pageSize: PAGE_SIZE }),
+    enabled: !!startDate && !!endDate && hasMoreData && !firstPageQuery.isLoading,
     staleTime: CACHE_TTL_DATA * 1000,
   });
 
   // Merge call data: full query takes precedence when available
   const mergedData = useMemo(() => {
-    const recentCalls: Record<string, CekuraCallData> = recentQuery.data?.calls || {};
+    const firstPageCalls: Record<string, CekuraCallData> = firstPageQuery.data?.calls || {};
     const fullCalls: Record<string, CekuraCallData> = fullQuery.data?.calls || {};
-    const agentId = fullQuery.data?.agentId || recentQuery.data?.agentId || CEKURA_AGENT_IDS.production;
+    const agentId = fullQuery.data?.agentId || firstPageQuery.data?.agentId || CEKURA_AGENT_IDS.production;
 
-    // Merge: start with recent, overlay with full (full has complete data)
-    const merged = { ...recentCalls, ...fullCalls };
+    // Merge: start with first page, overlay with full (full has complete data)
+    const merged = { ...firstPageCalls, ...fullCalls };
 
     return {
       calls: new Map(Object.entries(merged)),
       agentId,
     };
-  }, [recentQuery.data, fullQuery.data]);
+  }, [firstPageQuery.data, fullQuery.data]);
 
   // Loading states
-  const isInitialLoading = recentQuery.isLoading;
-  const isBackfilling = needsFullFetch && fullQuery.isLoading;
-  const isFullyLoaded = !isInitialLoading && (!needsFullFetch || !fullQuery.isLoading);
+  const isInitialLoading = firstPageQuery.isLoading;
+  const isBackfilling = hasMoreData && fullQuery.isLoading;
+  const isFullyLoaded = !isInitialLoading && (!hasMoreData || fullQuery.isSuccess);
 
   // Error state - helps debug API issues
-  const hasError = recentQuery.isError || fullQuery.isError;
-  const error = recentQuery.error || fullQuery.error;
+  const hasError = firstPageQuery.isError || fullQuery.isError;
+  const error = firstPageQuery.error || fullQuery.error;
 
   return {
     data: mergedData,
