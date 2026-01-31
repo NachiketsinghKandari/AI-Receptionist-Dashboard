@@ -1496,6 +1496,15 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
             </Button>
           ) : null
         )}
+        {/* Correlation ID with copy button */}
+        {call.platform_call_id && (
+          <div className="flex items-center gap-1 ml-auto px-2 py-1 rounded-md bg-muted/50">
+            <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px] md:max-w-[180px]">
+              {call.platform_call_id}
+            </span>
+            <CopyButton value={call.platform_call_id} />
+          </div>
+        )}
       </div>
 
       {/* Feedback Section */}
@@ -1604,8 +1613,13 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
                 )}
                 {cekuraCallInfo?.status && (
                   <Badge
-                    variant={cekuraCallInfo.status === 'success' ? 'default' : 'destructive'}
-                    className="px-2 py-1"
+                    variant="outline"
+                    className={cn(
+                      "px-2 py-1",
+                      cekuraCallInfo.status === 'success'
+                        ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                        : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
+                    )}
                   >
                     <BarChart3 className="h-3 w-3 mr-1" />
                     {cekuraCallInfo.status}
@@ -1759,14 +1773,22 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
  * Right panel for the two-panel layout:
  * - Audio player (full width)
  * - Transcript section (no max-height, uses full available space)
- * - Mode toggle (Basic/Advanced) at top
+ * - Mode toggle (Basic/Advanced/Errors) at top
  */
-export function CallDetailRightPanel({ callId }: CallDetailPanelSharedProps) {
+export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelSharedProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const platformCallId = data?.call?.platform_call_id;
 
   // Fetch webhooks for advanced transcript
   const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
+
+  // Fetch Cekura data for transcription errors
+  const { data: cekuraData, isLoading: cekuraLoading } = useCekuraCallMapping(
+    dateRange?.startDate || null,
+    dateRange?.endDate || null
+  );
+  const cekuraCallInfo = platformCallId ? cekuraData?.calls.get(platformCallId) : undefined;
+  const errorMetrics = cekuraCallInfo?.errorMetrics || [];
 
   if (isLoading) {
     return (
@@ -1814,6 +1836,8 @@ export function CallDetailRightPanel({ callId }: CallDetailPanelSharedProps) {
           transcription={call.transcription}
           webhooks={webhooksList}
           webhooksLoading={webhooksLoading}
+          errorMetrics={errorMetrics}
+          errorMetricsLoading={cekuraLoading}
         />
       </div>
     </div>
@@ -1827,12 +1851,16 @@ function TranscriptSection({
   transcription,
   webhooks,
   webhooksLoading,
+  errorMetrics,
+  errorMetricsLoading,
 }: {
   transcription: string | null;
   webhooks: Webhook[];
   webhooksLoading: boolean;
+  errorMetrics?: Array<{ name: string; score: number; explanation: string }>;
+  errorMetricsLoading?: boolean;
 }) {
-  const [mode, setMode] = useState<'basic' | 'advanced'>('advanced');
+  const [mode, setMode] = useState<'basic' | 'advanced' | 'errors'>('advanced');
 
   const extractedData = useMemo(() => {
     if (webhooksLoading) return null;
@@ -1840,7 +1868,9 @@ function TranscriptSection({
   }, [webhooks, webhooksLoading]);
 
   const hasAdvancedData = extractedData !== null && extractedData.messages.length > 0;
+  const hasErrorMetrics = errorMetrics && errorMetrics.length > 0;
   const showAdvanced = mode === 'advanced' && hasAdvancedData;
+  const showErrors = mode === 'errors';
 
   if (!transcription && !hasAdvancedData) {
     return (
@@ -1861,7 +1891,7 @@ function TranscriptSection({
             <FileText className="h-4 w-4" />
             Transcript
           </CardTitle>
-          {hasAdvancedData && (
+          {(hasAdvancedData || hasErrorMetrics) && (
             <div className="inline-flex items-center rounded-lg border bg-muted p-0.5">
               <button
                 onClick={() => setMode('basic')}
@@ -1874,17 +1904,33 @@ function TranscriptSection({
               >
                 Basic
               </button>
-              <button
-                onClick={() => setMode('advanced')}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                  mode === 'advanced'
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Advanced
-              </button>
+              {hasAdvancedData && (
+                <button
+                  onClick={() => setMode('advanced')}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    mode === 'advanced'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Advanced
+                </button>
+              )}
+              {(hasErrorMetrics || errorMetricsLoading) && (
+                <button
+                  onClick={() => setMode('errors')}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                    mode === 'errors'
+                      ? "bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
+                      : "text-red-500/70 hover:text-red-500"
+                  )}
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  Errors
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1895,6 +1941,11 @@ function TranscriptSection({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
             <span className="text-sm text-muted-foreground">Loading advanced transcript...</span>
           </div>
+        ) : showErrors ? (
+          <TranscriptErrorsView
+            errorMetrics={errorMetrics || []}
+            isLoading={errorMetricsLoading}
+          />
         ) : (
           <div className="space-y-3">
             {showAdvanced ? (
@@ -1916,6 +1967,184 @@ function TranscriptSection({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Parse transcription error explanation and display in git diff style
+ */
+function HighlightedExplanation({ text }: { text: string }) {
+  // Handle null/undefined text
+  if (!text || typeof text !== 'string') {
+    return <span className="text-sm text-muted-foreground">{String(text || '')}</span>;
+  }
+
+  // Pattern to match: "the/an [LABEL] says/said/played "VALUE"" or 'VALUE'
+  // Labels can be: "transcript", "Main Agent", "Testing Agent", "automated message", etc.
+  // Handles both double quotes "..." and single quotes '...'
+  const labelValuePattern = /(?:the\s+|an\s+)?([A-Za-z][A-Za-z\s]*?)\s+(?:says|said|played)\s+["']([^"']+)["']/gi;
+
+  // Find all matches in the entire text
+  const allMatches: Array<{ label: string; value: string; index: number }> = [];
+  let match;
+  while ((match = labelValuePattern.exec(text)) !== null) {
+    allMatches.push({
+      label: match[1].trim(),
+      value: match[2],
+      index: match.index,
+    });
+  }
+
+  if (allMatches.length === 0) {
+    // No patterns found, just render as plain text
+    return <p className="text-sm text-muted-foreground">{text}</p>;
+  }
+
+  // Group matches by splitting on sentence terminators (. followed by space and capital or end)
+  // We'll group consecutive matches that appear before a major sentence break
+  const groups: Array<Array<{ label: string; value: string }>> = [];
+  let currentGroup: Array<{ label: string; value: string }> = [];
+
+  // Find positions of sentence breaks in the text
+  const sentenceBreaks: number[] = [];
+  const breakPattern = /\.\s+(?=[A-Z])/g;
+  let breakMatch;
+  while ((breakMatch = breakPattern.exec(text)) !== null) {
+    sentenceBreaks.push(breakMatch.index);
+  }
+
+  allMatches.forEach((item, idx) => {
+    currentGroup.push({ label: item.label, value: item.value });
+
+    // Check if there's a sentence break between this match and the next
+    const nextMatch = allMatches[idx + 1];
+    if (nextMatch) {
+      const hasBreakBetween = sentenceBreaks.some(
+        (breakPos) => breakPos > item.index && breakPos < nextMatch.index
+      );
+      if (hasBreakBetween) {
+        groups.push(currentGroup);
+        currentGroup = [];
+      }
+    }
+  });
+
+  // Don't forget the last group
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  // Extract any prefix text before the first match
+  const firstMatchIndex = allMatches[0].index;
+  const prefixText = text.slice(0, firstMatchIndex).trim();
+
+  return (
+    <div className="space-y-2">
+      {/* Show prefix text if any (like "Transcription errors are:") */}
+      {prefixText && (
+        <p className="text-sm text-muted-foreground">{prefixText}</p>
+      )}
+
+      {/* Render each group as a diff block */}
+      {groups.map((group, groupIndex) => (
+        <div
+          key={`diff-${groupIndex}`}
+          className="rounded-md border border-border/50 overflow-hidden text-xs font-mono"
+        >
+          {group.map((item, idx) => {
+            // "transcript" gets red styling (the erroneous version), others get green
+            const isTranscript = item.label.toLowerCase() === 'transcript';
+
+            return (
+              <div
+                key={idx}
+                className={`flex items-start gap-3 px-3 py-2 ${
+                  isTranscript
+                    ? 'bg-red-500/5 border-l-2 border-red-400/50'
+                    : 'bg-green-500/5 border-l-2 border-green-400/50'
+                }`}
+              >
+                <span
+                  className={`select-none shrink-0 min-w-[100px] text-[10px] uppercase tracking-wide ${
+                    isTranscript ? 'text-red-400/80' : 'text-green-400/80'
+                  }`}
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={`flex-1 ${
+                    isTranscript
+                      ? 'text-red-700 dark:text-red-300/90'
+                      : 'text-green-700 dark:text-green-300/90'
+                  }`}
+                >
+                  {item.value}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Errors view for transcript panel - displays transcription accuracy issues
+ */
+function TranscriptErrorsView({
+  errorMetrics,
+  isLoading,
+}: {
+  errorMetrics: Array<{ name: string; score: number; explanation: string }>;
+  isLoading?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
+        <span className="text-sm text-muted-foreground">Loading error analysis...</span>
+      </div>
+    );
+  }
+
+  if (!errorMetrics || errorMetrics.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <div className="p-3 bg-green-500/10 rounded-full mb-3">
+          <CheckCircle className="h-6 w-6 text-green-500" />
+        </div>
+        <p className="text-sm font-medium text-green-600 dark:text-green-400">No Transcription Errors</p>
+        <p className="text-xs text-muted-foreground mt-1">The transcription appears to be accurate</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1 py-1 text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        Transcription Issues
+      </div>
+      {errorMetrics.map((metric, index) => (
+        <div
+          key={`error-${metric.name}-${index}`}
+          className="p-4 rounded-lg bg-red-500/5 border border-red-500/20"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+            <span className="text-sm font-medium text-red-700 dark:text-red-300">
+              {metric.name}
+            </span>
+          </div>
+          {metric.explanation && (
+            <div className="text-sm text-muted-foreground leading-relaxed pl-6">
+              <HighlightedExplanation text={metric.explanation} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

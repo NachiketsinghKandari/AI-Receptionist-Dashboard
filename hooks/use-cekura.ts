@@ -17,6 +17,8 @@ export interface CekuraCallData {
   status: string;
   feedback: string | null;
   metrics: CekuraMetric[];
+  // Error-related metrics like Transcription Accuracy
+  errorMetrics: CekuraMetric[];
 }
 
 interface CekuraApiResponse {

@@ -3,8 +3,9 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ColumnDef } from '@tanstack/react-table';
-import { Phone, Loader2, Flag } from 'lucide-react';
+import { Phone, Loader2, Flag, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -512,6 +513,25 @@ export default function CallsPage() {
             onCheckedChange={handleFlaggedOnlyChange}
           />
         </div>
+
+        {/* Reset Filters Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full mt-2"
+          onClick={() => {
+            setFirmId(null);
+            setCallType('All');
+            setTransferType('Off');
+            setCekuraStatusFilter('all');
+            setMultipleTransfers(false);
+            setFlaggedOnly(false);
+            setSearch('');
+          }}
+        >
+          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+          Reset Filters
+        </Button>
       </ResponsiveFilterSidebar>
 
       {/* Main Content */}

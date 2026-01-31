@@ -171,8 +171,23 @@ export function CekuraStatus({ callData, isLoading, isFullyLoaded, hasError }: C
       </PopoverTrigger>
       <PopoverContent className="w-80 p-2" align="start" onClick={handleClick}>
         <div className="space-y-1">
-          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Evaluation Metrics
+          <div className="px-2 py-1.5 flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Evaluation Metrics
+            </span>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-muted-foreground">{callData.metrics.filter(m => m.score === 1).length}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-muted-foreground">{callData.metrics.filter(m => m.score === 0).length}</span>
+              </span>
+              <span className="text-muted-foreground">
+                Total: {callData.metrics.length}
+              </span>
+            </div>
           </div>
           <div className="max-h-64 overflow-y-auto space-y-1">
             {callData.metrics.map((metric, index) => (

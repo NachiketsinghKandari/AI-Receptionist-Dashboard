@@ -48,6 +48,12 @@ export interface CekuraCallData {
     score: number;
     explanation: string;
   }>;
+  // Error-related metrics like Transcription Accuracy
+  errorMetrics: Array<{
+    name: string;
+    score: number;
+    explanation: string;
+  }>;
 }
 
 export async function GET(request: NextRequest) {
@@ -123,9 +129,20 @@ export async function GET(request: NextRequest) {
     const calls: Record<string, CekuraCallData> = {};
     for (const result of allResults) {
       if (result.call_id) {
-        // Filter metrics to only include binary_ types
-        const binaryMetrics = (result.evaluation?.metrics || [])
+        const allMetrics = result.evaluation?.metrics || [];
+
+        // Filter metrics to only include binary_ types (pass/fail metrics)
+        const binaryMetrics = allMetrics
           .filter(m => m.type?.includes('binary_'))
+          .map(m => ({
+            name: m.name,
+            score: m.score_normalized,
+            explanation: m.explanation || '',
+          }));
+
+        // Filter for error-related metrics (continuous_qualitative like Transcription Accuracy)
+        const errorMetrics = allMetrics
+          .filter(m => m.type === 'continuous_qualitative' || m.name?.toLowerCase().includes('transcription'))
           .map(m => ({
             name: m.name,
             score: m.score_normalized,
@@ -137,6 +154,7 @@ export async function GET(request: NextRequest) {
           status: result.status || 'unknown',
           feedback: result.feedback || null,
           metrics: binaryMetrics,
+          errorMetrics,
         };
       }
     }
