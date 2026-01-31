@@ -117,6 +117,29 @@ export function hasMultipleTransfers(payload: Record<string, unknown>): boolean 
 }
 
 /**
+ * Check if a webhook payload has any transfer that went to voicemail.
+ * Detects voicemail by looking for "voicemail" or "voice mail" in the transfer transcript.
+ */
+export function hasVoicemailTransfer(payload: Record<string, unknown>): boolean {
+  try {
+    const message = payload?.message as Record<string, unknown> | undefined;
+    const artifact = message?.artifact as Record<string, unknown> | undefined;
+    const transfers = artifact?.transfers as Array<{ transcript?: string }> | undefined;
+
+    if (!transfers || !Array.isArray(transfers)) {
+      return false;
+    }
+
+    return transfers.some((transfer) => {
+      const transcript = transfer.transcript?.toLowerCase() || '';
+      return transcript.includes('voicemail') || transcript.includes('voice mail');
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Enrich parsed webhook transfers with data from the database.
  * Uses database values (caller_name from call, transferred_to_name from transfers)
  * as the source of truth, falling back to webhook parsed values only when database

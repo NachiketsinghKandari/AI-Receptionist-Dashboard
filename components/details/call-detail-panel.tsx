@@ -49,6 +49,8 @@ import {
   Check,
   X,
   MessageSquareText,
+  Voicemail,
+  PhoneOff,
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
@@ -56,6 +58,7 @@ import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webh
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import { JsonViewer } from '@/components/ui/json-viewer';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 // Map dashboard environment to Sentry environment for URL
 const SENTRY_ENV_MAP: Record<string, string> = {
@@ -1399,6 +1402,24 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
   const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
   const { data: sentryData, isLoading: sentryLoading } = useSentryEventsForCall(platformCallId || null);
 
+  // Extract endedReason and detect voicemail from webhooks (must be before early returns)
+  const webhookData = useMemo(() => {
+    if (webhooksLoading || !webhooks?.length) return null;
+    return extractWebhookMessages(webhooks);
+  }, [webhooks, webhooksLoading]);
+
+  const endedReason = webhookData?.endedReason;
+
+  // Check if any transfer went to voicemail
+  const hasVoicemail = useMemo(() => {
+    const transfers = webhookData?.transfers;
+    if (!transfers) return false;
+    return transfers.some((transfer) => {
+      const transcript = transfer.transcript?.toLowerCase() || '';
+      return transcript.includes('voicemail') || transcript.includes('voice mail');
+    });
+  }, [webhookData]);
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -1573,6 +1594,27 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
                 {call.platform && (
                   <Badge variant="secondary" className="px-2 py-1">
                     {call.platform}
+                  </Badge>
+                )}
+                {hasVoicemail && (
+                  <Badge variant="outline" className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                    <Voicemail className="h-3 w-3 mr-1" />
+                    Voicemail
+                  </Badge>
+                )}
+                {cekuraCallInfo?.status && (
+                  <Badge
+                    variant={cekuraCallInfo.status === 'success' ? 'default' : 'destructive'}
+                    className="px-2 py-1"
+                  >
+                    <BarChart3 className="h-3 w-3 mr-1" />
+                    {cekuraCallInfo.status}
+                  </Badge>
+                )}
+                {endedReason && (
+                  <Badge variant="outline" className="px-2 py-1">
+                    <PhoneOff className="h-3 w-3 mr-1" />
+                    {endedReason}
                   </Badge>
                 )}
               </div>
@@ -1761,7 +1803,7 @@ export function CallDetailRightPanel({ callId }: CallDetailPanelSharedProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <audio controls src={call.recording_url} className="w-full" />
+            <AudioPlayer src={call.recording_url} />
           </CardContent>
         </Card>
       )}
@@ -1996,7 +2038,7 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <audio controls src={call.recording_url} className="w-full" />
+            <AudioPlayer src={call.recording_url} />
           </CardContent>
         </Card>
       )}

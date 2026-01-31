@@ -249,14 +249,12 @@ export function CallDetailSheet({
                 />
               </ScrollArea>
             </TabsContent>
-            <TabsContent value="transcript" className="flex-1 min-h-0 mt-0">
-              <ScrollArea className="h-full">
-                <CallDetailRightPanel
-                  callId={callId}
-                  highlightReasons={highlightReasons}
-                  dateRange={dateRange}
-                />
-              </ScrollArea>
+            <TabsContent value="transcript" className="flex-1 min-h-0 mt-0 overflow-hidden">
+              <CallDetailRightPanel
+                callId={callId}
+                highlightReasons={highlightReasons}
+                dateRange={dateRange}
+              />
             </TabsContent>
           </Tabs>
         )}
@@ -295,13 +293,11 @@ export function CallDetailSheet({
 
             {/* Right Panel */}
             <div className="h-full overflow-hidden flex-1">
-              <ScrollArea className="h-full">
-                <CallDetailRightPanel
-                  callId={callId}
-                  highlightReasons={highlightReasons}
-                  dateRange={dateRange}
-                />
-              </ScrollArea>
+              <CallDetailRightPanel
+                callId={callId}
+                highlightReasons={highlightReasons}
+                dateRange={dateRange}
+              />
             </div>
           </div>
         )}

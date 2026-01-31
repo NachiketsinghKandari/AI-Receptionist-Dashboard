@@ -14,7 +14,7 @@ import {
   isValidInt4,
   decodeBase64Payload,
 } from '@/lib/api/utils';
-import { hasMultipleTransfers } from '@/lib/webhook-utils';
+import { hasMultipleTransfers, hasVoicemailTransfer } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,27 +49,82 @@ export async function GET(request: NextRequest) {
 
     // If filtering by transfer_type, get call IDs that have transfers with that type
     let callIdsFilter: number[] | null = null;
+    let platformCallIdsWithVoicemail: string[] | null = null;
+
     if (transferType && transferType !== 'Off' && transferType !== 'All') {
-      const transfersResponse = await client
-        .from('transfers_details')
-        .select('call_id')
-        .eq('transfer_type', transferType);
+      if (transferType === 'voicemail') {
+        // Voicemail is detected from webhook payload, not from transfer_type column
+        let webhooksQuery = client
+          .from('webhook_dumps')
+          .select('platform_call_id, payload');
 
-      if (transfersResponse.error) {
-        console.error('Error fetching transfers for filter:', transfersResponse.error);
-        return errorResponse('Failed to fetch transfers', 500, 'TRANSFER_FETCH_ERROR');
-      }
+        // Apply date filters to webhooks query
+        if (startDate) {
+          webhooksQuery = webhooksQuery.gte('received_at', startDate);
+        }
+        if (endDate) {
+          webhooksQuery = webhooksQuery.lte('received_at', endDate);
+        }
 
-      if (transfersResponse.data && transfersResponse.data.length > 0) {
-        callIdsFilter = [...new Set(transfersResponse.data.map((t) => t.call_id))];
+        const webhooksResponse = await webhooksQuery;
+
+        if (webhooksResponse.error) {
+          console.error('Error fetching webhooks for voicemail filter:', webhooksResponse.error);
+          return errorResponse('Failed to fetch webhooks', 500, 'WEBHOOK_FETCH_ERROR');
+        }
+
+        if (webhooksResponse.data && webhooksResponse.data.length > 0) {
+          // Find webhooks with voicemail in their transfer transcripts
+          const platformCallIds = webhooksResponse.data
+            .filter((w) => {
+              const payload = decodeBase64Payload(w.payload);
+              return hasVoicemailTransfer(payload as Record<string, unknown>);
+            })
+            .map((w) => w.platform_call_id)
+            .filter((id): id is string => id !== null);
+
+          platformCallIdsWithVoicemail = [...new Set(platformCallIds)];
+
+          if (platformCallIdsWithVoicemail.length === 0) {
+            return NextResponse.json({
+              data: [],
+              total: 0,
+              limit,
+              offset,
+            });
+          }
+        } else {
+          // No webhooks at all
+          return NextResponse.json({
+            data: [],
+            total: 0,
+            limit,
+            offset,
+          });
+        }
       } else {
-        // No calls match this transfer type
-        return NextResponse.json({
-          data: [],
-          total: 0,
-          limit,
-          offset,
-        });
+        // Standard transfer type filter from database
+        const transfersResponse = await client
+          .from('transfers_details')
+          .select('call_id')
+          .eq('transfer_type', transferType);
+
+        if (transfersResponse.error) {
+          console.error('Error fetching transfers for filter:', transfersResponse.error);
+          return errorResponse('Failed to fetch transfers', 500, 'TRANSFER_FETCH_ERROR');
+        }
+
+        if (transfersResponse.data && transfersResponse.data.length > 0) {
+          callIdsFilter = [...new Set(transfersResponse.data.map((t) => t.call_id))];
+        } else {
+          // No calls match this transfer type
+          return NextResponse.json({
+            data: [],
+            total: 0,
+            limit,
+            offset,
+          });
+        }
       }
     }
 
@@ -149,6 +204,9 @@ export async function GET(request: NextRequest) {
     }
     if (platformCallIdsWithMultipleTransfers) {
       query = query.in('platform_call_id', platformCallIdsWithMultipleTransfers);
+    }
+    if (platformCallIdsWithVoicemail) {
+      query = query.in('platform_call_id', platformCallIdsWithVoicemail);
     }
     // Filter by specific correlation IDs (for Cekura status filtering)
     if (correlationIds) {
