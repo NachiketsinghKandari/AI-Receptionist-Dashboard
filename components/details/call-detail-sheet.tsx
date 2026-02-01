@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical, Share2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCallDetail } from '@/hooks/use-calls';
@@ -220,18 +220,6 @@ export function CallDetailSheet({
                 <ChevronRight className="h-4 w-4" />
                 <span className="sr-only">Next</span>
               </Button>
-              {onShare && callId && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => onShare(String(callId))}
-                  title="Share Call"
-                >
-                  <Share2 className="h-4 w-4" />
-                  <span className="sr-only">Share</span>
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -267,6 +255,7 @@ export function CallDetailSheet({
                 callId={callId}
                 highlightReasons={highlightReasons}
                 dateRange={dateRange}
+                onShare={onShare}
               />
             </TabsContent>
             <TabsContent value="transcript" className="flex-1 min-h-0 mt-0 overflow-hidden">
@@ -291,6 +280,7 @@ export function CallDetailSheet({
                 callId={callId}
                 highlightReasons={highlightReasons}
                 dateRange={dateRange}
+                onShare={onShare}
               />
             </div>
 

@@ -24,6 +24,7 @@ import {
   Mail,
   Webhook as WebhookIcon,
   ExternalLink,
+  Share2,
   Play,
   ClipboardList,
   FileText,
@@ -1193,6 +1194,7 @@ interface CallDetailPanelSharedProps {
     startDate: string | null;
     endDate: string | null;
   };
+  onShare?: (correlationId: string) => void;
 }
 
 /**
@@ -1398,7 +1400,7 @@ function FeedbackSection({
  * - Summary section
  * - Tabs: Info, Activity, Logs
  */
-export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: CallDetailPanelSharedProps) {
+export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onShare }: CallDetailPanelSharedProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const { environment } = useEnvironment();
   const platformCallId = data?.call?.platform_call_id;
@@ -1533,6 +1535,18 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
               cekuraId={cekuraCallId}
               correlationId={platformCallId}
             />
+          )}
+          {/* Share Button */}
+          {onShare && call.platform_call_id && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="px-2"
+              onClick={() => onShare(call.platform_call_id!)}
+              title="Share link"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+            </Button>
           )}
           {/* Correlation ID with copy button */}
           {call.platform_call_id && (
