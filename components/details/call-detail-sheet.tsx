@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCallDetail } from '@/hooks/use-calls';
@@ -28,6 +28,7 @@ interface CallDetailSheetProps {
     startDate: string | null;
     endDate: string | null;
   };
+  onShare?: (correlationId: string) => void;
 }
 
 const MIN_LEFT_PERCENT = 35;
@@ -44,6 +45,7 @@ export function CallDetailSheet({
   currentIndex,
   totalCount,
   dateRange,
+  onShare,
 }: CallDetailSheetProps) {
   const { data } = useCallDetail(callId);
   const call = data?.call;
@@ -218,6 +220,18 @@ export function CallDetailSheet({
                 <ChevronRight className="h-4 w-4" />
                 <span className="sr-only">Next</span>
               </Button>
+              {onShare && callId && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onShare(String(callId))}
+                  title="Share Call"
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span className="sr-only">Share</span>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

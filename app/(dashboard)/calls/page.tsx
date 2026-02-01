@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { ColumnDef } from '@tanstack/react-table';
-import { Phone, Loader2, Flag, RotateCcw } from 'lucide-react';
+import { Phone, Loader2, Flag, RotateCcw, Share2, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -173,12 +173,93 @@ export default function CallsPage() {
   const router = useRouter();
   const { environment } = useEnvironment();
 
-  // Initialize flaggedOnly from URL param
-  const [flaggedOnly, setFlaggedOnly] = useState(searchParams.get('flaggedOnly') === 'true');
+  // === URL Parameter Parsing (supports both compressed and legacy formats) ===
+  const urlFilters = useMemo(() => {
+    // Check for compressed state param first
+    const hasCompressed = searchParams.has('s');
 
-  // Derive selectedCallId from URL parameter (supports correlationId or legacy call_id)
-  const correlationIdParam = searchParams.get('correlationId') || searchParams.get('call_id');
-  const selectedCallId = correlationIdParam || null;  // string (correlation ID) or null
+    if (hasCompressed) {
+      // Use dynamic import for the parser (it's only needed for shared URLs)
+      // For now, parse inline since we need it synchronously
+      const compressed = searchParams.get('s');
+      if (compressed) {
+        try {
+          // Import lz-string synchronously (it's small)
+          const { decompressFromEncodedURIComponent } = require('lz-string');
+          const decompressed = decompressFromEncodedURIComponent(compressed);
+          if (decompressed) {
+            const state = JSON.parse(decompressed);
+            const firmIdParam = searchParams.get('f');
+            const parsedFirmId = firmIdParam ? parseInt(firmIdParam, 10) : 0;
+
+            return {
+              flaggedOnly: !!state.fo,
+              correlationId: searchParams.get('c') || null,
+              firmId: parsedFirmId === 0 ? null : parsedFirmId,
+              search: state.q || '',
+              callType: state.ct || 'All',
+              transferType: state.tt || 'Off',
+              multipleTransfers: !!state.mt,
+              cekuraStatus: (state.ck || 'all') as 'all' | 'success' | 'failure' | 'other',
+              sortBy: state.sb || 'started_at',
+              sortOrder: (state.so || 'desc') as SortOrder,
+              offset: state.o || 0,
+              limit: state.l || DEFAULT_PAGE_LIMIT,
+              dynamicFilters: state.df ? state.df.map((f: { f: string; c: string; v: string; x?: number }, i: number) => ({
+                id: String(i + 1),
+                field: f.f,
+                condition: f.c,
+                value: f.v,
+                combinator: f.x ? 'or' : 'and',
+              })) : [] as FilterRow[],
+              dateMode: state.dm as 'today' | 'yesterday' | 'custom' | 'all' | null,
+              startDate: state.sd || null,
+              endDate: state.ed || null,
+            };
+          }
+        } catch {
+          // Fall through to legacy parsing
+        }
+      }
+    }
+
+    // Legacy format parsing
+    const firmIdParam = searchParams.get('f') || searchParams.get('firm_id');
+    const parsedFirmId = firmIdParam ? parseInt(firmIdParam, 10) : null;
+
+    // Parse dynamic filters from URL
+    let parsedDynamicFilters: FilterRow[] = [];
+    const filtersParam = searchParams.get('filters');
+    if (filtersParam) {
+      try {
+        parsedDynamicFilters = JSON.parse(decodeURIComponent(filtersParam));
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    return {
+      flaggedOnly: searchParams.get('flaggedOnly') === 'true',
+      correlationId: searchParams.get('c') || searchParams.get('correlationId') || searchParams.get('call_id') || null,
+      firmId: parsedFirmId === 0 ? null : parsedFirmId,
+      search: searchParams.get('search') || '',
+      callType: searchParams.get('callType') || 'All',
+      transferType: searchParams.get('transferType') || 'Off',
+      multipleTransfers: searchParams.get('multipleTransfers') === 'true',
+      cekuraStatus: (searchParams.get('cekura') || 'all') as 'all' | 'success' | 'failure' | 'other',
+      sortBy: searchParams.get('sortBy') || 'started_at',
+      sortOrder: (searchParams.get('sortOrder') || 'desc') as SortOrder,
+      offset: parseInt(searchParams.get('offset') || '0', 10),
+      limit: parseInt(searchParams.get('limit') || String(DEFAULT_PAGE_LIMIT), 10),
+      dynamicFilters: parsedDynamicFilters,
+      dateMode: searchParams.get('dateMode') as 'today' | 'yesterday' | 'custom' | 'all' | null,
+      startDate: searchParams.get('startDate') || null,
+      endDate: searchParams.get('endDate') || null,
+    };
+  }, [searchParams]);
+
+  // Derive selectedCallId from URL parameter
+  const selectedCallId = urlFilters.correlationId;
 
   // Shared date filter state from context
   const {
@@ -190,44 +271,107 @@ export default function CallsPage() {
     setEndDate,
   } = useDateFilter();
 
-  // Filter state - firmId can be initialized from URL for deep linking (0 = All)
-  const [search, setSearch] = useState('');
-  const firmIdParam = searchParams.get('firm_id');
-  const parsedFirmId = firmIdParam ? parseInt(firmIdParam, 10) : null;
-  const [firmId, setFirmId] = useState<number | null>(parsedFirmId === 0 ? null : parsedFirmId);
-  const [callType, setCallType] = useState('All');
-  const [transferType, setTransferType] = useState('Off');
-  const [multipleTransfers, setMultipleTransfers] = useState(false);
-  const [cekuraStatusFilter, setCekuraStatusFilter] = useState<'all' | 'success' | 'failure' | 'other'>('all');
-  const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
-  const [offset, setOffset] = useState(0);
+  // Initialize date from URL on first load (if present)
+  const initializedFromUrl = useRef(false);
+  useEffect(() => {
+    if (!initializedFromUrl.current && urlFilters.dateMode) {
+      setDateFilterMode(urlFilters.dateMode);
+      if (urlFilters.dateMode === 'custom') {
+        if (urlFilters.startDate) setStartDate(urlFilters.startDate);
+        if (urlFilters.endDate) setEndDate(urlFilters.endDate);
+      }
+      initializedFromUrl.current = true;
+    }
+  }, [urlFilters.dateMode, urlFilters.startDate, urlFilters.endDate, setDateFilterMode, setStartDate, setEndDate]);
+
+  // Filter state - initialized from URL for deep linking
+  const [flaggedOnly, setFlaggedOnly] = useState(urlFilters.flaggedOnly);
+  const [search, setSearch] = useState(urlFilters.search);
+  const [firmId, setFirmId] = useState<number | null>(urlFilters.firmId);
+  const [callType, setCallType] = useState(urlFilters.callType);
+  const [transferType, setTransferType] = useState(urlFilters.transferType);
+  const [multipleTransfers, setMultipleTransfers] = useState(urlFilters.multipleTransfers);
+  const [cekuraStatusFilter, setCekuraStatusFilter] = useState<'all' | 'success' | 'failure' | 'other'>(urlFilters.cekuraStatus);
+  const [limit, setLimit] = useState(urlFilters.limit);
+  const [offset, setOffset] = useState(urlFilters.offset);
+  const [sortBy, setSortBy] = useState<string | null>(urlFilters.sortBy);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(urlFilters.sortOrder);
+  const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>(urlFilters.dynamicFilters);
   const [highlightReasons, setHighlightReasons] = useState<HighlightReasons>({ sentry: false, duration: false, important: false, transferMismatch: false });
-
-  // Helper to update URL with call selection (firm_id, environment, correlationId - in that order)
-  const updateCallIdInUrl = useCallback((correlationId: string | null) => {
-    // Build params in specific order: firm_id, environment, correlationId
-    const params = new URLSearchParams();
-
-    // Preserve flaggedOnly if set
-    if (searchParams.get('flaggedOnly') === 'true') {
-      params.set('flaggedOnly', 'true');
-    }
-
-    if (correlationId !== null) {
-      // firm_id=0 means "All", otherwise use the selected firm
-      params.set('firm_id', String(firmId ?? 0));
-      params.set('environment', environment);
-      params.set('correlationId', correlationId);
-    }
-
-    router.replace(`/calls?${params.toString()}`, { scroll: false });
-  }, [searchParams, environment, firmId, router]);
-  const [sortBy, setSortBy] = useState<string | null>('started_at');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>([]);
   const [pendingNavigation, setPendingNavigation] = useState<'first' | 'last' | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
+
+  // === Lightweight URL Sync (only essential params for navigation) ===
+  const updateCallIdInUrl = useCallback((correlationId: string | null) => {
+    const params = new URLSearchParams();
+    params.set('f', String(firmId ?? 0));
+    params.set('e', environment);
+    if (correlationId) {
+      params.set('c', correlationId);
+    }
+    router.replace(`/calls?${params.toString()}`, { scroll: false });
+  }, [firmId, environment, router]);
+
+  // === Share URL Generation (compressed, includes all filters) ===
+  const [shareToastVisible, setShareToastVisible] = useState(false);
+
+  const handleSharePage = useCallback(async () => {
+    const { buildShareableUrl, copyToClipboard } = await import('@/lib/share-url');
+    const url = buildShareableUrl({
+      flaggedOnly,
+      firmId: firmId ?? 0,
+      dateMode: dateFilterMode,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      search: debouncedSearch || undefined,
+      callType: callType !== 'All' ? callType : undefined,
+      transferType: transferType !== 'Off' ? transferType : undefined,
+      multipleTransfers: multipleTransfers || undefined,
+      cekuraStatus: cekuraStatusFilter,
+      sortBy: sortBy || undefined,
+      sortOrder,
+      offset: offset > 0 ? offset : undefined,
+      limit: limit !== DEFAULT_PAGE_LIMIT ? limit : undefined,
+      dynamicFilters: dynamicFilters.length > 0 ? dynamicFilters : undefined,
+      environment,
+    });
+
+    const success = await copyToClipboard(url);
+    if (success) {
+      setShareToastVisible(true);
+      setTimeout(() => setShareToastVisible(false), 2000);
+    }
+  }, [flaggedOnly, firmId, dateFilterMode, startDate, endDate, debouncedSearch, callType, transferType, multipleTransfers, cekuraStatusFilter, sortBy, sortOrder, offset, limit, dynamicFilters, environment]);
+
+  const handleShareCall = useCallback(async (correlationId: string) => {
+    const { buildShareableUrl, copyToClipboard } = await import('@/lib/share-url');
+    const url = buildShareableUrl({
+      flaggedOnly,
+      firmId: firmId ?? 0,
+      dateMode: dateFilterMode,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      search: debouncedSearch || undefined,
+      callType: callType !== 'All' ? callType : undefined,
+      transferType: transferType !== 'Off' ? transferType : undefined,
+      multipleTransfers: multipleTransfers || undefined,
+      cekuraStatus: cekuraStatusFilter,
+      sortBy: sortBy || undefined,
+      sortOrder,
+      offset: offset > 0 ? offset : undefined,
+      limit: limit !== DEFAULT_PAGE_LIMIT ? limit : undefined,
+      dynamicFilters: dynamicFilters.length > 0 ? dynamicFilters : undefined,
+      environment,
+      correlationId,
+    });
+
+    const success = await copyToClipboard(url);
+    if (success) {
+      setShareToastVisible(true);
+      setTimeout(() => setShareToastVisible(false), 2000);
+    }
+  }, [flaggedOnly, firmId, dateFilterMode, startDate, endDate, debouncedSearch, callType, transferType, multipleTransfers, cekuraStatusFilter, sortBy, sortOrder, offset, limit, dynamicFilters, environment]);
 
   // Helper to get the identifier for a call (correlation ID preferred, fallback to numeric ID)
   const getCallIdentifier = (row: CallListItem | FlaggedCallListItem): string => {
@@ -238,13 +382,10 @@ export default function CallsPage() {
   const { data: firmsData } = useFirms();
   const firms = useMemo(() => [...(firmsData?.firms ?? [])].sort((a, b) => a.id - b.id), [firmsData]);
 
-  // Update URL when flaggedOnly changes (without causing re-render loops)
+  // Handle flaggedOnly toggle (URL sync handled by effect)
   const handleFlaggedOnlyChange = (checked: boolean) => {
     setFlaggedOnly(checked);
     setOffset(0); // Reset pagination when toggling
-    // Update URL without using router to avoid re-render loops
-    const url = checked ? '/calls?flaggedOnly=true' : '/calls';
-    window.history.replaceState(null, '', url);
   };
 
   // Compute effective date range based on filter mode
@@ -974,13 +1115,13 @@ export default function CallsPage() {
         {!flaggedOnly && (
           <>
             <div className="grid grid-cols-2 gap-2">
-              <div>
+              <div className="min-w-0">
                 <Label className="text-sm">Firm</Label>
                 <Select
                   value={firmId ? String(firmId) : 'all'}
                   onValueChange={(v) => setFirmId(v === 'all' ? null : parseInt(v))}
                 >
-                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                  <SelectTrigger className="mt-0.5 h-8 text-xs w-full [&>span:first-child]:truncate [&>span:first-child]:max-w-[calc(100%-1rem)]">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
@@ -993,10 +1134,10 @@ export default function CallsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label className="text-sm">Call Type</Label>
                 <Select value={callType} onValueChange={setCallType}>
-                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                  <SelectTrigger className="mt-0.5 h-8 text-xs w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1011,7 +1152,7 @@ export default function CallsPage() {
               <div className="min-w-0">
                 <Label className="text-sm">Transfer</Label>
                 <Select value={transferType} onValueChange={setTransferType}>
-                  <SelectTrigger className="mt-0.5 h-8 text-xs [&>span]:truncate">
+                  <SelectTrigger className="mt-0.5 h-8 text-xs w-full [&>span:first-child]:truncate">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1023,13 +1164,13 @@ export default function CallsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label className="text-sm">Cekura</Label>
                 <Select
                   value={cekuraStatusFilter}
                   onValueChange={(v) => setCekuraStatusFilter(v as typeof cekuraStatusFilter)}
                 >
-                  <SelectTrigger className="mt-0.5 h-8 text-xs">
+                  <SelectTrigger className="mt-0.5 h-8 text-xs w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1081,6 +1222,7 @@ export default function CallsPage() {
           size="sm"
           className="w-full mt-2"
           onClick={() => {
+            // Reset all filter state
             setFirmId(null);
             setCallType('All');
             setTransferType('Off');
@@ -1089,6 +1231,11 @@ export default function CallsPage() {
             setFlaggedOnly(false);
             setSearch('');
             setDynamicFilters([]);
+            setOffset(0);
+            setSortBy('started_at');
+            setSortOrder('desc');
+            // Reset URL to clean state
+            router.replace('/calls', { scroll: false });
           }}
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
@@ -1100,19 +1247,30 @@ export default function CallsPage() {
       <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
         {/* Header - fixed */}
         <div className="shrink-0">
-          <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 flex items-center gap-2">
-            {flaggedOnly ? (
-              <>
-                <Flag className="h-5 w-5 md:h-6 md:w-6 text-red-500" />
-                Flagged Calls
-              </>
-            ) : (
-              <>
-                <Phone className="h-5 w-5 md:h-6 md:w-6" />
-                Calls
-              </>
-            )}
-          </h1>
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+              {flaggedOnly ? (
+                <>
+                  <Flag className="h-5 w-5 md:h-6 md:w-6 text-red-500" />
+                  Flagged Calls
+                </>
+              ) : (
+                <>
+                  <Phone className="h-5 w-5 md:h-6 md:w-6" />
+                  Calls
+                </>
+              )}
+            </h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSharePage}
+              className="gap-1.5"
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+          </div>
 
           {/* Stats */}
           <div className="flex flex-wrap gap-2 md:gap-4 mb-2">
@@ -1177,7 +1335,16 @@ export default function CallsPage() {
           startDate: effectiveDateRange.startDate ? `${effectiveDateRange.startDate.split('T')[0]}T00:00:00Z` : null,
           endDate: effectiveDateRange.endDate ? `${effectiveDateRange.endDate.split('T')[0]}T23:59:59Z` : null,
         }}
+        onShare={handleShareCall}
       />
+
+      {/* Share Toast */}
+      {shareToastVisible && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
+          <Check className="h-4 w-4" />
+          Link copied to clipboard
+        </div>
+      )}
     </div>
   );
 }
