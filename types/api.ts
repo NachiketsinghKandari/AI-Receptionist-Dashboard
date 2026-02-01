@@ -40,20 +40,42 @@ export interface DynamicFilter {
   field: string;
   condition: DynamicFilterCondition;
   value: string;
+  combinator?: 'and' | 'or'; // How this filter connects to previous filters
 }
 
 export interface CallFilters extends BaseFilters {
   firmId?: number | null;
   callType?: string | null;
+  callTypeValues?: string[] | null; // multiple call type values for OR combinator
+  callTypeUseUnion?: boolean; // true = OR (match ANY), false = AND (impossible for single-value field)
   transferType?: string | null;
+  transferTypeValues?: string[] | null; // multiple values for OR combinator
+  transferTypeUseIntersection?: boolean; // true = AND (must match ALL types), false = OR (must match ANY type)
   platformCallId?: string | null;
   multipleTransfers?: boolean;
   correlationIds?: string[] | null;
   dynamicFilters?: DynamicFilter[] | null;
   excludeTransferType?: string | null;
+  excludeTransferTypeValues?: string[] | null; // multiple exclude values for OR combinator
+  excludeTransferTypeUseUnion?: boolean; // true = OR (exclude ANY), false = AND (exclude only if matches ALL)
   excludeCallType?: string | null;
+  excludeCallTypeValues?: string[] | null; // multiple exclude call type values for OR combinator
+  excludeCallTypeUseUnion?: boolean; // true = OR (exclude ANY), false = AND (exclude only if matches ALL)
   requireHasTransfer?: boolean | null; // true = must have transfer, false = must NOT have transfer
   toolCallResult?: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null; // last transfer result category
+  toolCallResultValues?: string[] | null; // multiple values for OR combinator
+  toolCallResultUseUnion?: boolean; // true = OR (match ANY), false = AND (impossible for single-value field)
+  excludeToolCallResult?: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null; // exclude calls matching this category
+  excludeToolCallResultValues?: string[] | null; // multiple exclude values for OR combinator
+  excludeToolCallResultUseUnion?: boolean; // true = OR (exclude ANY), false = AND (exclude only if matches ALL)
+  status?: string | null; // single status value
+  statusValues?: string[] | null; // multiple status values for OR combinator
+  statusUseUnion?: boolean; // true = OR (match ANY), false = AND (impossible for single-value field)
+  excludeStatus?: string | null; // exclude calls matching this status
+  excludeStatusValues?: string[] | null; // multiple exclude status values for OR combinator
+  excludeStatusUseUnion?: boolean; // true = OR (exclude ANY), false = AND (exclude only if matches ALL)
+  hasImpossibleCondition?: boolean; // true = contradictory filter (e.g., is_empty AND is_not_empty), should return 0 results
+  _filtersHash?: string; // Hash of raw filters for cache invalidation when combinators change
 }
 
 export interface EmailFilters extends BaseFilters {

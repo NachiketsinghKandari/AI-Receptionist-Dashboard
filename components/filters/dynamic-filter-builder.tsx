@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Filter, Plus, Trash2, X } from 'lucide-react';
+import { Filter, Plus, Trash2, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -61,6 +61,7 @@ export interface FilterRow {
   field: string;
   condition: ConditionOperator;
   value: string;
+  combinator: 'and' | 'or'; // How this filter connects to previous filters
 }
 
 // Conditions available per field type
@@ -149,9 +150,19 @@ function MobileFilterRow({
     <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
       {/* Header with label and delete */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">
-          {index === 0 ? 'Where' : 'And'}
-        </span>
+        {index === 0 ? (
+          <span className="text-sm font-medium text-muted-foreground">Where</span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => updateFilterRow(filter.id, { combinator: filter.combinator === 'and' ? 'or' : 'and' })}
+            className="text-sm font-medium px-2 py-0.5 rounded transition-colors inline-flex items-center gap-1 hover:bg-accent cursor-pointer text-foreground border border-input bg-background"
+            title="Click to toggle between And/Or"
+          >
+            {filter.combinator === 'and' ? 'And' : 'Or'}
+            <ChevronDown className="h-3 w-3 opacity-50" />
+          </button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -170,7 +181,7 @@ function MobileFilterRow({
         <SelectTrigger className="w-full">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent side="bottom">
           {fields.map((field) => (
             <SelectItem key={field.key} value={field.key}>
               {field.label}
@@ -189,7 +200,7 @@ function MobileFilterRow({
         <SelectTrigger className="w-full">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent side="bottom">
           {conditions.map((cond) => (
             <SelectItem key={cond.value} value={cond.value}>
               {cond.label}
@@ -209,7 +220,7 @@ function MobileFilterRow({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select value..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent side="bottom">
                 {fieldDef.options.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
@@ -275,10 +286,20 @@ function DesktopFilterRow({
 }) {
   return (
     <div className="flex items-center gap-2">
-      {/* Where / And label */}
-      <span className="w-12 text-sm text-muted-foreground shrink-0">
-        {index === 0 ? 'Where' : 'And'}
-      </span>
+      {/* Where / And|Or label */}
+      {index === 0 ? (
+        <span className="w-14 text-sm text-muted-foreground shrink-0">Where</span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => updateFilterRow(filter.id, { combinator: filter.combinator === 'and' ? 'or' : 'and' })}
+          className="w-14 h-8 text-sm shrink-0 transition-colors rounded-md px-2 inline-flex items-center justify-between hover:bg-accent cursor-pointer text-foreground border border-input bg-background"
+          title="Click to toggle between And/Or"
+        >
+          <span>{filter.combinator === 'and' ? 'And' : 'Or'}</span>
+          <ChevronDown className="h-3 w-3 opacity-50" />
+        </button>
+      )}
 
       {/* Field selector */}
       <Select
@@ -288,7 +309,7 @@ function DesktopFilterRow({
         <SelectTrigger className="w-[140px]">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent side="bottom">
           {fields.map((field) => (
             <SelectItem key={field.key} value={field.key}>
               {field.label}
@@ -307,7 +328,7 @@ function DesktopFilterRow({
         <SelectTrigger className="w-[140px]">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent side="bottom">
           {conditions.map((cond) => (
             <SelectItem key={cond.value} value={cond.value}>
               {cond.label}
@@ -327,7 +348,7 @@ function DesktopFilterRow({
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Select value..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent side="bottom">
                 {fieldDef.options.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
@@ -509,6 +530,7 @@ export function DynamicFilterBuilder({
       field: defaultField.key,
       condition: defaultConditions[0].value,
       value: '',
+      combinator: 'and', // Default to AND for new rows
     };
     onFiltersChange([...filters, newRow]);
   }, [fields, filters, onFiltersChange]);

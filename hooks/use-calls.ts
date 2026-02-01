@@ -11,7 +11,20 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
 
   if (filters.firmId) params.set('firmId', String(filters.firmId));
   if (filters.callType && filters.callType !== 'All') params.set('callType', filters.callType);
+  // Multiple call type values for OR combinator
+  if (filters.callTypeValues && filters.callTypeValues.length > 0) {
+    params.set('callTypeValues', filters.callTypeValues.join(','));
+  }
+  if (filters.callTypeUseUnion) {
+    params.set('callTypeUseUnion', 'true');
+  }
   if (filters.transferType && filters.transferType !== 'Off') params.set('transferType', filters.transferType);
+  if (filters.transferTypeValues && filters.transferTypeValues.length > 0) {
+    params.set('transferTypeValues', filters.transferTypeValues.join(','));
+  }
+  if (filters.transferTypeUseIntersection) {
+    params.set('transferTypeUseIntersection', 'true');
+  }
   if (filters.platformCallId) params.set('platformCallId', filters.platformCallId);
   if (filters.startDate) params.set('startDate', filters.startDate);
   if (filters.endDate) params.set('endDate', filters.endDate);
@@ -30,14 +43,61 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   if (filters.excludeTransferType) {
     params.set('excludeTransferType', filters.excludeTransferType);
   }
+  if (filters.excludeTransferTypeValues && filters.excludeTransferTypeValues.length > 0) {
+    params.set('excludeTransferTypeValues', filters.excludeTransferTypeValues.join(','));
+  }
+  if (filters.excludeTransferTypeUseUnion) {
+    params.set('excludeTransferTypeUseUnion', 'true');
+  }
   if (filters.excludeCallType) {
     params.set('excludeCallType', filters.excludeCallType);
+  }
+  // Multiple exclude call type values for OR combinator
+  if (filters.excludeCallTypeValues && filters.excludeCallTypeValues.length > 0) {
+    params.set('excludeCallTypeValues', filters.excludeCallTypeValues.join(','));
+  }
+  if (filters.excludeCallTypeUseUnion) {
+    params.set('excludeCallTypeUseUnion', 'true');
   }
   if (filters.requireHasTransfer !== undefined && filters.requireHasTransfer !== null) {
     params.set('requireHasTransfer', filters.requireHasTransfer ? 'true' : 'false');
   }
   if (filters.toolCallResult) {
     params.set('toolCallResult', filters.toolCallResult);
+  }
+  if (filters.toolCallResultValues && filters.toolCallResultValues.length > 0) {
+    params.set('toolCallResultValues', filters.toolCallResultValues.join(','));
+  }
+  if (filters.toolCallResultUseUnion) {
+    params.set('toolCallResultUseUnion', 'true');
+  }
+  if (filters.excludeToolCallResult) {
+    params.set('excludeToolCallResult', filters.excludeToolCallResult);
+  }
+  if (filters.excludeToolCallResultValues && filters.excludeToolCallResultValues.length > 0) {
+    params.set('excludeToolCallResultValues', filters.excludeToolCallResultValues.join(','));
+  }
+  if (filters.excludeToolCallResultUseUnion) {
+    params.set('excludeToolCallResultUseUnion', 'true');
+  }
+  // Status filter parameters
+  if (filters.status) {
+    params.set('status', filters.status);
+  }
+  if (filters.statusValues && filters.statusValues.length > 0) {
+    params.set('statusValues', filters.statusValues.join(','));
+  }
+  if (filters.statusUseUnion) {
+    params.set('statusUseUnion', 'true');
+  }
+  if (filters.excludeStatus) {
+    params.set('excludeStatus', filters.excludeStatus);
+  }
+  if (filters.excludeStatusValues && filters.excludeStatusValues.length > 0) {
+    params.set('excludeStatusValues', filters.excludeStatusValues.join(','));
+  }
+  if (filters.excludeStatusUseUnion) {
+    params.set('excludeStatusUseUnion', 'true');
   }
 
   const response = await fetch(`/api/calls?${params}`);
@@ -53,9 +113,24 @@ async function fetchCallDetail(id: number, environment: string): Promise<CallDet
 
 export function useCalls(filters: CallFilters) {
   const { environment } = useEnvironment();
+
+  // If filter has impossible condition (e.g., is_empty AND is_not_empty), return empty results
+  const hasImpossibleCondition = filters.hasImpossibleCondition === true;
+
   return useQuery({
     queryKey: ['calls', 'list', environment, filters],
-    queryFn: () => fetchCalls(filters, environment),
+    queryFn: () => {
+      // Return empty results immediately for impossible conditions
+      if (hasImpossibleCondition) {
+        return Promise.resolve({
+          data: [],
+          total: 0,
+          limit: filters.limit || 25,
+          offset: filters.offset || 0,
+        } as CallsResponse);
+      }
+      return fetchCalls(filters, environment);
+    },
     staleTime: CACHE_TTL_DATA * 1000,
     placeholderData: (prev) => prev,
   });

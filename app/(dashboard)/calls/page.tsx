@@ -247,45 +247,107 @@ export default function CallsPage() {
       (f) => f.value || !conditionRequiresValue(f.condition)
     );
 
-    // Special filters that need custom handling
-    let extractedTransferType: string | null = null;
-    let excludeTransferType: string | null = null; // For "not equals" transfer type
-    let requireHasTransfer: boolean | null = null; // true = must have transfer, false = must NOT have transfer
-    let extractedCekuraStatus: 'all' | 'success' | 'failure' | 'other' = 'all';
-    let excludeCekuraStatus: string | null = null; // For "not equals" Cekura status
-    let extractedMultipleTransfers: boolean | null = null; // null = not set, true = only multiple, false = exclude multiple
-    let extractedCallType: string | null = null;
-    let excludeCallType: string | null = null;
+    // Helper to evaluate boolean conditions with AND/OR logic
+    // Returns: { value: boolean | null, impossible: boolean }
+    // - impossible=true means contradictory AND (e.g., true AND false)
+    // - value=null means tautology OR (e.g., true OR false) - no filter needed
+    const evaluateBooleanConditions = (
+      conditions: Array<{ value: boolean; combinator: 'and' | 'or' }>
+    ): { value: boolean | null; impossible: boolean } => {
+      if (conditions.length === 0) return { value: null, impossible: false };
+
+      const result = conditions[0].value;
+
+      for (let i = 1; i < conditions.length; i++) {
+        const { value, combinator } = conditions[i];
+
+        if (combinator === 'and') {
+          // AND logic: if values differ, it's impossible (true AND false = empty set)
+          if (result !== value) {
+            return { value: null, impossible: true };
+          }
+          // Same values: result stays the same
+        } else {
+          // OR logic: if values differ, it's a tautology (true OR false = everything)
+          if (result !== value) {
+            return { value: null, impossible: false };
+          }
+          // Same values: result stays the same
+        }
+      }
+
+      return { value: result, impossible: false };
+    };
+
+    // Helper to evaluate value conditions with AND/OR logic
+    // For equals: collect values, track if ANY are ORed (union) vs all ANDed (intersection)
+    // For simplicity: if any OR combinator exists, use union; otherwise intersection
+    const evaluateValueConditions = (
+      conditions: Array<{ value: string; combinator: 'and' | 'or' }>
+    ): { values: string[]; useUnion: boolean } => {
+      if (conditions.length === 0) return { values: [], useUnion: false };
+
+      const values = conditions.map(c => c.value);
+      // Check if any combinator (after the first) is OR
+      const useUnion = conditions.slice(1).some(c => c.combinator === 'or');
+
+      return { values, useUnion };
+    };
+
+    // Track conditions with combinators for special filters
+    const requireHasTransferConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
+    const multipleTransfersConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
+    const transferTypeConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const excludeTransferTypeConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const cekuraStatusConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const excludeCekuraStatusConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const toolCallResultConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const excludeToolCallResultConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const callTypeConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const excludeCallTypeConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const statusConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    const excludeStatusConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+
+    // Boolean trackers for select field emptiness (is_empty / is_not_empty)
+    const cekuraStatusEmptyConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
+    const callTypeEmptyConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
+    const toolCallResultEmptyConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
+    const statusEmptyConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
+
     let extractedFirmId: number | null = null;
-    let extractedToolCallResult: 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other' | null = null;
 
     // Standard filters to pass to API
     const standardFilters: DynamicFilter[] = [];
 
     for (const filter of validFilters) {
+      const combinator = filter.combinator || 'and';
+
       // Handle transfer_type specially (includes voicemail detection from webhooks)
       if (filter.field === 'transfer_type') {
         if (filter.condition === 'equals') {
-          extractedTransferType = filter.value;
+          transferTypeConditions.push({ value: filter.value, combinator });
         } else if (filter.condition === 'not_equals') {
-          excludeTransferType = filter.value;
+          excludeTransferTypeConditions.push({ value: filter.value, combinator });
         } else if (filter.condition === 'is_not_empty') {
-          // "is not empty" = call must have at least one transfer
-          requireHasTransfer = true;
+          requireHasTransferConditions.push({ value: true, combinator });
         } else if (filter.condition === 'is_empty') {
-          // "is empty" = call must NOT have any transfers
-          requireHasTransfer = false;
+          requireHasTransferConditions.push({ value: false, combinator });
         }
-        // Other conditions for transfer_type are not supported (it's not a column on calls)
         continue;
       }
 
       // Handle cekura_status specially (requires Cekura API data)
       if (filter.field === 'cekura_status') {
         if (filter.condition === 'equals') {
-          extractedCekuraStatus = filter.value as 'success' | 'failure' | 'other';
+          cekuraStatusConditions.push({ value: filter.value, combinator });
         } else if (filter.condition === 'not_equals') {
-          excludeCekuraStatus = filter.value;
+          excludeCekuraStatusConditions.push({ value: filter.value, combinator });
+        } else if (filter.condition === 'is_not_empty') {
+          // has cekura data (value: true means "must have data")
+          cekuraStatusEmptyConditions.push({ value: true, combinator });
+        } else if (filter.condition === 'is_empty') {
+          // no cekura data (value: false means "must NOT have data")
+          cekuraStatusEmptyConditions.push({ value: false, combinator });
         }
         continue;
       }
@@ -293,9 +355,9 @@ export default function CallsPage() {
       // Handle multiple_transfers (boolean from webhook analysis)
       if (filter.field === 'multiple_transfers') {
         if (filter.condition === 'is_true') {
-          extractedMultipleTransfers = true;
+          multipleTransfersConditions.push({ value: true, combinator });
         } else if (filter.condition === 'is_false') {
-          extractedMultipleTransfers = false;
+          multipleTransfersConditions.push({ value: false, combinator });
         }
         continue;
       }
@@ -303,23 +365,56 @@ export default function CallsPage() {
       // Handle tool_call_result (last transfer result from webhook)
       if (filter.field === 'tool_call_result') {
         if (filter.condition === 'equals') {
-          extractedToolCallResult = filter.value as 'transfer_executed' | 'transfer_cancelled' | 'other';
+          toolCallResultConditions.push({ value: filter.value, combinator });
+        } else if (filter.condition === 'not_equals') {
+          excludeToolCallResultConditions.push({ value: filter.value, combinator });
+        } else if (filter.condition === 'is_not_empty') {
+          toolCallResultEmptyConditions.push({ value: true, combinator });
+        } else if (filter.condition === 'is_empty') {
+          toolCallResultEmptyConditions.push({ value: false, combinator });
         }
         continue;
       }
 
-      // Handle call_type - equals goes to dedicated filter, others go to standard
+      // Handle call_type
       if (filter.field === 'call_type') {
         if (filter.condition === 'equals') {
-          extractedCallType = filter.value;
+          callTypeConditions.push({ value: filter.value, combinator });
         } else if (filter.condition === 'not_equals') {
-          excludeCallType = filter.value;
+          excludeCallTypeConditions.push({ value: filter.value, combinator });
+        } else if (filter.condition === 'is_not_empty') {
+          callTypeEmptyConditions.push({ value: true, combinator });
+        } else if (filter.condition === 'is_empty') {
+          callTypeEmptyConditions.push({ value: false, combinator });
         } else {
           // Other conditions (contains, etc.) go to standard filters
           standardFilters.push({
             field: filter.field,
             condition: filter.condition,
             value: filter.value,
+            combinator: filter.combinator,
+          });
+        }
+        continue;
+      }
+
+      // Handle status (special extraction for AND/OR logic and impossible condition detection)
+      if (filter.field === 'status') {
+        if (filter.condition === 'equals') {
+          statusConditions.push({ value: filter.value, combinator });
+        } else if (filter.condition === 'not_equals') {
+          excludeStatusConditions.push({ value: filter.value, combinator });
+        } else if (filter.condition === 'is_not_empty') {
+          statusEmptyConditions.push({ value: true, combinator });
+        } else if (filter.condition === 'is_empty') {
+          statusEmptyConditions.push({ value: false, combinator });
+        } else {
+          // Other conditions (contains, etc.) go to standard filters
+          standardFilters.push({
+            field: filter.field,
+            condition: filter.condition,
+            value: filter.value,
+            combinator: filter.combinator,
           });
         }
         continue;
@@ -331,26 +426,124 @@ export default function CallsPage() {
         continue;
       }
 
-      // All other filters go to standard filters
+      // All other filters go to standard filters (include combinator for per-filter AND/OR)
       standardFilters.push({
         field: filter.field,
         condition: filter.condition,
         value: filter.value,
+        combinator: filter.combinator,
       });
     }
 
+    // Evaluate boolean conditions
+    const requireHasTransferResult = evaluateBooleanConditions(requireHasTransferConditions);
+    const multipleTransfersResult = evaluateBooleanConditions(multipleTransfersConditions);
+
+    // Evaluate boolean emptiness conditions for select fields
+    const cekuraStatusEmptyResult = evaluateBooleanConditions(cekuraStatusEmptyConditions);
+    const callTypeEmptyResult = evaluateBooleanConditions(callTypeEmptyConditions);
+    const toolCallResultEmptyResult = evaluateBooleanConditions(toolCallResultEmptyConditions);
+
+    // Evaluate value conditions
+    const transferTypeResult = evaluateValueConditions(transferTypeConditions);
+    const excludeTransferTypeResult = evaluateValueConditions(excludeTransferTypeConditions);
+    const cekuraStatusResult = evaluateValueConditions(cekuraStatusConditions);
+    const excludeCekuraStatusResult = evaluateValueConditions(excludeCekuraStatusConditions);
+    const toolCallResultResult = evaluateValueConditions(toolCallResultConditions);
+    const excludeToolCallResultResult = evaluateValueConditions(excludeToolCallResultConditions);
+    const callTypeResult = evaluateValueConditions(callTypeConditions);
+    const excludeCallTypeResult = evaluateValueConditions(excludeCallTypeConditions);
+    const statusResult = evaluateValueConditions(statusConditions);
+    const excludeStatusResult = evaluateValueConditions(excludeStatusConditions);
+    const statusEmptyResult = evaluateBooleanConditions(statusEmptyConditions);
+
+    // Helper to check if value conditions are impossible (AND with different values)
+    const hasImpossibleValueCondition = (values: string[], useUnion: boolean) => {
+      if (values.length <= 1) return false;
+      if (useUnion) return false; // OR can't be impossible
+      return new Set(values).size > 1; // AND with different values = impossible
+    };
+
+    // Check for any impossible conditions (contradictory ANDs)
+    const hasImpossibleCondition =
+      // Boolean impossibilities
+      requireHasTransferResult.impossible ||
+      multipleTransfersResult.impossible ||
+      cekuraStatusEmptyResult.impossible ||
+      callTypeEmptyResult.impossible ||
+      toolCallResultEmptyResult.impossible ||
+      statusEmptyResult.impossible ||
+      // Value impossibilities (AND with different values)
+      hasImpossibleValueCondition(cekuraStatusResult.values, cekuraStatusResult.useUnion) ||
+      hasImpossibleValueCondition(callTypeResult.values, callTypeResult.useUnion) ||
+      hasImpossibleValueCondition(toolCallResultResult.values, toolCallResultResult.useUnion) ||
+      hasImpossibleValueCondition(statusResult.values, statusResult.useUnion) ||
+      // Cross-condition impossibilities: equals AND is_empty
+      (cekuraStatusResult.values.length > 0 && cekuraStatusEmptyResult.value === false) ||
+      (callTypeResult.values.length > 0 && callTypeEmptyResult.value === false) ||
+      (toolCallResultResult.values.length > 0 && toolCallResultEmptyResult.value === false) ||
+      (statusResult.values.length > 0 && statusEmptyResult.value === false);
+
     return {
-      transferType: extractedTransferType,
-      excludeTransferType,
-      requireHasTransfer,
-      cekuraStatus: extractedCekuraStatus,
-      excludeCekuraStatus,
-      multipleTransfers: extractedMultipleTransfers,
-      callType: extractedCallType,
-      excludeCallType,
+      // Transfer type values
+      transferType: transferTypeResult.values.length > 0 ? transferTypeResult.values[0] : null,
+      transferTypeValues: transferTypeResult.values.length > 0 ? transferTypeResult.values : null,
+      transferTypeUseUnion: transferTypeResult.useUnion,
+      excludeTransferType: excludeTransferTypeResult.values.length > 0 ? excludeTransferTypeResult.values[0] : null,
+      excludeTransferTypeValues: excludeTransferTypeResult.values.length > 0 ? excludeTransferTypeResult.values : null,
+      excludeTransferTypeUseUnion: excludeTransferTypeResult.useUnion,
+      // Boolean filters with proper AND/OR evaluation
+      requireHasTransfer: requireHasTransferResult.value,
+      multipleTransfers: multipleTransfersResult.value,
+      // Cekura status
+      cekuraStatus: cekuraStatusResult.values.length > 0
+        ? cekuraStatusResult.values[0] as 'success' | 'failure' | 'other'
+        : 'all' as const,
+      cekuraStatusValues: cekuraStatusResult.values.length > 0 ? cekuraStatusResult.values : null,
+      cekuraStatusUseUnion: cekuraStatusResult.useUnion,
+      excludeCekuraStatus: excludeCekuraStatusResult.values.length > 0 ? excludeCekuraStatusResult.values[0] : null,
+      excludeCekuraStatusValues: excludeCekuraStatusResult.values.length > 0 ? excludeCekuraStatusResult.values : null,
+      excludeCekuraStatusUseUnion: excludeCekuraStatusResult.useUnion,
+      // Cekura status emptiness (is_empty / is_not_empty)
+      // true = has data (is_not_empty), false = no data (is_empty), null = no filter
+      cekuraStatusEmpty: cekuraStatusEmptyResult.value,
+      // Call type
+      callType: callTypeResult.values.length > 0 ? callTypeResult.values[0] : null,
+      callTypeValues: callTypeResult.values.length > 0 ? callTypeResult.values : null,
+      callTypeUseUnion: callTypeResult.useUnion,
+      excludeCallType: excludeCallTypeResult.values.length > 0 ? excludeCallTypeResult.values[0] : null,
+      excludeCallTypeValues: excludeCallTypeResult.values.length > 0 ? excludeCallTypeResult.values : null,
+      excludeCallTypeUseUnion: excludeCallTypeResult.useUnion,
+      // Call type emptiness (is_empty / is_not_empty)
+      callTypeEmpty: callTypeEmptyResult.value,
+      // Status
+      status: statusResult.values.length > 0 ? statusResult.values[0] : null,
+      statusValues: statusResult.values.length > 0 ? statusResult.values : null,
+      statusUseUnion: statusResult.useUnion,
+      excludeStatus: excludeStatusResult.values.length > 0 ? excludeStatusResult.values[0] : null,
+      excludeStatusValues: excludeStatusResult.values.length > 0 ? excludeStatusResult.values : null,
+      excludeStatusUseUnion: excludeStatusResult.useUnion,
+      // Status emptiness (is_empty / is_not_empty)
+      statusEmpty: statusEmptyResult.value,
+      // Firm ID
       firmId: extractedFirmId,
-      toolCallResult: extractedToolCallResult,
+      // Tool call result
+      toolCallResult: toolCallResultResult.values.length > 0
+        ? toolCallResultResult.values[0] as 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other'
+        : null,
+      toolCallResultValues: toolCallResultResult.values.length > 0 ? toolCallResultResult.values : null,
+      toolCallResultUseUnion: toolCallResultResult.useUnion,
+      excludeToolCallResult: excludeToolCallResultResult.values.length > 0
+        ? excludeToolCallResultResult.values[0] as 'transfer_executed' | 'transfer_completed' | 'transfer_cancelled' | 'other'
+        : null,
+      excludeToolCallResultValues: excludeToolCallResultResult.values.length > 0 ? excludeToolCallResultResult.values : null,
+      excludeToolCallResultUseUnion: excludeToolCallResultResult.useUnion,
+      // Tool call result emptiness (is_empty / is_not_empty)
+      toolCallResultEmpty: toolCallResultEmptyResult.value,
+      // Standard filters for API
       standardFilters: standardFilters.length > 0 ? standardFilters : null,
+      // Flag for impossible conditions (should return 0 results)
+      hasImpossibleCondition,
     };
   }, [dynamicFilters]);
 
@@ -373,16 +566,80 @@ export default function CallsPage() {
       return null; // No data yet
     }
 
-    // If neither include nor exclude is set, no Cekura filtering
-    if (effectiveCekuraStatus === 'all' && !effectiveExcludeCekuraStatus) {
+    const statusValues = extractedFilters.cekuraStatusValues;
+    const useUnion = extractedFilters.cekuraStatusUseUnion;
+    const excludeValues = extractedFilters.excludeCekuraStatusValues;
+    const excludeUseUnion = extractedFilters.excludeCekuraStatusUseUnion;
+    const emptyFilter = extractedFilters.cekuraStatusEmpty;
+
+    // Handle is_empty (calls without Cekura data)
+    // When is_empty is true, we need calls NOT in cekuraCallsData
+    // Return empty array to signal "use negative filter" - actual filtering happens at API level
+    if (emptyFilter === false) {
+      // is_empty: return empty array to indicate no Cekura correlation IDs should match
+      // The API will then return calls that DON'T have matching correlation IDs
+      return [];
+    }
+
+    // Handle is_not_empty (calls with Cekura data)
+    if (emptyFilter === true && !statusValues && !excludeValues && effectiveCekuraStatus === 'all') {
+      // is_not_empty without value filters: return all correlation IDs that have data
+      const matchingIds: string[] = [];
+      cekuraCallsData.calls.forEach((_, correlationId) => {
+        matchingIds.push(correlationId);
+      });
+      return matchingIds;
+    }
+
+    // If neither include, exclude, nor sidebar filter is set, no Cekura filtering
+    if (effectiveCekuraStatus === 'all' && !statusValues && !excludeValues) {
       return null;
     }
 
+    // Handle multiple values with AND/OR logic
+    if (statusValues && statusValues.length > 1) {
+      if (!useUnion) {
+        // AND with different values = impossible (a call can only have one status)
+        if (new Set(statusValues).size > 1) return [];
+      }
+      // OR logic: match any of the categories
+      const matchingIds: string[] = [];
+      cekuraCallsData.calls.forEach((callData, correlationId) => {
+        const status = callData.status || '';
+        const matches = statusValues.some(cat =>
+          matchesCekuraCategory(status, cat as 'success' | 'failure' | 'other')
+        );
+        if (matches) matchingIds.push(correlationId);
+      });
+      return matchingIds;
+    }
+
+    // Handle multiple exclude values with AND/OR logic
+    if (excludeValues && excludeValues.length > 1) {
+      const matchingIds: string[] = [];
+      cekuraCallsData.calls.forEach((callData, correlationId) => {
+        const status = callData.status || '';
+        if (excludeUseUnion) {
+          // OR exclude: exclude if matches ANY of the excluded categories
+          const shouldExclude = excludeValues.some(cat =>
+            matchesCekuraCategory(status, cat as 'success' | 'failure' | 'other')
+          );
+          if (!shouldExclude) matchingIds.push(correlationId);
+        } else {
+          // AND exclude: exclude only if matches ALL excluded categories (impossible for single status)
+          // In practice, AND with different exclude values means "exclude nothing" since a status can't be multiple things
+          matchingIds.push(correlationId);
+        }
+      });
+      return matchingIds;
+    }
+
+    // Single value filtering (original logic)
     const matchingIds: string[] = [];
     cekuraCallsData.calls.forEach((callData, correlationId) => {
       const status = callData.status || '';
 
-      // If we have an include filter, check if it matches
+      // If we have an include filter (sidebar or single dynamic value), check if it matches
       if (effectiveCekuraStatus !== 'all') {
         if (matchesCekuraCategory(status, effectiveCekuraStatus)) {
           matchingIds.push(correlationId);
@@ -398,7 +655,7 @@ export default function CallsPage() {
     });
 
     return matchingIds;
-  }, [effectiveCekuraStatus, effectiveExcludeCekuraStatus, cekuraCallsData]);
+  }, [effectiveCekuraStatus, effectiveExcludeCekuraStatus, cekuraCallsData, extractedFilters.cekuraStatusValues, extractedFilters.cekuraStatusUseUnion, extractedFilters.excludeCekuraStatusValues, extractedFilters.excludeCekuraStatusUseUnion, extractedFilters.cekuraStatusEmpty]);
 
   // Date-only filters for total count (no other filters applied)
   const dateOnlyFilters = useMemo(
@@ -414,21 +671,72 @@ export default function CallsPage() {
   // Compute effective filter values (sidebar takes precedence, then dynamic)
   const effectiveFirmId = firmId ?? extractedFilters.firmId;
   const effectiveCallType = callType !== 'All' ? callType : extractedFilters.callType;
+  // For transfer type: sidebar selection overrides, otherwise use dynamic filter values
   const effectiveTransferType = transferType !== 'Off' ? transferType : extractedFilters.transferType;
+  const effectiveTransferTypeValues = transferType !== 'Off' ? null : extractedFilters.transferTypeValues;
   // For multipleTransfers: sidebar true overrides, dynamic true/false applies, otherwise undefined
   const effectiveMultipleTransfers = multipleTransfers ? true : (extractedFilters.multipleTransfers ?? undefined);
 
+  // Create a stable hash of the dynamic filters to ensure query cache invalidation when combinators change
+  // This is needed because the extracted/evaluated values might be the same even when combinators differ
+  const dynamicFiltersHash = useMemo(() => {
+    return JSON.stringify(dynamicFilters.map(f => ({
+      id: f.id,
+      field: f.field,
+      condition: f.condition,
+      value: f.value,
+      combinator: f.combinator,
+    })));
+  }, [dynamicFilters]);
+
+  // Compute effective call type values (sidebar overrides, then dynamic filter)
+  const effectiveCallTypeValues = callType !== 'All' ? null : extractedFilters.callTypeValues;
+
   // Build filters for regular calls
+  // Each filter now has its own combinator for mixed AND/OR logic
   const callFilters = useMemo(
     () => ({
       firmId: effectiveFirmId,
-      callType: effectiveCallType,
-      transferType: effectiveTransferType,
+      // Pass call type - use array if multiple values, otherwise single value
+      callType: effectiveCallTypeValues && effectiveCallTypeValues.length > 1
+        ? undefined // Don't use single value when we have multiple
+        : effectiveCallType,
+      callTypeValues: effectiveCallTypeValues,
+      // AND = intersection for call type (impossible with different values for single-value field)
+      callTypeUseUnion: extractedFilters.callTypeUseUnion,
+      // Pass transfer type - use array if multiple values, otherwise single value
+      transferType: effectiveTransferTypeValues && effectiveTransferTypeValues.length > 1
+        ? undefined // Don't use single value when we have multiple
+        : effectiveTransferType,
+      transferTypeValues: effectiveTransferTypeValues,
+      // AND = intersection (must match ALL), OR = union (must match ANY)
+      transferTypeUseIntersection: extractedFilters.transferTypeUseUnion === false && (effectiveTransferTypeValues?.length ?? 0) > 1,
       multipleTransfers: effectiveMultipleTransfers,
       excludeTransferType: extractedFilters.excludeTransferType,
+      excludeTransferTypeValues: extractedFilters.excludeTransferTypeValues,
+      excludeTransferTypeUseUnion: extractedFilters.excludeTransferTypeUseUnion,
       excludeCallType: extractedFilters.excludeCallType,
+      excludeCallTypeValues: extractedFilters.excludeCallTypeValues,
+      excludeCallTypeUseUnion: extractedFilters.excludeCallTypeUseUnion,
       requireHasTransfer: extractedFilters.requireHasTransfer,
-      toolCallResult: extractedFilters.toolCallResult,
+      // Pass tool call result values - always use arrays if multiple values exist
+      toolCallResult: extractedFilters.toolCallResultValues && extractedFilters.toolCallResultValues.length > 1
+        ? undefined // Don't use single value when we have multiple
+        : extractedFilters.toolCallResult,
+      toolCallResultValues: extractedFilters.toolCallResultValues,
+      toolCallResultUseUnion: extractedFilters.toolCallResultUseUnion,
+      excludeToolCallResult: extractedFilters.excludeToolCallResult,
+      excludeToolCallResultValues: extractedFilters.excludeToolCallResultValues,
+      excludeToolCallResultUseUnion: extractedFilters.excludeToolCallResultUseUnion,
+      // Pass status values - use array if multiple values, otherwise single value
+      status: extractedFilters.statusValues && extractedFilters.statusValues.length > 1
+        ? undefined // Don't use single value when we have multiple
+        : extractedFilters.status,
+      statusValues: extractedFilters.statusValues,
+      statusUseUnion: extractedFilters.statusUseUnion,
+      excludeStatus: extractedFilters.excludeStatus,
+      excludeStatusValues: extractedFilters.excludeStatusValues,
+      excludeStatusUseUnion: extractedFilters.excludeStatusUseUnion,
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
       search: debouncedSearch || undefined,
@@ -438,8 +746,12 @@ export default function CallsPage() {
       sortOrder,
       correlationIds: cekuraFilteredCorrelationIds,
       dynamicFilters: extractedFilters.standardFilters,
+      // Flag for impossible filter conditions (e.g., is_empty AND is_not_empty)
+      hasImpossibleCondition: extractedFilters.hasImpossibleCondition,
+      // Include hash of raw filters to ensure cache invalidation when combinators change
+      _filtersHash: dynamicFiltersHash,
     }),
-    [effectiveFirmId, effectiveCallType, effectiveTransferType, effectiveMultipleTransfers, extractedFilters.excludeTransferType, extractedFilters.excludeCallType, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, extractedFilters.standardFilters]
+    [effectiveFirmId, effectiveCallType, effectiveCallTypeValues, extractedFilters.callTypeUseUnion, effectiveTransferType, effectiveTransferTypeValues, effectiveMultipleTransfers, extractedFilters.transferTypeUseUnion, extractedFilters.excludeTransferType, extractedFilters.excludeTransferTypeValues, extractedFilters.excludeTransferTypeUseUnion, extractedFilters.excludeCallType, extractedFilters.excludeCallTypeValues, extractedFilters.excludeCallTypeUseUnion, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, extractedFilters.toolCallResultValues, extractedFilters.toolCallResultUseUnion, extractedFilters.excludeToolCallResult, extractedFilters.excludeToolCallResultValues, extractedFilters.excludeToolCallResultUseUnion, extractedFilters.status, extractedFilters.statusValues, extractedFilters.statusUseUnion, extractedFilters.excludeStatus, extractedFilters.excludeStatusValues, extractedFilters.excludeStatusUseUnion, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, extractedFilters.standardFilters, extractedFilters.hasImpossibleCondition, dynamicFiltersHash]
   );
 
   // Build filters for flagged calls
