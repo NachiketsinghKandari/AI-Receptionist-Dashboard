@@ -15,7 +15,7 @@ import {
 } from '@/components/details/call-detail-panel';
 
 interface CallDetailSheetProps {
-  callId: number | null;
+  callId: number | string | null;  // Supports both numeric ID and correlation ID
   highlightReasons: HighlightReasons;
   onClose: () => void;
   onPrevious: () => void;
@@ -28,6 +28,7 @@ interface CallDetailSheetProps {
     startDate: string | null;
     endDate: string | null;
   };
+  onShare?: (correlationId: string) => void;
 }
 
 const MIN_LEFT_PERCENT = 35;
@@ -44,6 +45,7 @@ export function CallDetailSheet({
   currentIndex,
   totalCount,
   dateRange,
+  onShare,
 }: CallDetailSheetProps) {
   const { data } = useCallDetail(callId);
   const call = data?.call;
@@ -253,6 +255,7 @@ export function CallDetailSheet({
                 callId={callId}
                 highlightReasons={highlightReasons}
                 dateRange={dateRange}
+                onShare={onShare}
               />
             </TabsContent>
             <TabsContent value="transcript" className="flex-1 min-h-0 mt-0 overflow-hidden">
@@ -277,6 +280,7 @@ export function CallDetailSheet({
                 callId={callId}
                 highlightReasons={highlightReasons}
                 dateRange={dateRange}
+                onShare={onShare}
               />
             </div>
 
