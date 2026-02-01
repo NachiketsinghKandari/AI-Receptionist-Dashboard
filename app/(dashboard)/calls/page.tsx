@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEnvironment } from '@/components/providers/environment-provider';
 import { ColumnDef } from '@tanstack/react-table';
 import { Phone, Loader2, Flag, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -169,9 +170,15 @@ function createColumns(
 
 export default function CallsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { environment } = useEnvironment();
 
   // Initialize flaggedOnly from URL param
   const [flaggedOnly, setFlaggedOnly] = useState(searchParams.get('flaggedOnly') === 'true');
+
+  // Derive selectedCallId from URL parameter (supports correlationId or legacy call_id)
+  const correlationIdParam = searchParams.get('correlationId') || searchParams.get('call_id');
+  const selectedCallId = correlationIdParam || null;  // string (correlation ID) or null
 
   // Shared date filter state from context
   const {
@@ -183,23 +190,49 @@ export default function CallsPage() {
     setEndDate,
   } = useDateFilter();
 
-  // Filter state
+  // Filter state - firmId can be initialized from URL for deep linking (0 = All)
   const [search, setSearch] = useState('');
-  const [firmId, setFirmId] = useState<number | null>(null);
+  const firmIdParam = searchParams.get('firm_id');
+  const parsedFirmId = firmIdParam ? parseInt(firmIdParam, 10) : null;
+  const [firmId, setFirmId] = useState<number | null>(parsedFirmId === 0 ? null : parsedFirmId);
   const [callType, setCallType] = useState('All');
   const [transferType, setTransferType] = useState('Off');
   const [multipleTransfers, setMultipleTransfers] = useState(false);
   const [cekuraStatusFilter, setCekuraStatusFilter] = useState<'all' | 'success' | 'failure' | 'other'>('all');
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
-  const [selectedCallId, setSelectedCallId] = useState<number | null>(null);
   const [highlightReasons, setHighlightReasons] = useState<HighlightReasons>({ sentry: false, duration: false, important: false, transferMismatch: false });
+
+  // Helper to update URL with call selection (firm_id, environment, correlationId - in that order)
+  const updateCallIdInUrl = useCallback((correlationId: string | null) => {
+    // Build params in specific order: firm_id, environment, correlationId
+    const params = new URLSearchParams();
+
+    // Preserve flaggedOnly if set
+    if (searchParams.get('flaggedOnly') === 'true') {
+      params.set('flaggedOnly', 'true');
+    }
+
+    if (correlationId !== null) {
+      // firm_id=0 means "All", otherwise use the selected firm
+      params.set('firm_id', String(firmId ?? 0));
+      params.set('environment', environment);
+      params.set('correlationId', correlationId);
+    }
+
+    router.replace(`/calls?${params.toString()}`, { scroll: false });
+  }, [searchParams, environment, firmId, router]);
   const [sortBy, setSortBy] = useState<string | null>('started_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [dynamicFilters, setDynamicFilters] = useState<FilterRow[]>([]);
   const [pendingNavigation, setPendingNavigation] = useState<'first' | 'last' | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
+
+  // Helper to get the identifier for a call (correlation ID preferred, fallback to numeric ID)
+  const getCallIdentifier = (row: CallListItem | FlaggedCallListItem): string => {
+    return row.platform_call_id || String(row.id);
+  };
 
   // Firms for the grid filter
   const { data: firmsData } = useFirms();
@@ -844,14 +877,14 @@ export default function CallsPage() {
     } else {
       setHighlightReasons({ sentry: false, duration: false, important: false, transferMismatch: false });
     }
-    setSelectedCallId(row?.id ?? null);
+    updateCallIdInUrl(row ? getCallIdentifier(row) : null);
   };
 
   // Navigation logic for detail dialog
   const dataArray = data?.data ?? [];
   const totalFiltered = data?.total ?? 0;
   const localIndex = selectedCallId !== null
-    ? dataArray.findIndex(c => c.id === selectedCallId)
+    ? dataArray.findIndex(c => getCallIdentifier(c) === selectedCallId)
     : -1;
 
   // Global index across all pages
@@ -866,7 +899,7 @@ export default function CallsPage() {
 
     if (localIndex > 0) {
       // Navigate within current page
-      setSelectedCallId(dataArray[localIndex - 1].id);
+      updateCallIdInUrl(getCallIdentifier(dataArray[localIndex - 1]));
     } else if (offset > 0) {
       // Go to previous page and select last item
       const newOffset = Math.max(0, offset - limit);
@@ -885,7 +918,7 @@ export default function CallsPage() {
 
     if (localIndex < dataArray.length - 1) {
       // Navigate within current page
-      setSelectedCallId(dataArray[localIndex + 1].id);
+      updateCallIdInUrl(getCallIdentifier(dataArray[localIndex + 1]));
     } else if (offset + dataArray.length < totalFiltered) {
       // Go to next page and select first item
       const newOffset = offset + limit;
@@ -902,13 +935,13 @@ export default function CallsPage() {
   useEffect(() => {
     if (pendingNavigation && dataArray.length > 0) {
       if (pendingNavigation === 'first') {
-        setSelectedCallId(dataArray[0].id);
+        updateCallIdInUrl(getCallIdentifier(dataArray[0]));
       } else if (pendingNavigation === 'last') {
-        setSelectedCallId(dataArray[dataArray.length - 1].id);
+        updateCallIdInUrl(getCallIdentifier(dataArray[dataArray.length - 1]));
       }
       setPendingNavigation(null);
     }
-  }, [pendingNavigation, dataArray]);
+  }, [pendingNavigation, dataArray, updateCallIdInUrl]);
 
   return (
     <div className="flex h-full">
@@ -1119,7 +1152,7 @@ export default function CallsPage() {
             selectedRowId={selectedCallId}
             isLoading={isLoading || cekuraIsLoading}
             isFetching={isFetching}
-            getRowId={(row) => String(row.id)}
+            getRowId={(row) => getCallIdentifier(row)}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={handleSort}
@@ -1133,7 +1166,7 @@ export default function CallsPage() {
       <CallDetailSheet
         callId={selectedCallId}
         highlightReasons={highlightReasons}
-        onClose={() => setSelectedCallId(null)}
+        onClose={() => updateCallIdInUrl(null)}
         onPrevious={handlePrevious}
         onNext={handleNext}
         hasPrevious={hasPrevious}

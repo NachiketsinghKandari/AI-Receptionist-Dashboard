@@ -76,7 +76,7 @@ export interface HighlightReasons {
 }
 
 interface CallDetailPanelProps {
-  callId: number;
+  callId: number | string;  // Supports both numeric ID and correlation ID
   highlightReasons?: HighlightReasons;
   dateRange?: {
     startDate: string | null;
@@ -1187,7 +1187,7 @@ function SectionBadge({ count, color, isLoading }: { count: number; color: strin
 
 // Shared props for left/right panels
 interface CallDetailPanelSharedProps {
-  callId: number;
+  callId: number | string;  // Supports both numeric ID and correlation ID
   highlightReasons?: HighlightReasons;
   dateRange?: {
     startDate: string | null;
@@ -1413,8 +1413,8 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange }: Cal
   const cekuraCallId = cekuraCallInfo?.cekuraId;
 
   // Track which callId has been acknowledged for each tab
-  const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | null>(null);
-  const [activityAcknowledgedFor, setActivityAcknowledgedFor] = useState<number | null>(null);
+  const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | string | null>(null);
+  const [activityAcknowledgedFor, setActivityAcknowledgedFor] = useState<number | string | null>(null);
 
   const logsAcknowledged = logsAcknowledgedFor === callId;
   const activityAcknowledged = activityAcknowledgedFor === callId;
@@ -2199,8 +2199,8 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
   const cekuraCallId = cekuraCallInfo?.cekuraId;
 
   // Track which callId has been acknowledged for each tab (avoids useEffect reset)
-  const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | null>(null);
-  const [activityAcknowledgedFor, setActivityAcknowledgedFor] = useState<number | null>(null);
+  const [logsAcknowledgedFor, setLogsAcknowledgedFor] = useState<number | string | null>(null);
+  const [activityAcknowledgedFor, setActivityAcknowledgedFor] = useState<number | string | null>(null);
 
   // Derive acknowledged state by comparing against current callId
   const logsAcknowledged = logsAcknowledgedFor === callId;

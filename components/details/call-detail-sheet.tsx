@@ -15,7 +15,7 @@ import {
 } from '@/components/details/call-detail-panel';
 
 interface CallDetailSheetProps {
-  callId: number | null;
+  callId: number | string | null;  // Supports both numeric ID and correlation ID
   highlightReasons: HighlightReasons;
   onClose: () => void;
   onPrevious: () => void;

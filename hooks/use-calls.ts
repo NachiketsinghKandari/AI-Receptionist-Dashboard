@@ -105,7 +105,8 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   return response.json();
 }
 
-async function fetchCallDetail(id: number, environment: string): Promise<CallDetailResponse> {
+async function fetchCallDetail(id: number | string, environment: string): Promise<CallDetailResponse> {
+  // Supports both numeric ID and correlation ID (platform_call_id)
   const response = await fetch(`/api/calls/${id}?env=${environment}`);
   if (!response.ok) throw new Error('Failed to fetch call detail');
   return response.json();
@@ -136,7 +137,8 @@ export function useCalls(filters: CallFilters) {
   });
 }
 
-export function useCallDetail(id: number | null) {
+// Supports both numeric ID and correlation ID (platform_call_id string)
+export function useCallDetail(id: number | string | null) {
   const { environment } = useEnvironment();
   return useQuery({
     queryKey: ['calls', 'detail', environment, id],
