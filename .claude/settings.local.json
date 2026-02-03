@@ -29,7 +29,9 @@
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
       "Bash(pkill:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(gh pr create --title \"feat: URL-based call detail and shareable filter links\" --body \"$\\(cat <<''EOF''\n## Summary\n- Add URL-based navigation for call details using `correlationId` parameter\n- Add shareable URLs with compressed filter state for the calls page\n- Support deep linking to specific calls with filters preserved\n\n## Changes\n- **URL Parameters**: `f` \\(firm_id\\), `e` \\(environment\\), `c` \\(correlationId\\), `s` \\(compressed state\\)\n- **API Enhancement**: Call detail endpoint now accepts both numeric ID and correlation ID \\(UUID\\)\n- **Share Buttons**: \n  - \"Share\" button in page header for sharing filtered view\n  - Share icon in Quick Links section for sharing specific call\n- **Compression**: Uses lz-string to compress filter state for shorter URLs\n- **Deep Linking**: Opening a shared URL restores all filters and selected call\n\n## URL Format\n```\n/calls?f=5&e=production&s=N4IgDg...&c=019c10c9-a3dc-7bb7-8374-bb6d800ed7a1\n```\n\n## Test plan\n- [ ] Click a call row → URL updates with correlationId\n- [ ] Close detail panel → correlationId removed from URL\n- [ ] Click \"Share\" in header → copies URL with all filters\n- [ ] Click share icon in Quick Links → copies URL with call + filters\n- [ ] Open shared URL → filters and call restored correctly\n- [ ] Reset Filters → URL cleared\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(gh auth:*)"
     ]
   }
 }

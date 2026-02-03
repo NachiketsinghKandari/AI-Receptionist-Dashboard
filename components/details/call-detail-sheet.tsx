@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCallDetail } from '@/hooks/use-calls';
@@ -182,10 +183,20 @@ export function CallDetailSheet({
         <div className="px-4 py-3 md:px-6 md:py-4 border-b shrink-0 bg-background">
           <div className="flex items-start justify-between gap-2 md:gap-4">
             <div className="flex-1 min-w-0">
-              <h2 className="text-base md:text-lg font-semibold flex items-center gap-2">
-                <Phone className="h-4 w-4 md:h-5 md:w-5" />
-                Call #{callId}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                  <Phone className="h-4 w-4 md:h-5 md:w-5" />
+                  Call
+                </h2>
+                {call?.platform_call_id && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50">
+                    <span className="text-sm font-mono">
+                      {call.platform_call_id}
+                    </span>
+                    <CopyButton value={call.platform_call_id} />
+                  </div>
+                )}
+              </div>
               {call && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {call.caller_name} - {call.phone_number}

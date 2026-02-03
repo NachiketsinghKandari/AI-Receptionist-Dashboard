@@ -1548,15 +1548,6 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onSha
               <Share2 className="h-3.5 w-3.5" />
             </Button>
           )}
-          {/* Correlation ID with copy button */}
-          {call.platform_call_id && (
-            <div className="flex items-center gap-1 ml-auto px-2 py-1 rounded-md bg-muted/50">
-              <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px] md:max-w-[180px]">
-                {call.platform_call_id}
-              </span>
-              <CopyButton value={call.platform_call_id} />
-            </div>
-          )}
         </div>
 
         {/* Feedback Section */}
