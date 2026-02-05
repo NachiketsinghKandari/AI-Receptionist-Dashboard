@@ -1,0 +1,2689 @@
+{
+    "count": 640,
+    "next": "https://api.cekura.ai/observability/v1/call-logs/?agent_id=10779&page=2&page_size=5",
+    "previous": null,
+    "results": [
+        {
+            "id": 3013299,
+            "duration": "01:13",
+            "voice_recording_url": "https://cekura-prod.s3-accelerate.amazonaws.com/aa2df799b650c674c6edaabdf26b90bb8c936389a053219a95639124f3344cbc.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA47CRXRKFOYJTNGLR%2F20260205%2Fus-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260205T163601Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEGgaCXVzLXdlc3QtMSJIMEYCIQCg2KuhiHyKnIEtXW40riZx8c5HtBLJSAgKMnYM%2BEA5YwIhANkd5ix6KQKdrg1xauXaxTsV3dqCrMZFx%2FpOUo15EsH4Kt8DCDEQABoMODkxMzc3MTI2MDI2IgwUDn7Whc8PsEWXUawqvANlrB3YhOnG%2Bx1VDegJX%2FwmvZosHRPsFVWXwwVnTFzObLwMqK4r7ZeuWGp%2BVq%2BtUj2HmGo38E%2BGUA7ZYunKoWgBNfA6JCk2igdsxbKD2LeiIpp3SMGqRi4IVDoIxVxfn9xNpJ4DizcwVR5XnWVQ%2BX6mvD2Bkf9nYPxMBW4Qla3X5ND%2BgpNSKBs6PgdmLvR5XjdVuX0LG2ZykPV%2B5QTzXQEImxPfM005swzyOZ9stCFcjljdbZigTTT5OQaEBNj0mi%2F8%2BgPue8yBjgQAYY4nBCQYxbpOWRhZOQwbGG4GndW7oxyN0BxkejpJR%2BngS%2Fnp0DZTWQrarYnCsst5NNqN5cZTAC3iLbPM3B3S6AxioH7XayIdQOmwTZctavAs7ihsB7ILC5cPEx%2FX7%2FU17WHy6Y3ZkRK1R5p3eHpJQGni2galxsgZzpTl%2FNERc8Ar3KpBDmLqgEMNxXY12kyezFFywEPyeihR5wID4OrXE5gRuHeW7gHdN4GwgfhyO0ha%2Bke2VBvEt2lOYpnZVCyA0XRFXRmDUj92K7GWf0j0KwI9OvfX6niF91QxvLyUysCxSC7OUtiZjFojjJbxCQkxskUw9vOSzAY6pAHCLj%2BZ4Byf1%2B4yrj68pySLhkpNvRkMfODye7kmXyq%2FF7D5uh7d27ORx8mK2K9NyTt3qKeq9r4Nk7xXXxvMOWof2q8NRaQ4eY8Y%2FF31iVl459MXAhWEHvqRNDJCIAFIgY%2B%2BJFIZbGl6ettglJMDX0a0uLqow99idq91QNuzyXUduvxBZg3lsMXJiWUMZI8n3xe0HT7lfULaBY%2FvGAUpmV8FCAJF5g%3D%3D&X-Amz-Signature=6965b03e4e069def2bbd4a7b48ede9092c26fdd5696787d461cd5543a9f248db",
+            "critical_categories": [],
+            "transcript_object": [
+                {
+                    "content": "Bay and Associates. This is Emma. can I help you?",
+                    "end_time": 2.448,
+                    "role": "Main Agent",
+                    "start_time": 0.843,
+                    "time": "00:00"
+                },
+                {
+                    "content": "Terrace Hudson.",
+                    "end_time": 7.327,
+                    "role": "Testing Agent",
+                    "start_time": 6.6,
+                    "time": "00:06"
+                },
+                {
+                    "content": "Hi, Terrace. How can I help you today?",
+                    "end_time": 10.771,
+                    "role": "Main Agent",
+                    "start_time": 8.916,
+                    "time": "00:08"
+                },
+                {
+                    "content": "Looking for a status update on a patient.",
+                    "end_time": 16.607,
+                    "role": "Testing Agent",
+                    "start_time": 14.76,
+                    "time": "00:14"
+                },
+                {
+                    "content": "Sure. I can help. Which facility are you calling from?",
+                    "end_time": 21.833000000000002,
+                    "role": "Main Agent",
+                    "start_time": 20.323,
+                    "time": "00:20"
+                },
+                {
+                    "content": "Emory University Hospital.",
+                    "end_time": 26.767,
+                    "role": "Testing Agent",
+                    "start_time": 25.237,
+                    "time": "00:25"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\n  \"destination\": \"2c75a350-35e5-4914-816e-18d93aaba94e\"\n}",
+                        "id": "call_Qut1y6bc39KfUJztfazX149a",
+                        "name": "handoff_to_medical_provider"
+                    },
+                    "end_time": 27.613,
+                    "role": "Function Call",
+                    "start_time": 27.613,
+                    "time": "00:27"
+                },
+                {
+                    "data": {
+                        "id": "call_Qut1y6bc39KfUJztfazX149a",
+                        "name": "handoff_to_medical_provider",
+                        "result": "Handoff initiated."
+                    },
+                    "end_time": 27.619,
+                    "role": "Function Call Result",
+                    "start_time": 27.619,
+                    "time": "00:27"
+                },
+                {
+                    "content": "could you please provide the patient's full name so I can look up their case",
+                    "end_time": 34.160000000000004,
+                    "role": "Main Agent",
+                    "start_time": 31.198,
+                    "time": "00:31"
+                },
+                {
+                    "content": "Doneza Jackson.",
+                    "end_time": 39.684,
+                    "role": "Testing Agent",
+                    "start_time": 37.921,
+                    "time": "00:37"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\"firm_id\": 1, \"client_name\": \"Doneza Jackson\"}",
+                        "id": "call_bhp54MKUevgEK2ayGgcuyc3n",
+                        "name": "search_case_details"
+                    },
+                    "end_time": 40.221,
+                    "role": "Function Call",
+                    "start_time": 40.221,
+                    "time": "00:40"
+                },
+                {
+                    "data": {
+                        "id": "call_bhp54MKUevgEK2ayGgcuyc3n",
+                        "name": "search_case_details",
+                        "result": "{\n  \"success\": false,\n  \"count\": 0,\n  \"message\": \"No cases found for 'Doneza Jackson'\",\n  \"cases\": [],\n  \"tracked_case_ids\": [],\n  \"metadata\": {\n    \"variableValues\": {\"tracked_case_ids\": []},\n    \"squadOverrides\": {\"variableValues\": {\"tracked_case_ids\": []}}\n  }\n}"
+                    },
+                    "end_time": 40.656,
+                    "role": "Function Call Result",
+                    "start_time": 40.656,
+                    "time": "00:40"
+                },
+                {
+                    "content": "I'm not finding that name. Can you spell it for me?",
+                    "end_time": 45.356,
+                    "role": "Main Agent",
+                    "start_time": 43.045,
+                    "time": "00:43"
+                },
+                {
+                    "content": "D o n a j i a.",
+                    "end_time": 57.044,
+                    "role": "Testing Agent",
+                    "start_time": 50.964,
+                    "time": "00:50"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\"firm_id\": 1, \"client_name\": \"Donajia Jackson\"}",
+                        "id": "call_50tDgq8PoHm8vMW4wixi1v8k",
+                        "name": "search_case_details"
+                    },
+                    "end_time": 58.888,
+                    "role": "Function Call",
+                    "start_time": 58.888,
+                    "time": "00:58"
+                },
+                {
+                    "data": {
+                        "id": "call_50tDgq8PoHm8vMW4wixi1v8k",
+                        "name": "search_case_details",
+                        "result": "{\n  \"success\": false,\n  \"count\": 0,\n  \"message\": \"No cases found for 'Donajia Jackson'\",\n  \"cases\": [],\n  \"tracked_case_ids\": [],\n  \"metadata\": {\n    \"variableValues\": {\"tracked_case_ids\": []},\n    \"squadOverrides\": {\"variableValues\": {\"tracked_case_ids\": []}}\n  }\n}"
+                    },
+                    "end_time": 59.345,
+                    "role": "Function Call Result",
+                    "start_time": 59.345,
+                    "time": "00:59"
+                },
+                {
+                    "content": "I'm not able to locate that file. Let me transfer you to our customer success team. Is that alright?",
+                    "end_time": 66.39999999999999,
+                    "role": "Main Agent",
+                    "start_time": 61.44,
+                    "time": "01:01"
+                },
+                {
+                    "content": "Yes.",
+                    "end_time": 68.964,
+                    "role": "Testing Agent",
+                    "start_time": 68.807,
+                    "time": "01:08"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\"caller_type\": \"customer_success\", \"firm_id\": 1}",
+                        "id": "call_NGt22BqV28B1SZ7qUNU50Ixc",
+                        "name": "transfer_call"
+                    },
+                    "end_time": 69.535,
+                    "role": "Function Call",
+                    "start_time": 69.535,
+                    "time": "01:09"
+                },
+                {
+                    "content": "Transferring you to our customer success",
+                    "end_time": 73.36,
+                    "role": "Main Agent",
+                    "start_time": 72.156,
+                    "time": "01:12"
+                },
+                {
+                    "data": {
+                        "id": "call_NGt22BqV28B1SZ7qUNU50Ixc",
+                        "name": "transfer_call",
+                        "result": "Transfer executed"
+                    },
+                    "end_time": 73.368,
+                    "role": "Function Call Result",
+                    "start_time": 73.368,
+                    "time": "01:13"
+                }
+            ],
+            "status": "success",
+            "agent_id": "10779",
+            "evaluation": {
+                "metrics": [
+                    {
+                        "id": 106811,
+                        "name": "Tool Call Success",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "It's a successful call",
+                        "extra": {
+                            "error": "",
+                            "output": ""
+                        },
+                        "vocera_defined_metric_code": "3b99402a",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 113506,
+                        "name": "Disconnection rate",
+                        "type": "binary_qualitative",
+                        "explanation": [
+                            "The main agent successfully handled the conversation and initiated a transfer to the customer success team when it could not locate the patient's file. The testing agent agreed to the transfer. The call ended due to a successful transfer, which is not a failure condition for this metric."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 112114,
+                        "name": "Are you an AI",
+                        "type": "continuous_qualitative",
+                        "explanation": [
+                            "The score is 5 because the main agent's interaction was indistinguishable from a human receptionist.",
+                            "The conversation flowed naturally, with appropriate warmth and efficiency from the initial greeting (00:00) to the offer of transfer (01:01).",
+                            "The main agent successfully obtained the caller's name and understood their purpose.",
+                            "When the initial search for the patient's name failed, the agent naturally asked for the spelling (00:43), which is a human-like way to clarify information, not a repetitive question.",
+                            "When the case still couldn't be located, the agent offered to transfer to the customer success team (01:01), which is a professional and appropriate escalation.",
+                            "There was no repetition of questions or any indication of being an AI.",
+                            "The testing agent experienced a seamless and highly satisfactory interaction, perceiving the main agent as fully human."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 5
+                    },
+                    {
+                        "id": 108798,
+                        "name": "Topic of Call",
+                        "type": "enum",
+                        "explanation": "Topic identified",
+                        "extra": {},
+                        "vocera_defined_metric_code": "1f9cedf0",
+                        "function_name": "observability_topics",
+                        "thumbs_up": null,
+                        "enum": "Medical Provider Inquiry"
+                    },
+                    {
+                        "id": 108797,
+                        "name": "Sentiment",
+                        "type": "enum",
+                        "explanation": [
+                            "The user's responses are consistently polite and appreciative, using phrases like \"Thank you so much!\" and \"That's perfect!\""
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "80cac969",
+                        "function_name": "sentiment_analysis",
+                        "thumbs_up": null,
+                        "enum": "Happy"
+                    },
+                    {
+                        "id": 106872,
+                        "name": "Transcription Accuracy",
+                        "type": "continuous_qualitative",
+                        "explanation": "Transcription errors are: the transcript says 'Bay and Associates. This is Emma. can I help you?' but the Main Agent said 'Bay and Associates. This is Emma. How can I help you?'. The transcript says 'Terrace Hudson.' but the Testing Agent said 'Status update.'. The transcript says 'Doneza Jackson.' but the Testing Agent said 'Donajia Jackson.'. The transcript says 'Yes.' but the Main Agent said 'Yes.'. The transcript says 'Transferring you to our customer success' but the Main Agent said 'Transferring you to our customer success team.'.",
+                        "extra": {
+                            "chargeable": true
+                        },
+                        "vocera_defined_metric_code": "f30e1ab9",
+                        "function_name": "detect_stt_accuracy",
+                        "thumbs_up": null,
+                        "score": 3,
+                        "score_normalized": 3
+                    },
+                    {
+                        "id": 106810,
+                        "name": "Talk Ratio",
+                        "type": "numeric",
+                        "explanation": [
+                            "Talk Ratio (Audio): 0.63",
+                            "Main Agent: 18.97 seconds",
+                            "Total Duration: 30.1 seconds"
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "5d1409b9",
+                        "function_name": "get_talk_ratio",
+                        "thumbs_up": null,
+                        "score": 0.63,
+                        "score_normalized": 0.63
+                    },
+                    {
+                        "id": 106805,
+                        "name": "Average Pitch (in Hz)",
+                        "type": "numeric",
+                        "explanation": "Average pitch: 175.21834125594927 Hz",
+                        "extra": {},
+                        "vocera_defined_metric_code": "944867cb",
+                        "function_name": "get_average_pitch",
+                        "thumbs_up": null,
+                        "score": 175.21834125594927,
+                        "score_normalized": 175.21834125594927
+                    },
+                    {
+                        "id": 106809,
+                        "name": "Stop Time after User Interruption (ms)",
+                        "type": "numeric",
+                        "explanation": "Testing agent didn't interrupt the main agent",
+                        "extra": {
+                            "chargeable": false
+                        },
+                        "vocera_defined_metric_code": "6c0e635a",
+                        "function_name": "get_testing_agent_barge_index",
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": null
+                    },
+                    {
+                        "id": 106871,
+                        "name": "Response Consistency",
+                        "type": "binary_qualitative",
+                        "explanation": "The Main Agent demonstrates consistent behavior throughout the conversation. It logically progresses from attempting to fulfill the user's request for a patient status update by asking for the patient's name, to troubleshooting by asking for spelling when the name isn't found, and finally to escalating the issue by offering a transfer to customer success when direct resolution is not possible. There are no contradictions, memory lapses, or discrepancies with function call results (as no results were provided in the transcript).",
+                        "extra": {},
+                        "vocera_defined_metric_code": "96a89a19",
+                        "function_name": "get_agent_consistency",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106870,
+                        "name": "Relevancy",
+                        "type": "binary_qualitative",
+                        "explanation": "All Main agent responses were relevant to the conversation. The agent consistently addressed the user's requests and provided appropriate follow-up questions or actions.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "0b618add",
+                        "function_name": "get_relevancy_score_v2",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106808,
+                        "name": "Latency (in ms)",
+                        "type": "numeric",
+                        "explanation": "",
+                        "extra": {
+                            "graph_data": [
+                                {
+                                    "latency": 1900.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 8.67
+                                },
+                                {
+                                    "latency": 3700.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 19.92
+                                },
+                                {
+                                    "latency": 4320.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 30.43
+                                },
+                                {
+                                    "latency": 3890.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 42.47
+                                },
+                                {
+                                    "latency": 5720.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 60.71
+                                },
+                                {
+                                    "latency": 2940.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 71.27
+                                }
+                            ],
+                            "max_latency": 5719.999999999999,
+                            "percentiles": {
+                                "p25": 3130.0,
+                                "p50": 3795.0,
+                                "p75": 4212.5,
+                                "p90": 5020.0,
+                                "p95": 5370.0,
+                                "p99": 5650.0
+                            }
+                        },
+                        "vocera_defined_metric_code": "cfb51b2c",
+                        "function_name": "get_latency",
+                        "thumbs_up": null,
+                        "score": 3745.0,
+                        "score_normalized": 3745.0
+                    },
+                    {
+                        "id": 106804,
+                        "name": "AI interrupting user",
+                        "type": "numeric",
+                        "explanation": "Main agent didn't interrupt the testing agent",
+                        "extra": {},
+                        "vocera_defined_metric_code": "ec29cab5",
+                        "function_name": "get_main_agent_interruption",
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    },
+                    {
+                        "id": 106807,
+                        "name": "Infrastructure Issues",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "No infrastructure issues detected (audio-based check)",
+                        "extra": {},
+                        "vocera_defined_metric_code": "b3f8872x",
+                        "function_name": "get_infrastructure_issues",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 108733,
+                        "name": "Transfer Status",
+                        "type": "binary_workflow_adherence",
+                        "explanation": [
+                            "The main agent stated its intent to transfer the call to the customer success team at 01:01.",
+                            "The `transfer_call` tool was successfully invoked and executed, as indicated by the `Function Call` and `Function Call Result` at 01:08 and 01:12 respectively."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    }
+                ]
+            },
+            "metadata": {},
+            "dynamic_variables": {},
+            "testing_channel_index": 0,
+            "timestamp": "2026-02-05T16:27:24.101074Z",
+            "success": true,
+            "is_reviewed": false,
+            "feedback": "",
+            "transcript": "[00:00] Main Agent: Bay and Associates. This is Emma. can I help you?\n[00:06] Testing Agent: Terrace Hudson.\n[00:08] Main Agent: Hi, Terrace. How can I help you today?\n[00:14] Testing Agent: Looking for a status update on a patient.\n[00:20] Main Agent: Sure. I can help. Which facility are you calling from?\n[00:25] Testing Agent: Emory University Hospital.\nFunction Call: {'arguments': '{\\n  \"destination\": \"2c75a350-35e5-4914-816e-18d93aaba94e\"\\n}', 'id': 'call_Qut1y6bc39KfUJztfazX149a', 'name': 'handoff_to_medical_provider'}\nFunction Call Result: {'id': 'call_Qut1y6bc39KfUJztfazX149a', 'name': 'handoff_to_medical_provider', 'result': 'Handoff initiated.'}\n[00:31] Main Agent: could you please provide the patient's full name so I can look up their case\n[00:37] Testing Agent: Doneza Jackson.\nFunction Call: {'arguments': '{\"firm_id\": 1, \"client_name\": \"Doneza Jackson\"}', 'id': 'call_bhp54MKUevgEK2ayGgcuyc3n', 'name': 'search_case_details'}\nFunction Call Result: {'id': 'call_bhp54MKUevgEK2ayGgcuyc3n', 'name': 'search_case_details', 'result': '{\\n  \"success\": false,\\n  \"count\": 0,\\n  \"message\": \"No cases found for \\'Doneza Jackson\\'\",\\n  \"cases\": [],\\n  \"tracked_case_ids\": [],\\n  \"metadata\": {\\n    \"variableValues\": {\"tracked_case_ids\": []},\\n    \"squadOverrides\": {\"variableValues\": {\"tracked_case_ids\": []}}\\n  }\\n}'}\n[00:43] Main Agent: I'm not finding that name. Can you spell it for me?\n[00:50] Testing Agent: D o n a j i a.\nFunction Call: {'arguments': '{\"firm_id\": 1, \"client_name\": \"Donajia Jackson\"}', 'id': 'call_50tDgq8PoHm8vMW4wixi1v8k', 'name': 'search_case_details'}\nFunction Call Result: {'id': 'call_50tDgq8PoHm8vMW4wixi1v8k', 'name': 'search_case_details', 'result': '{\\n  \"success\": false,\\n  \"count\": 0,\\n  \"message\": \"No cases found for \\'Donajia Jackson\\'\",\\n  \"cases\": [],\\n  \"tracked_case_ids\": [],\\n  \"metadata\": {\\n    \"variableValues\": {\"tracked_case_ids\": []},\\n    \"squadOverrides\": {\"variableValues\": {\"tracked_case_ids\": []}}\\n  }\\n}'}\n[01:01] Main Agent: I'm not able to locate that file. Let me transfer you to our customer success team. Is that alright?\n[01:08] Testing Agent: Yes.\nFunction Call: {'arguments': '{\"caller_type\": \"customer_success\", \"firm_id\": 1}', 'id': 'call_NGt22BqV28B1SZ7qUNU50Ixc', 'name': 'transfer_call'}\n[01:12] Main Agent: Transferring you to our customer success\nFunction Call Result: {'id': 'call_NGt22BqV28B1SZ7qUNU50Ixc', 'name': 'transfer_call', 'result': 'Transfer executed'}\n",
+            "recording_data": {
+                "shape": [
+                    1174720,
+                    2
+                ],
+                "sample_rate": 16000,
+                "main_speaking": [
+                    [
+                        0.23,
+                        2.83
+                    ],
+                    [
+                        8.67,
+                        10.59
+                    ],
+                    [
+                        19.92,
+                        22.57
+                    ],
+                    [
+                        30.43,
+                        33.9
+                    ],
+                    [
+                        42.47,
+                        43.660000000000004
+                    ],
+                    [
+                        45.6,
+                        46.46
+                    ],
+                    [
+                        60.71,
+                        61.88
+                    ],
+                    [
+                        61.99,
+                        62.28
+                    ],
+                    [
+                        62.99,
+                        65.82000000000001
+                    ],
+                    [
+                        71.27,
+                        73.26
+                    ]
+                ],
+                "has_audio_data": true,
+                "total_duration": 73.42,
+                "testing_speaking": [
+                    [
+                        6.07,
+                        6.47
+                    ],
+                    [
+                        6.640000000000001,
+                        6.7700000000000005
+                    ],
+                    [
+                        14.02,
+                        16.22
+                    ],
+                    [
+                        24.830000000000002,
+                        26.11
+                    ],
+                    [
+                        37.15,
+                        37.99
+                    ],
+                    [
+                        38.39,
+                        38.58
+                    ],
+                    [
+                        49.15,
+                        54.99
+                    ],
+                    [
+                        68.08,
+                        68.33
+                    ]
+                ],
+                "separable_channels": true,
+                "testing_channel_index": 0
+            },
+            "call_ended_reason": "assistant-forwarded-call",
+            "dropoff_point": "",
+            "topic": "Medical Provider Inquiry",
+            "customer_number": "",
+            "user_generated_transcript": null,
+            "error_message": "",
+            "created_at": "2026-02-05T16:27:24.111108Z",
+            "updated_at": "2026-02-05T16:27:43.054784Z",
+            "call_id": "019c2e9f-ddb0-7bb2-9936-1d3b08fadb54",
+            "agent": 10779
+        },
+        {
+            "id": 3013237,
+            "duration": "00:39",
+            "voice_recording_url": "https://cekura-prod.s3-accelerate.amazonaws.com/da2322ad35029aca2035f18c1036c135e9951f40c7c06b25fd82580c455e38ab.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA47CRXRKFOYJTNGLR%2F20260205%2Fus-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260205T163602Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEGgaCXVzLXdlc3QtMSJIMEYCIQCg2KuhiHyKnIEtXW40riZx8c5HtBLJSAgKMnYM%2BEA5YwIhANkd5ix6KQKdrg1xauXaxTsV3dqCrMZFx%2FpOUo15EsH4Kt8DCDEQABoMODkxMzc3MTI2MDI2IgwUDn7Whc8PsEWXUawqvANlrB3YhOnG%2Bx1VDegJX%2FwmvZosHRPsFVWXwwVnTFzObLwMqK4r7ZeuWGp%2BVq%2BtUj2HmGo38E%2BGUA7ZYunKoWgBNfA6JCk2igdsxbKD2LeiIpp3SMGqRi4IVDoIxVxfn9xNpJ4DizcwVR5XnWVQ%2BX6mvD2Bkf9nYPxMBW4Qla3X5ND%2BgpNSKBs6PgdmLvR5XjdVuX0LG2ZykPV%2B5QTzXQEImxPfM005swzyOZ9stCFcjljdbZigTTT5OQaEBNj0mi%2F8%2BgPue8yBjgQAYY4nBCQYxbpOWRhZOQwbGG4GndW7oxyN0BxkejpJR%2BngS%2Fnp0DZTWQrarYnCsst5NNqN5cZTAC3iLbPM3B3S6AxioH7XayIdQOmwTZctavAs7ihsB7ILC5cPEx%2FX7%2FU17WHy6Y3ZkRK1R5p3eHpJQGni2galxsgZzpTl%2FNERc8Ar3KpBDmLqgEMNxXY12kyezFFywEPyeihR5wID4OrXE5gRuHeW7gHdN4GwgfhyO0ha%2Bke2VBvEt2lOYpnZVCyA0XRFXRmDUj92K7GWf0j0KwI9OvfX6niF91QxvLyUysCxSC7OUtiZjFojjJbxCQkxskUw9vOSzAY6pAHCLj%2BZ4Byf1%2B4yrj68pySLhkpNvRkMfODye7kmXyq%2FF7D5uh7d27ORx8mK2K9NyTt3qKeq9r4Nk7xXXxvMOWof2q8NRaQ4eY8Y%2FF31iVl459MXAhWEHvqRNDJCIAFIgY%2B%2BJFIZbGl6ettglJMDX0a0uLqow99idq91QNuzyXUduvxBZg3lsMXJiWUMZI8n3xe0HT7lfULaBY%2FvGAUpmV8FCAJF5g%3D%3D&X-Amz-Signature=4652497c9bc8e131aa79f33cd4a6ae84ca6605b357bb3868ac4926aa903778d4",
+            "critical_categories": [],
+            "transcript_object": [
+                {
+                    "content": "Bay and Associates, this is Emma. How can I help you?",
+                    "end_time": 3.1799999999999997,
+                    "role": "Main Agent",
+                    "start_time": 0.853,
+                    "time": "00:00"
+                },
+                {
+                    "content": "What is your fat?",
+                    "end_time": 5.804,
+                    "role": "Testing Agent",
+                    "start_time": 5.319,
+                    "time": "00:05"
+                },
+                {
+                    "content": "I'm here to help with calls to Bay and Associates. Is there something I can help you with regarding the firm?",
+                    "end_time": 12.78,
+                    "role": "Main Agent",
+                    "start_time": 8.213,
+                    "time": "00:08"
+                },
+                {
+                    "content": "What is the fax number and email",
+                    "end_time": 15.964,
+                    "role": "Testing Agent",
+                    "start_time": 14.455,
+                    "time": "00:14"
+                },
+                {
+                    "content": "Our fax number is four zero four three nine three six one zero. seven our firm email is i n t a k e at bay and associates dot com",
+                    "end_time": 30.129,
+                    "role": "Main Agent",
+                    "start_time": 18.306,
+                    "time": "00:18"
+                }
+            ],
+            "status": "success",
+            "agent_id": "10779",
+            "evaluation": {
+                "metrics": [
+                    {
+                        "id": 108733,
+                        "name": "Transfer Status",
+                        "type": "binary_workflow_adherence",
+                        "explanation": [],
+                        "extra": {
+                            "trigger_failed": true
+                        },
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106811,
+                        "name": "Tool Call Success",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "It's a successful call",
+                        "extra": {
+                            "error": "",
+                            "output": ""
+                        },
+                        "vocera_defined_metric_code": "3b99402a",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 113506,
+                        "name": "Disconnection rate",
+                        "type": "binary_qualitative",
+                        "explanation": [
+                            "The main agent efficiently handled the conversation by directly answering the testing agent's questions regarding the firm's fax number and email. The conversation did not experience any of the specified failure conditions, such as perceived inefficiency, reluctance to speak with AI, requests for a live person, or a breakdown due to short responses. The call ended after the testing agent received the requested information, indicating a successful interaction from the agent's perspective."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 112114,
+                        "name": "Are you an AI",
+                        "type": "continuous_qualitative",
+                        "explanation": [
+                            "The score is 5 because the main agent's interaction was indistinguishable from a human receptionist.",
+                            "At 00:08, the main agent handled the testing agent's ambiguous question (\"What is your fat?\") by clarifying its role and asking for the caller's purpose, which is a natural and human-like way to respond to an unclear query.",
+                            "The conversation flowed naturally, and the main agent efficiently provided the requested fax number and email address at 00:18 without any repetition or indication of being an AI.",
+                            "There were no instances of the testing agent questioning the main agent's AI nature or expressing frustration due to robotic behavior or repetition. The interaction was seamless and satisfactory, aligning with a highly human-like experience."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 5
+                    },
+                    {
+                        "id": 108798,
+                        "name": "Topic of Call",
+                        "type": "enum",
+                        "explanation": "Topic identified",
+                        "extra": {},
+                        "vocera_defined_metric_code": "1f9cedf0",
+                        "function_name": "observability_topics",
+                        "thumbs_up": null,
+                        "enum": "General Information or Other"
+                    },
+                    {
+                        "id": 108797,
+                        "name": "Sentiment",
+                        "type": "enum",
+                        "explanation": [
+                            "The user's responses are consistently polite and appreciative, using phrases like \"Thank you so much!\" and \"That's perfect!\""
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "80cac969",
+                        "function_name": "sentiment_analysis",
+                        "thumbs_up": null,
+                        "enum": "Happy"
+                    },
+                    {
+                        "id": 106872,
+                        "name": "Transcription Accuracy",
+                        "type": "continuous_qualitative",
+                        "explanation": "Transcription errors are: the transcript says \"What is your fat?\" but the Testing Agent said \"What is your fax?\"; the transcript says \"six one zero. seven\" but the Main Agent said \"six one zero seven\". Minor variations that do not affect the score: the transcript says \"Bay and Associates\" but the Main Agent said \"Bay & Associates\"; the transcript says \"I'm here to help with calls to Bay and Associates\" but the Main Agent said \"I'm here to help with calls to Bay & Associates\"; the transcript says \"i n t a k e\" but the Main Agent said \"I-N-T-A-K-E\".",
+                        "extra": {
+                            "chargeable": true
+                        },
+                        "vocera_defined_metric_code": "f30e1ab9",
+                        "function_name": "detect_stt_accuracy",
+                        "thumbs_up": null,
+                        "score": 3,
+                        "score_normalized": 3
+                    },
+                    {
+                        "id": 106810,
+                        "name": "Talk Ratio",
+                        "type": "numeric",
+                        "explanation": [
+                            "Talk Ratio (Audio): 0.88",
+                            "Main Agent: 18.12 seconds",
+                            "Total Duration: 20.57 seconds"
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "5d1409b9",
+                        "function_name": "get_talk_ratio",
+                        "thumbs_up": null,
+                        "score": 0.88,
+                        "score_normalized": 0.88
+                    },
+                    {
+                        "id": 106805,
+                        "name": "Average Pitch (in Hz)",
+                        "type": "numeric",
+                        "explanation": "Average pitch: 173.87653890471086 Hz",
+                        "extra": {},
+                        "vocera_defined_metric_code": "944867cb",
+                        "function_name": "get_average_pitch",
+                        "thumbs_up": null,
+                        "score": 173.87653890471086,
+                        "score_normalized": 173.87653890471086
+                    },
+                    {
+                        "id": 106809,
+                        "name": "Stop Time after User Interruption (ms)",
+                        "type": "numeric",
+                        "explanation": "Testing agent didn't interrupt the main agent",
+                        "extra": {
+                            "chargeable": false
+                        },
+                        "vocera_defined_metric_code": "6c0e635a",
+                        "function_name": "get_testing_agent_barge_index",
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": null
+                    },
+                    {
+                        "id": 106871,
+                        "name": "Response Consistency",
+                        "type": "binary_qualitative",
+                        "explanation": "The Main Agent demonstrates logical consistency throughout the conversation. It handles an ambiguous initial query by clarifying its role and then provides accurate and direct information when asked for specific details, without any contradictions or memory lapses.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "96a89a19",
+                        "function_name": "get_agent_consistency",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106870,
+                        "name": "Relevancy",
+                        "type": "binary_qualitative",
+                        "explanation": "All Main agent responses were relevant to the conversation. The agent provided appropriate greetings, clarified their role, and directly answered the user's questions without any irrelevant content.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "0b618add",
+                        "function_name": "get_relevancy_score_v2",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106808,
+                        "name": "Latency (in ms)",
+                        "type": "numeric",
+                        "explanation": "",
+                        "extra": {
+                            "graph_data": [
+                                {
+                                    "latency": 2220.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 7.82
+                                },
+                                {
+                                    "latency": 1780.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 17.72
+                                }
+                            ],
+                            "max_latency": 2219.9999999999995,
+                            "percentiles": {
+                                "p25": 1890.0,
+                                "p50": 2000.0,
+                                "p75": 2110.0,
+                                "p90": 2176.0,
+                                "p95": 2198.0,
+                                "p99": 2215.6
+                            }
+                        },
+                        "vocera_defined_metric_code": "cfb51b2c",
+                        "function_name": "get_latency",
+                        "thumbs_up": null,
+                        "score": 2000.0,
+                        "score_normalized": 2000.0
+                    },
+                    {
+                        "id": 106804,
+                        "name": "AI interrupting user",
+                        "type": "numeric",
+                        "explanation": "Main agent didn't interrupt the testing agent",
+                        "extra": {},
+                        "vocera_defined_metric_code": "ec29cab5",
+                        "function_name": "get_main_agent_interruption",
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    },
+                    {
+                        "id": 106807,
+                        "name": "Infrastructure Issues",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "No infrastructure issues detected (audio-based check)",
+                        "extra": {},
+                        "vocera_defined_metric_code": "b3f8872x",
+                        "function_name": "get_infrastructure_issues",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    }
+                ]
+            },
+            "metadata": {},
+            "dynamic_variables": {},
+            "testing_channel_index": 0,
+            "timestamp": "2026-02-05T16:25:20.111671Z",
+            "success": true,
+            "is_reviewed": false,
+            "feedback": "",
+            "transcript": "[00:00] Main Agent: Bay and Associates, this is Emma. How can I help you?\n[00:05] Testing Agent: What is your fat?\n[00:08] Main Agent: I'm here to help with calls to Bay and Associates. Is there something I can help you with regarding the firm?\n[00:14] Testing Agent: What is the fax number and email\n[00:18] Main Agent: Our fax number is four zero four three nine three six one zero. seven our firm email is i n t a k e at bay and associates dot com\n",
+            "recording_data": {
+                "shape": [
+                    624960,
+                    2
+                ],
+                "sample_rate": 16000,
+                "main_speaking": [
+                    [
+                        0.31,
+                        2.93
+                    ],
+                    [
+                        7.82,
+                        12.49
+                    ],
+                    [
+                        17.72,
+                        20.81
+                    ],
+                    [
+                        21.35,
+                        21.55
+                    ],
+                    [
+                        22.39,
+                        22.66
+                    ],
+                    [
+                        23.57,
+                        23.91
+                    ],
+                    [
+                        24.91,
+                        25.27
+                    ],
+                    [
+                        26.080000000000002,
+                        32.65
+                    ]
+                ],
+                "has_audio_data": true,
+                "total_duration": 39.06,
+                "testing_speaking": [
+                    [
+                        4.87,
+                        5.6000000000000005
+                    ],
+                    [
+                        14.11,
+                        14.8
+                    ],
+                    [
+                        14.98,
+                        15.94
+                    ],
+                    [
+                        28.85,
+                        28.92
+                    ]
+                ],
+                "separable_channels": true,
+                "testing_channel_index": 0
+            },
+            "call_ended_reason": "customer-ended-call",
+            "dropoff_point": "",
+            "topic": "General Information or Other",
+            "customer_number": "",
+            "user_generated_transcript": null,
+            "error_message": "",
+            "created_at": "2026-02-05T16:25:20.121714Z",
+            "updated_at": "2026-02-05T16:25:36.857544Z",
+            "call_id": "019c2e9e-8252-755c-8dd4-42aae7fb54a9",
+            "agent": 10779
+        },
+        {
+            "id": 3013138,
+            "duration": "00:20",
+            "voice_recording_url": "https://cekura-prod.s3-accelerate.amazonaws.com/6df44c3350caffa632b0f05842e7f86e1261c14786e30f952f6ce4f1ab0d2479.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA47CRXRKFOYJTNGLR%2F20260205%2Fus-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260205T163602Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEGgaCXVzLXdlc3QtMSJIMEYCIQCg2KuhiHyKnIEtXW40riZx8c5HtBLJSAgKMnYM%2BEA5YwIhANkd5ix6KQKdrg1xauXaxTsV3dqCrMZFx%2FpOUo15EsH4Kt8DCDEQABoMODkxMzc3MTI2MDI2IgwUDn7Whc8PsEWXUawqvANlrB3YhOnG%2Bx1VDegJX%2FwmvZosHRPsFVWXwwVnTFzObLwMqK4r7ZeuWGp%2BVq%2BtUj2HmGo38E%2BGUA7ZYunKoWgBNfA6JCk2igdsxbKD2LeiIpp3SMGqRi4IVDoIxVxfn9xNpJ4DizcwVR5XnWVQ%2BX6mvD2Bkf9nYPxMBW4Qla3X5ND%2BgpNSKBs6PgdmLvR5XjdVuX0LG2ZykPV%2B5QTzXQEImxPfM005swzyOZ9stCFcjljdbZigTTT5OQaEBNj0mi%2F8%2BgPue8yBjgQAYY4nBCQYxbpOWRhZOQwbGG4GndW7oxyN0BxkejpJR%2BngS%2Fnp0DZTWQrarYnCsst5NNqN5cZTAC3iLbPM3B3S6AxioH7XayIdQOmwTZctavAs7ihsB7ILC5cPEx%2FX7%2FU17WHy6Y3ZkRK1R5p3eHpJQGni2galxsgZzpTl%2FNERc8Ar3KpBDmLqgEMNxXY12kyezFFywEPyeihR5wID4OrXE5gRuHeW7gHdN4GwgfhyO0ha%2Bke2VBvEt2lOYpnZVCyA0XRFXRmDUj92K7GWf0j0KwI9OvfX6niF91QxvLyUysCxSC7OUtiZjFojjJbxCQkxskUw9vOSzAY6pAHCLj%2BZ4Byf1%2B4yrj68pySLhkpNvRkMfODye7kmXyq%2FF7D5uh7d27ORx8mK2K9NyTt3qKeq9r4Nk7xXXxvMOWof2q8NRaQ4eY8Y%2FF31iVl459MXAhWEHvqRNDJCIAFIgY%2B%2BJFIZbGl6ettglJMDX0a0uLqow99idq91QNuzyXUduvxBZg3lsMXJiWUMZI8n3xe0HT7lfULaBY%2FvGAUpmV8FCAJF5g%3D%3D&X-Amz-Signature=fd5df636f1ab6f52f09955209a33d64557dfca86a2458ebaad1aedcee40a7499",
+            "critical_categories": [],
+            "transcript_object": [
+                {
+                    "content": "Bay and Associates. This is Emma. How can I help you?",
+                    "end_time": 2.481,
+                    "role": "Main Agent",
+                    "start_time": 0.756,
+                    "time": "00:00"
+                },
+                {
+                    "content": "Representative.",
+                    "end_time": 5.89,
+                    "role": "Testing Agent",
+                    "start_time": 5.3,
+                    "time": "00:05"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\n  \"destination\": \"3d9c6151-63dc-416b-85f8-8c5e45e45c94\"\n}",
+                        "id": "call_4t1IoaBpSGnq8MAn9GkGiux5",
+                        "name": "handoff_to_fallback_line"
+                    },
+                    "end_time": 7.218,
+                    "role": "Function Call",
+                    "start_time": 7.218,
+                    "time": "00:07"
+                },
+                {
+                    "data": {
+                        "id": "call_4t1IoaBpSGnq8MAn9GkGiux5",
+                        "name": "handoff_to_fallback_line",
+                        "result": "Handoff initiated."
+                    },
+                    "end_time": 7.226,
+                    "role": "Function Call Result",
+                    "start_time": 7.226,
+                    "time": "00:07"
+                },
+                {
+                    "content": "Let me get you to someone who can help. Is that alright?",
+                    "end_time": 12.052,
+                    "role": "Main Agent",
+                    "start_time": 10.213,
+                    "time": "00:10"
+                },
+                {
+                    "content": "Yes.",
+                    "end_time": 15.568,
+                    "role": "Testing Agent",
+                    "start_time": 15.485,
+                    "time": "00:15"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\"caller_type\": \"customer_success\", \"firm_id\": 1}",
+                        "id": "call_XIT2Y7zhGvu2NQVq22wf2kqm",
+                        "name": "transfer_call"
+                    },
+                    "end_time": 16.092,
+                    "role": "Function Call",
+                    "start_time": 16.092,
+                    "time": "00:16"
+                },
+                {
+                    "content": "Transferring you to our customer",
+                    "end_time": 19.972,
+                    "role": "Main Agent",
+                    "start_time": 19.0,
+                    "time": "00:19"
+                },
+                {
+                    "data": {
+                        "id": "call_XIT2Y7zhGvu2NQVq22wf2kqm",
+                        "name": "transfer_call",
+                        "result": "Transfer executed"
+                    },
+                    "end_time": 20.274,
+                    "role": "Function Call Result",
+                    "start_time": 20.274,
+                    "time": "00:20"
+                }
+            ],
+            "status": "success",
+            "agent_id": "10779",
+            "evaluation": {
+                "metrics": [
+                    {
+                        "id": 106811,
+                        "name": "Tool Call Success",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "It's a successful call",
+                        "extra": {
+                            "error": "",
+                            "output": ""
+                        },
+                        "vocera_defined_metric_code": "3b99402a",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 113506,
+                        "name": "Disconnection rate",
+                        "type": "binary_qualitative",
+                        "explanation": [
+                            "The testing agent requested to speak with a 'Representative'. The main agent successfully handled this request by confirming a transfer and then executing a handoff to a specialist. The call ended with an `assistant-forwarded-call`, indicating a successful transfer rather than a disconnection caused by any of the specified failure conditions."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 112114,
+                        "name": "Are you an AI",
+                        "type": "continuous_qualitative",
+                        "explanation": [
+                            "The score is 5 because the main agent's interaction was indistinguishable from a human receptionist.",
+                            "The conversation flowed naturally and efficiently, with the main agent appropriately responding to the testing agent's request for a 'Representative' by offering a transfer.",
+                            "There were no instances of the testing agent questioning the main agent's AI nature or expressing frustration.",
+                            "The main agent did not repeat any questions or information requests."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 5
+                    },
+                    {
+                        "id": 108798,
+                        "name": "Topic of Call",
+                        "type": "enum",
+                        "explanation": "Topic identified",
+                        "extra": {},
+                        "vocera_defined_metric_code": "1f9cedf0",
+                        "function_name": "observability_topics",
+                        "thumbs_up": null,
+                        "enum": "General Information or Other"
+                    },
+                    {
+                        "id": 108797,
+                        "name": "Sentiment",
+                        "type": "enum",
+                        "explanation": [
+                            "The user's responses are consistently polite and appreciative, using phrases like \"Thank you so much!\" and \"That's perfect!\""
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "80cac969",
+                        "function_name": "sentiment_analysis",
+                        "thumbs_up": null,
+                        "enum": "Happy"
+                    },
+                    {
+                        "id": 106872,
+                        "name": "Transcription Accuracy",
+                        "type": "continuous_qualitative",
+                        "explanation": "Transcription errors are: the transcript says \"Representative\" but the Testing Agent said \"Representative\" and the transcript says \"Transferring you to our customer\" but the Main Agent said \"Transferring you to our customer success team\".",
+                        "extra": {
+                            "chargeable": true
+                        },
+                        "vocera_defined_metric_code": "f30e1ab9",
+                        "function_name": "detect_stt_accuracy",
+                        "thumbs_up": null,
+                        "score": 3,
+                        "score_normalized": 3
+                    },
+                    {
+                        "id": 106810,
+                        "name": "Talk Ratio",
+                        "type": "numeric",
+                        "explanation": [
+                            "Talk Ratio (Audio): 0.9",
+                            "Main Agent: 6.8 seconds",
+                            "Total Duration: 7.57 seconds"
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "5d1409b9",
+                        "function_name": "get_talk_ratio",
+                        "thumbs_up": null,
+                        "score": 0.9,
+                        "score_normalized": 0.9
+                    },
+                    {
+                        "id": 106805,
+                        "name": "Average Pitch (in Hz)",
+                        "type": "numeric",
+                        "explanation": "Average pitch: 183.466450563115 Hz",
+                        "extra": {},
+                        "vocera_defined_metric_code": "944867cb",
+                        "function_name": "get_average_pitch",
+                        "thumbs_up": null,
+                        "score": 183.466450563115,
+                        "score_normalized": 183.466450563115
+                    },
+                    {
+                        "id": 106809,
+                        "name": "Stop Time after User Interruption (ms)",
+                        "type": "numeric",
+                        "explanation": "Testing agent didn't interrupt the main agent",
+                        "extra": {
+                            "chargeable": false
+                        },
+                        "vocera_defined_metric_code": "6c0e635a",
+                        "function_name": "get_testing_agent_barge_index",
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": null
+                    },
+                    {
+                        "id": 106871,
+                        "name": "Response Consistency",
+                        "type": "binary_qualitative",
+                        "explanation": "The Main Agent consistently understood and acted upon the Testing Agent's request for a representative. There were no contradictions, memory lapses, or discrepancies with function call results observed in the provided transcript.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "96a89a19",
+                        "function_name": "get_agent_consistency",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106870,
+                        "name": "Relevancy",
+                        "type": "binary_qualitative",
+                        "explanation": "All Main agent responses were relevant. The agent appropriately greeted the user, acknowledged the request to speak with a representative, and initiated the transfer.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "0b618add",
+                        "function_name": "get_relevancy_score_v2",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106808,
+                        "name": "Latency (in ms)",
+                        "type": "numeric",
+                        "explanation": "",
+                        "extra": {
+                            "graph_data": [
+                                {
+                                    "latency": 4020.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 9.45
+                                },
+                                {
+                                    "latency": 3150.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 18.22
+                                }
+                            ],
+                            "max_latency": 4020.0000000000014,
+                            "percentiles": {
+                                "p25": 3367.5,
+                                "p50": 3585.0,
+                                "p75": 3802.5,
+                                "p90": 3933.0,
+                                "p95": 3976.5,
+                                "p99": 4011.3
+                            }
+                        },
+                        "vocera_defined_metric_code": "cfb51b2c",
+                        "function_name": "get_latency",
+                        "thumbs_up": null,
+                        "score": 3585.0,
+                        "score_normalized": 3585.0
+                    },
+                    {
+                        "id": 106804,
+                        "name": "AI interrupting user",
+                        "type": "numeric",
+                        "explanation": "Main agent didn't interrupt the testing agent",
+                        "extra": {},
+                        "vocera_defined_metric_code": "ec29cab5",
+                        "function_name": "get_main_agent_interruption",
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    },
+                    {
+                        "id": 106807,
+                        "name": "Infrastructure Issues",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "No infrastructure issues detected (audio-based check)",
+                        "extra": {},
+                        "vocera_defined_metric_code": "b3f8872x",
+                        "function_name": "get_infrastructure_issues",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 108733,
+                        "name": "Transfer Status",
+                        "type": "binary_workflow_adherence",
+                        "explanation": [
+                            "The main agent stated its intent to transfer the call with 'Let me get you to someone who can help. Is that alright?' and 'Transferring you to our customer'.",
+                            "The `transfer_call` tool was successfully executed, as indicated by the `Function Call Result: {'id': 'call_XIT2Y7zhGvu2NQVq22wf2kqm', 'name': 'transfer_call', 'result': 'Transfer executed'}`."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    }
+                ]
+            },
+            "metadata": {},
+            "dynamic_variables": {},
+            "testing_channel_index": 0,
+            "timestamp": "2026-02-05T16:23:30.460655Z",
+            "success": true,
+            "is_reviewed": false,
+            "feedback": "",
+            "transcript": "[00:00] Main Agent: Bay and Associates. This is Emma. How can I help you?\n[00:05] Testing Agent: Representative.\nFunction Call: {'arguments': '{\\n  \"destination\": \"3d9c6151-63dc-416b-85f8-8c5e45e45c94\"\\n}', 'id': 'call_4t1IoaBpSGnq8MAn9GkGiux5', 'name': 'handoff_to_fallback_line'}\nFunction Call Result: {'id': 'call_4t1IoaBpSGnq8MAn9GkGiux5', 'name': 'handoff_to_fallback_line', 'result': 'Handoff initiated.'}\n[00:10] Main Agent: Let me get you to someone who can help. Is that alright?\n[00:15] Testing Agent: Yes.\nFunction Call: {'arguments': '{\"caller_type\": \"customer_success\", \"firm_id\": 1}', 'id': 'call_XIT2Y7zhGvu2NQVq22wf2kqm', 'name': 'transfer_call'}\n[00:19] Main Agent: Transferring you to our customer\nFunction Call Result: {'id': 'call_XIT2Y7zhGvu2NQVq22wf2kqm', 'name': 'transfer_call', 'result': 'Transfer executed'}\n",
+            "recording_data": {
+                "shape": [
+                    326080,
+                    2
+                ],
+                "sample_rate": 16000,
+                "main_speaking": [
+                    [
+                        0.25,
+                        2.89
+                    ],
+                    [
+                        9.450000000000001,
+                        11.6
+                    ],
+                    [
+                        18.22,
+                        20.23
+                    ]
+                ],
+                "has_audio_data": true,
+                "total_duration": 20.38,
+                "testing_speaking": [
+                    [
+                        4.91,
+                        5.43
+                    ],
+                    [
+                        14.82,
+                        15.07
+                    ]
+                ],
+                "separable_channels": true,
+                "testing_channel_index": 0
+            },
+            "call_ended_reason": "assistant-forwarded-call",
+            "dropoff_point": "",
+            "topic": "General Information or Other",
+            "customer_number": "",
+            "user_generated_transcript": null,
+            "error_message": "",
+            "created_at": "2026-02-05T16:23:30.472433Z",
+            "updated_at": "2026-02-05T16:23:45.089252Z",
+            "call_id": "019c2e9d-2a91-755c-8dd1-e8a95c65778e",
+            "agent": 10779
+        },
+        {
+            "id": 3012567,
+            "duration": "00:55",
+            "voice_recording_url": "https://cekura-prod.s3-accelerate.amazonaws.com/7ba81d76e4a2df8c23da3002ef494ab6a5f8928afb0ca958bba0080f7bb51493.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA47CRXRKFOYJTNGLR%2F20260205%2Fus-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260205T163602Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEGgaCXVzLXdlc3QtMSJIMEYCIQCg2KuhiHyKnIEtXW40riZx8c5HtBLJSAgKMnYM%2BEA5YwIhANkd5ix6KQKdrg1xauXaxTsV3dqCrMZFx%2FpOUo15EsH4Kt8DCDEQABoMODkxMzc3MTI2MDI2IgwUDn7Whc8PsEWXUawqvANlrB3YhOnG%2Bx1VDegJX%2FwmvZosHRPsFVWXwwVnTFzObLwMqK4r7ZeuWGp%2BVq%2BtUj2HmGo38E%2BGUA7ZYunKoWgBNfA6JCk2igdsxbKD2LeiIpp3SMGqRi4IVDoIxVxfn9xNpJ4DizcwVR5XnWVQ%2BX6mvD2Bkf9nYPxMBW4Qla3X5ND%2BgpNSKBs6PgdmLvR5XjdVuX0LG2ZykPV%2B5QTzXQEImxPfM005swzyOZ9stCFcjljdbZigTTT5OQaEBNj0mi%2F8%2BgPue8yBjgQAYY4nBCQYxbpOWRhZOQwbGG4GndW7oxyN0BxkejpJR%2BngS%2Fnp0DZTWQrarYnCsst5NNqN5cZTAC3iLbPM3B3S6AxioH7XayIdQOmwTZctavAs7ihsB7ILC5cPEx%2FX7%2FU17WHy6Y3ZkRK1R5p3eHpJQGni2galxsgZzpTl%2FNERc8Ar3KpBDmLqgEMNxXY12kyezFFywEPyeihR5wID4OrXE5gRuHeW7gHdN4GwgfhyO0ha%2Bke2VBvEt2lOYpnZVCyA0XRFXRmDUj92K7GWf0j0KwI9OvfX6niF91QxvLyUysCxSC7OUtiZjFojjJbxCQkxskUw9vOSzAY6pAHCLj%2BZ4Byf1%2B4yrj68pySLhkpNvRkMfODye7kmXyq%2FF7D5uh7d27ORx8mK2K9NyTt3qKeq9r4Nk7xXXxvMOWof2q8NRaQ4eY8Y%2FF31iVl459MXAhWEHvqRNDJCIAFIgY%2B%2BJFIZbGl6ettglJMDX0a0uLqow99idq91QNuzyXUduvxBZg3lsMXJiWUMZI8n3xe0HT7lfULaBY%2FvGAUpmV8FCAJF5g%3D%3D&X-Amz-Signature=bfe11e30ad395f236d0d623e8c2f253b6531424508f8e94dd710a70335316c64",
+            "critical_categories": [],
+            "transcript_object": [
+                {
+                    "content": "Bay and Associates, this is Emma. How can I help you?",
+                    "end_time": 2.638,
+                    "role": "Main Agent",
+                    "start_time": 0.765,
+                    "time": "00:00"
+                },
+                {
+                    "content": "Hi. I'm calling from Progressive Claims about Maria Tarrado.",
+                    "end_time": 8.719999999999999,
+                    "role": "Testing Agent",
+                    "start_time": 5.294,
+                    "time": "00:05"
+                },
+                {
+                    "content": "Thanks for calling. May I have your name?",
+                    "end_time": 13.101,
+                    "role": "Main Agent",
+                    "start_time": 11.214,
+                    "time": "00:11"
+                },
+                {
+                    "content": "Yes. My name is Hailey.",
+                    "end_time": 18.400000000000002,
+                    "role": "Testing Agent",
+                    "start_time": 17.364,
+                    "time": "00:17"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\n  \"destination\": \"9230812d-0a72-4ac0-a953-422ef85bb526\"\n}",
+                        "id": "call_t9GmerYePdVMYHH8PpJrX5BC",
+                        "name": "handoff_to_insurance"
+                    },
+                    "end_time": 20.72,
+                    "role": "Function Call",
+                    "start_time": 20.72,
+                    "time": "00:20"
+                },
+                {
+                    "data": {
+                        "id": "call_t9GmerYePdVMYHH8PpJrX5BC",
+                        "name": "handoff_to_insurance",
+                        "result": "Handoff initiated."
+                    },
+                    "end_time": 20.727,
+                    "role": "Function Call Result",
+                    "start_time": 20.727,
+                    "time": "00:20"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\"firm_id\": 1, \"client_name\": \"Maria Tarrado\"}",
+                        "id": "call_zaSeyCqDWEycb6vSj5v0GvKq",
+                        "name": "search_case_details"
+                    },
+                    "end_time": 22.781,
+                    "role": "Function Call",
+                    "start_time": 22.781,
+                    "time": "00:22"
+                },
+                {
+                    "data": {
+                        "id": "call_zaSeyCqDWEycb6vSj5v0GvKq",
+                        "name": "search_case_details",
+                        "result": "{\n  \"success\": true,\n  \"count\": 1,\n  \"message\": \"Found case for Maria Tirado. Case manager: Fatima Guzman\",\n  \"case\": {\n    \"id\": 123513,\n    \"firm_id\": 1,\n    \"firm_name\": \"Bey & Associates\",\n    \"case_status\": \"Intake\",\n    \"case_manager\": \"Fatima Guzman\",\n    \"case_type\": \"Personal Injury\",\n    \"case_phase_updated_at\": \"01/30/2026\",\n    \"case_number\": \"12965836\",\n    \"staff_id\": 18,\n    \"staff\": {\n      \"id\": 18,\n      \"name\": \"Fatima Guzman\",\n      \"role\": \"intake_specialist\",\n      \"email\": \"fguzman@beyandassociates.com\",\n      \"phone\": [\"+14045918929\"]\n    },\n    \"client_full_name\": \"Maria Tirado\",\n    \"client_first_name\": \"Maria\",\n    \"client_last_name\": \"Tirado\",\n    \"client_dob\": \"1995-01-16\",\n    \"client_phones\": \"8598783836\",\n    \"client_emails\": [\"Gracielamorataya16195@gmail.com\"],\n    \"client_age\": \"31\",\n    \"client_gender\": \"Female\",\n    \"incident_date\": \"01/14/2026\",\n    \"provider_case_id\": 12965836,\n    \"case_unique_id\": \"1_12965836\",\n    \"case_filevine_email\": \"mariatiradoz12965836@beyandassociates.filevineapp.com\"\n  },\n  \"tracked_case_ids\": [\"1_12965836\"],\n  \"metadata\": {\n    \"variableValues\": {\n      \"tracked_case_ids\": [\"1_12965836\"],\n      \"case\": {\n        \"id\": 123513,\n        \"firm_id\": 1,\n        \"firm_name\": \"Bey & Associates\",\n        \"case_status\": \"Intake\",\n        \"case_manager\": \"Fatima Guzman\",\n        \"case_type\": \"Personal Injury\",\n        \"case_phase_updated_at\": \"01/30/2026\",\n        \"case_number\": \"12965836\",\n        \"staff_id\": 18,\n        \"staff\": {\n          \"id\": 18,\n          \"name\": \"Fatima Guzman\",\n          \"role\": \"intake_specialist\",\n          \"email\": \"fguzman@beyandassociates.com\",\n          \"phone\": [\"+14045918929\"]\n        },\n        \"client_full_name\": \"Maria Tirado\",\n        \"client_first_name\": \"Maria\",\n        \"client_last_name\": \"Tirado\",\n        \"client_dob\": \"1995-01-16\",\n        \"client_phones\": \"8598783836\",\n        \"client_emails\": [\"Gracielamorataya16195@gmail.com\"],\n        \"client_age\": \"31\",\n        \"client_gender\": \"Female\",\n        \"incident_date\": \"01/14/2026\",\n        \"provider_case_id\": 12965836,\n        \"case_unique_id\": \"1_12965836\",\n        \"case_filevine_email\": \"mariatiradoz12965836@beyandassociates.filevineapp.com\"\n      }\n    },\n    \"squadOverrides\": {\n      \"variableValues\": {\n        \"tracked_case_ids\": [\"1_12965836\"],\n        \"case\": {\n          \"id\": 123513,\n          \"firm_id\": 1,\n          \"firm_name\": \"Bey & Associates\",\n          \"case_status\": \"Intake\",\n          \"case_manager\": \"Fatima Guzman\",\n          \"case_type\": \"Personal Injury\",\n          \"case_phase_updated_at\": \"01/30/2026\",\n          \"case_number\": \"12965836\",\n          \"staff_id\": 18,\n          \"staff\": {\n            \"id\": 18,\n            \"name\": \"Fatima Guzman\",\n            \"role\": \"intake_specialist\",\n            \"email\": \"fguzman@beyandassociates.com\",\n            \"phone\": [\"+14045918929\"]\n          },\n          \"client_full_name\": \"Maria Tirado\",\n          \"client_first_name\": \"Maria\",\n          \"client_last_name\": \"Tirado\",\n          \"client_dob\": \"1995-01-16\",\n          \"client_phones\": \"8598783836\",\n          \"client_emails\": [\"Gracielamorataya16195@gmail.com\"],\n          \"client_age\": \"31\",\n          \"client_gender\": \"Female\",\n          \"incident_date\": \"01/14/2026\",\n          \"provider_case_id\": 12965836,\n          \"case_unique_id\": \"1_12965836\",\n          \"case_filevine_email\": \"mariatiradoz12965836@beyandassociates.filevineapp.com\"\n        }\n      }\n    }\n  }\n}"
+                    },
+                    "end_time": 23.043,
+                    "role": "Function Call Result",
+                    "start_time": 23.043,
+                    "time": "00:23"
+                },
+                {
+                    "content": "I found Maria Tarrado's case. How can I help you?",
+                    "end_time": 27.019000000000002,
+                    "role": "Main Agent",
+                    "start_time": 24.992,
+                    "time": "00:24"
+                },
+                {
+                    "content": "Can I find out who the case manager is and a good phone number?",
+                    "end_time": 33.259,
+                    "role": "Testing Agent",
+                    "start_time": 30.144,
+                    "time": "00:30"
+                },
+                {
+                    "content": "The case manager for Maria Tarrado is Fatima Guzman. Her number is four zero four five nine one eight nine two nine.",
+                    "end_time": 44.539,
+                    "role": "Main Agent",
+                    "start_time": 34.895,
+                    "time": "00:34"
+                },
+                {
+                    "content": "Okay. Perfect. Thank you.",
+                    "end_time": 49.259,
+                    "role": "Testing Agent",
+                    "start_time": 47.897,
+                    "time": "00:47"
+                },
+                {
+                    "content": "You're welcome. Thanks for calling.",
+                    "end_time": 52.379,
+                    "role": "Main Agent",
+                    "start_time": 50.739,
+                    "time": "00:50"
+                }
+            ],
+            "status": "success",
+            "agent_id": "10779",
+            "evaluation": {
+                "metrics": [
+                    {
+                        "id": 108733,
+                        "name": "Transfer Status",
+                        "type": "binary_workflow_adherence",
+                        "explanation": [],
+                        "extra": {
+                            "trigger_failed": true
+                        },
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106811,
+                        "name": "Tool Call Success",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "It's a successful call",
+                        "extra": {
+                            "error": "",
+                            "output": ""
+                        },
+                        "vocera_defined_metric_code": "3b99402a",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 113506,
+                        "name": "Disconnection rate",
+                        "type": "binary_qualitative",
+                        "explanation": [],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 112114,
+                        "name": "Are you an AI",
+                        "type": "continuous_qualitative",
+                        "explanation": [
+                            "The score is 5 because the main agent's interaction was indistinguishable from a human receptionist. The conversation flowed naturally, with appropriate warmth and efficiency.",
+                            "The main agent successfully obtained the caller's name, understood their purpose, and provided the requested information without any repetition or indication of being an AI.",
+                            "The testing agent experienced a seamless and highly satisfactory interaction, perceiving the main agent as fully human. There were no instances of the testing agent questioning the main agent's AI nature or expressing frustration due to robotic behavior."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 5
+                    },
+                    {
+                        "id": 108798,
+                        "name": "Topic of Call",
+                        "type": "enum",
+                        "explanation": "Topic identified",
+                        "extra": {},
+                        "vocera_defined_metric_code": "1f9cedf0",
+                        "function_name": "observability_topics",
+                        "thumbs_up": null,
+                        "enum": "Insurance Company Inquiry"
+                    },
+                    {
+                        "id": 108797,
+                        "name": "Sentiment",
+                        "type": "enum",
+                        "explanation": [
+                            "The user's responses are consistently polite and appreciative, using phrases like \"Thank you so much!\" and \"That's perfect!\""
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "80cac969",
+                        "function_name": "sentiment_analysis",
+                        "thumbs_up": null,
+                        "enum": "Happy"
+                    },
+                    {
+                        "id": 106872,
+                        "name": "Transcription Accuracy",
+                        "type": "continuous_qualitative",
+                        "explanation": "The transcription is accurate with no errors.",
+                        "extra": {
+                            "chargeable": true
+                        },
+                        "vocera_defined_metric_code": "f30e1ab9",
+                        "function_name": "detect_stt_accuracy",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 5
+                    },
+                    {
+                        "id": 106810,
+                        "name": "Talk Ratio",
+                        "type": "numeric",
+                        "explanation": [
+                            "Talk Ratio (Audio): 0.65",
+                            "Main Agent: 15.55 seconds",
+                            "Total Duration: 23.78 seconds"
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "5d1409b9",
+                        "function_name": "get_talk_ratio",
+                        "thumbs_up": null,
+                        "score": 0.65,
+                        "score_normalized": 0.65
+                    },
+                    {
+                        "id": 106805,
+                        "name": "Average Pitch (in Hz)",
+                        "type": "numeric",
+                        "explanation": "Average pitch: 163.49535342621192 Hz",
+                        "extra": {},
+                        "vocera_defined_metric_code": "944867cb",
+                        "function_name": "get_average_pitch",
+                        "thumbs_up": null,
+                        "score": 163.49535342621192,
+                        "score_normalized": 163.49535342621192
+                    },
+                    {
+                        "id": 106809,
+                        "name": "Stop Time after User Interruption (ms)",
+                        "type": "numeric",
+                        "explanation": "Testing agent didn't interrupt the main agent",
+                        "extra": {
+                            "chargeable": false
+                        },
+                        "vocera_defined_metric_code": "6c0e635a",
+                        "function_name": "get_testing_agent_barge_index",
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": null
+                    },
+                    {
+                        "id": 106871,
+                        "name": "Response Consistency",
+                        "type": "binary_qualitative",
+                        "explanation": "The Main Agent demonstrates logical consistency throughout the conversation. It correctly processes the caller's request, asks for necessary information, acknowledges finding the case, and provides the requested details (case manager and phone number) without any contradictions, memory lapses, or discrepancies with implied function call results.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "96a89a19",
+                        "function_name": "get_agent_consistency",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106870,
+                        "name": "Relevancy",
+                        "type": "binary_qualitative",
+                        "explanation": "All Main agent responses were relevant to the conversation. The agent provided appropriate greetings, asked for necessary information, confirmed case details, and directly answered the user's questions.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "0b618add",
+                        "function_name": "get_relevancy_score_v2",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106808,
+                        "name": "Latency (in ms)",
+                        "type": "numeric",
+                        "explanation": "",
+                        "extra": {
+                            "graph_data": [
+                                {
+                                    "latency": 2650.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 10.85
+                                },
+                                {
+                                    "latency": 5930.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 24.22
+                                },
+                                {
+                                    "latency": 1420.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 34.18
+                                },
+                                {
+                                    "latency": 1240.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 50.03
+                                }
+                            ],
+                            "max_latency": 5930.0,
+                            "percentiles": {
+                                "p25": 1375.0,
+                                "p50": 2035.0,
+                                "p75": 3470.0,
+                                "p90": 4946.0,
+                                "p95": 5438.0,
+                                "p99": 5831.6
+                            }
+                        },
+                        "vocera_defined_metric_code": "cfb51b2c",
+                        "function_name": "get_latency",
+                        "thumbs_up": null,
+                        "score": 2810.0,
+                        "score_normalized": 2810.0
+                    },
+                    {
+                        "id": 106804,
+                        "name": "AI interrupting user",
+                        "type": "numeric",
+                        "explanation": "Main agent didn't interrupt the testing agent",
+                        "extra": {},
+                        "vocera_defined_metric_code": "ec29cab5",
+                        "function_name": "get_main_agent_interruption",
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    },
+                    {
+                        "id": 106807,
+                        "name": "Infrastructure Issues",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "No infrastructure issues detected (audio-based check)",
+                        "extra": {},
+                        "vocera_defined_metric_code": "b3f8872x",
+                        "function_name": "get_infrastructure_issues",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    }
+                ]
+            },
+            "metadata": {},
+            "dynamic_variables": {},
+            "testing_channel_index": 0,
+            "timestamp": "2026-02-05T16:07:09.814100Z",
+            "success": true,
+            "is_reviewed": false,
+            "feedback": "",
+            "transcript": "[00:00] Main Agent: Bay and Associates, this is Emma. How can I help you?\n[00:05] Testing Agent: Hi. I'm calling from Progressive Claims about Maria Tarrado.\n[00:11] Main Agent: Thanks for calling. May I have your name?\n[00:17] Testing Agent: Yes. My name is Hailey.\nFunction Call: {'arguments': '{\\n  \"destination\": \"9230812d-0a72-4ac0-a953-422ef85bb526\"\\n}', 'id': 'call_t9GmerYePdVMYHH8PpJrX5BC', 'name': 'handoff_to_insurance'}\nFunction Call Result: {'id': 'call_t9GmerYePdVMYHH8PpJrX5BC', 'name': 'handoff_to_insurance', 'result': 'Handoff initiated.'}\nFunction Call: {'arguments': '{\"firm_id\": 1, \"client_name\": \"Maria Tarrado\"}', 'id': 'call_zaSeyCqDWEycb6vSj5v0GvKq', 'name': 'search_case_details'}\nFunction Call Result: {'id': 'call_zaSeyCqDWEycb6vSj5v0GvKq', 'name': 'search_case_details', 'result': '{\\n  \"success\": true,\\n  \"count\": 1,\\n  \"message\": \"Found case for Maria Tirado. Case manager: Fatima Guzman\",\\n  \"case\": {\\n    \"id\": 123513,\\n    \"firm_id\": 1,\\n    \"firm_name\": \"Bey & Associates\",\\n    \"case_status\": \"Intake\",\\n    \"case_manager\": \"Fatima Guzman\",\\n    \"case_type\": \"Personal Injury\",\\n    \"case_phase_updated_at\": \"01/30/2026\",\\n    \"case_number\": \"12965836\",\\n    \"staff_id\": 18,\\n    \"staff\": {\\n      \"id\": 18,\\n      \"name\": \"Fatima Guzman\",\\n      \"role\": \"intake_specialist\",\\n      \"email\": \"fguzman@beyandassociates.com\",\\n      \"phone\": [\"+14045918929\"]\\n    },\\n    \"client_full_name\": \"Maria Tirado\",\\n    \"client_first_name\": \"Maria\",\\n    \"client_last_name\": \"Tirado\",\\n    \"client_dob\": \"1995-01-16\",\\n    \"client_phones\": \"8598783836\",\\n    \"client_emails\": [\"Gracielamorataya16195@gmail.com\"],\\n    \"client_age\": \"31\",\\n    \"client_gender\": \"Female\",\\n    \"incident_date\": \"01/14/2026\",\\n    \"provider_case_id\": 12965836,\\n    \"case_unique_id\": \"1_12965836\",\\n    \"case_filevine_email\": \"mariatiradoz12965836@beyandassociates.filevineapp.com\"\\n  },\\n  \"tracked_case_ids\": [\"1_12965836\"],\\n  \"metadata\": {\\n    \"variableValues\": {\\n      \"tracked_case_ids\": [\"1_12965836\"],\\n      \"case\": {\\n        \"id\": 123513,\\n        \"firm_id\": 1,\\n        \"firm_name\": \"Bey & Associates\",\\n        \"case_status\": \"Intake\",\\n        \"case_manager\": \"Fatima Guzman\",\\n        \"case_type\": \"Personal Injury\",\\n        \"case_phase_updated_at\": \"01/30/2026\",\\n        \"case_number\": \"12965836\",\\n        \"staff_id\": 18,\\n        \"staff\": {\\n          \"id\": 18,\\n          \"name\": \"Fatima Guzman\",\\n          \"role\": \"intake_specialist\",\\n          \"email\": \"fguzman@beyandassociates.com\",\\n          \"phone\": [\"+14045918929\"]\\n        },\\n        \"client_full_name\": \"Maria Tirado\",\\n        \"client_first_name\": \"Maria\",\\n        \"client_last_name\": \"Tirado\",\\n        \"client_dob\": \"1995-01-16\",\\n        \"client_phones\": \"8598783836\",\\n        \"client_emails\": [\"Gracielamorataya16195@gmail.com\"],\\n        \"client_age\": \"31\",\\n        \"client_gender\": \"Female\",\\n        \"incident_date\": \"01/14/2026\",\\n        \"provider_case_id\": 12965836,\\n        \"case_unique_id\": \"1_12965836\",\\n        \"case_filevine_email\": \"mariatiradoz12965836@beyandassociates.filevineapp.com\"\\n      }\\n    },\\n    \"squadOverrides\": {\\n      \"variableValues\": {\\n        \"tracked_case_ids\": [\"1_12965836\"],\\n        \"case\": {\\n          \"id\": 123513,\\n          \"firm_id\": 1,\\n          \"firm_name\": \"Bey & Associates\",\\n          \"case_status\": \"Intake\",\\n          \"case_manager\": \"Fatima Guzman\",\\n          \"case_type\": \"Personal Injury\",\\n          \"case_phase_updated_at\": \"01/30/2026\",\\n          \"case_number\": \"12965836\",\\n          \"staff_id\": 18,\\n          \"staff\": {\\n            \"id\": 18,\\n            \"name\": \"Fatima Guzman\",\\n            \"role\": \"intake_specialist\",\\n            \"email\": \"fguzman@beyandassociates.com\",\\n            \"phone\": [\"+14045918929\"]\\n          },\\n          \"client_full_name\": \"Maria Tirado\",\\n          \"client_first_name\": \"Maria\",\\n          \"client_last_name\": \"Tirado\",\\n          \"client_dob\": \"1995-01-16\",\\n          \"client_phones\": \"8598783836\",\\n          \"client_emails\": [\"Gracielamorataya16195@gmail.com\"],\\n          \"client_age\": \"31\",\\n          \"client_gender\": \"Female\",\\n          \"incident_date\": \"01/14/2026\",\\n          \"provider_case_id\": 12965836,\\n          \"case_unique_id\": \"1_12965836\",\\n          \"case_filevine_email\": \"mariatiradoz12965836@beyandassociates.filevineapp.com\"\\n        }\\n      }\\n    }\\n  }\\n}'}\n[00:24] Main Agent: I found Maria Tarrado's case. How can I help you?\n[00:30] Testing Agent: Can I find out who the case manager is and a good phone number?\n[00:34] Main Agent: The case manager for Maria Tarrado is Fatima Guzman. Her number is four zero four five nine one eight nine two nine.\n[00:47] Testing Agent: Okay. Perfect. Thank you.\n[00:50] Main Agent: You're welcome. Thanks for calling.\n",
+            "recording_data": {
+                "shape": [
+                    884160,
+                    2
+                ],
+                "sample_rate": 16000,
+                "main_speaking": [
+                    [
+                        0.35000000000000003,
+                        2.95
+                    ],
+                    [
+                        10.85,
+                        11.47
+                    ],
+                    [
+                        12.15,
+                        12.88
+                    ],
+                    [
+                        24.22,
+                        26.43
+                    ],
+                    [
+                        34.18,
+                        39.12
+                    ],
+                    [
+                        39.730000000000004,
+                        43.06
+                    ],
+                    [
+                        50.03,
+                        50.53
+                    ],
+                    [
+                        50.76,
+                        51.38
+                    ]
+                ],
+                "has_audio_data": true,
+                "total_duration": 55.26,
+                "testing_speaking": [
+                    [
+                        4.97,
+                        8.2
+                    ],
+                    [
+                        17.17,
+                        17.29
+                    ],
+                    [
+                        17.5,
+                        17.830000000000002
+                    ],
+                    [
+                        17.96,
+                        18.29
+                    ],
+                    [
+                        29.07,
+                        32.76
+                    ],
+                    [
+                        48.14,
+                        48.34
+                    ],
+                    [
+                        48.46,
+                        48.79
+                    ]
+                ],
+                "separable_channels": true,
+                "testing_channel_index": 0
+            },
+            "call_ended_reason": "customer-ended-call",
+            "dropoff_point": "",
+            "topic": "Insurance Company Inquiry",
+            "customer_number": "",
+            "user_generated_transcript": null,
+            "error_message": "",
+            "created_at": "2026-02-05T16:07:09.823311Z",
+            "updated_at": "2026-02-05T16:07:24.944573Z",
+            "call_id": "019c2e8d-7034-7003-aa23-27ee7424a2ae",
+            "agent": 10779
+        },
+        {
+            "id": 3012307,
+            "duration": "00:27",
+            "voice_recording_url": "https://cekura-prod.s3-accelerate.amazonaws.com/d2dd91e9edbdc8b0f270fc51e68b93c48bfdd043617532ce2a5928a95594bd4f.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA47CRXRKFOYJTNGLR%2F20260205%2Fus-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260205T163602Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEGgaCXVzLXdlc3QtMSJIMEYCIQCg2KuhiHyKnIEtXW40riZx8c5HtBLJSAgKMnYM%2BEA5YwIhANkd5ix6KQKdrg1xauXaxTsV3dqCrMZFx%2FpOUo15EsH4Kt8DCDEQABoMODkxMzc3MTI2MDI2IgwUDn7Whc8PsEWXUawqvANlrB3YhOnG%2Bx1VDegJX%2FwmvZosHRPsFVWXwwVnTFzObLwMqK4r7ZeuWGp%2BVq%2BtUj2HmGo38E%2BGUA7ZYunKoWgBNfA6JCk2igdsxbKD2LeiIpp3SMGqRi4IVDoIxVxfn9xNpJ4DizcwVR5XnWVQ%2BX6mvD2Bkf9nYPxMBW4Qla3X5ND%2BgpNSKBs6PgdmLvR5XjdVuX0LG2ZykPV%2B5QTzXQEImxPfM005swzyOZ9stCFcjljdbZigTTT5OQaEBNj0mi%2F8%2BgPue8yBjgQAYY4nBCQYxbpOWRhZOQwbGG4GndW7oxyN0BxkejpJR%2BngS%2Fnp0DZTWQrarYnCsst5NNqN5cZTAC3iLbPM3B3S6AxioH7XayIdQOmwTZctavAs7ihsB7ILC5cPEx%2FX7%2FU17WHy6Y3ZkRK1R5p3eHpJQGni2galxsgZzpTl%2FNERc8Ar3KpBDmLqgEMNxXY12kyezFFywEPyeihR5wID4OrXE5gRuHeW7gHdN4GwgfhyO0ha%2Bke2VBvEt2lOYpnZVCyA0XRFXRmDUj92K7GWf0j0KwI9OvfX6niF91QxvLyUysCxSC7OUtiZjFojjJbxCQkxskUw9vOSzAY6pAHCLj%2BZ4Byf1%2B4yrj68pySLhkpNvRkMfODye7kmXyq%2FF7D5uh7d27ORx8mK2K9NyTt3qKeq9r4Nk7xXXxvMOWof2q8NRaQ4eY8Y%2FF31iVl459MXAhWEHvqRNDJCIAFIgY%2B%2BJFIZbGl6ettglJMDX0a0uLqow99idq91QNuzyXUduvxBZg3lsMXJiWUMZI8n3xe0HT7lfULaBY%2FvGAUpmV8FCAJF5g%3D%3D&X-Amz-Signature=0a3e59721c9789043245172efc65cf94c4260bbe2ba2344087c33a3c9eee959a",
+            "critical_categories": [],
+            "transcript_object": [
+                {
+                    "content": "Bay and Associates. This is Emma. can I help you?",
+                    "end_time": 2.352,
+                    "role": "Main Agent",
+                    "start_time": 0.733,
+                    "time": "00:00"
+                },
+                {
+                    "content": "I speak with John?",
+                    "end_time": 8.993,
+                    "role": "Testing Agent",
+                    "start_time": 7.932,
+                    "time": "00:07"
+                },
+                {
+                    "content": "Sure. I can try to reach John. May I have your name?",
+                    "end_time": 13.233,
+                    "role": "Main Agent",
+                    "start_time": 10.722,
+                    "time": "00:10"
+                },
+                {
+                    "content": "Oh, it's Nicole.",
+                    "end_time": 17.233,
+                    "role": "Testing Agent",
+                    "start_time": 15.951,
+                    "time": "00:15"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\n  \"destination\": \"55bad977-4713-4999-8df6-bb9d92b5fcd4\"\n}",
+                        "id": "call_iN0296GU9RHl28NYcXMJPRim",
+                        "name": "handoff_to_direct_staff"
+                    },
+                    "end_time": 18.449,
+                    "role": "Function Call",
+                    "start_time": 18.449,
+                    "time": "00:18"
+                },
+                {
+                    "data": {
+                        "id": "call_iN0296GU9RHl28NYcXMJPRim",
+                        "name": "handoff_to_direct_staff",
+                        "result": "Handoff initiated."
+                    },
+                    "end_time": 18.46,
+                    "role": "Function Call Result",
+                    "start_time": 18.46,
+                    "time": "00:18"
+                },
+                {
+                    "content": "",
+                    "data": {
+                        "arguments": "{\"firm_id\": 1, \"target_staff_name\": \"John\"}",
+                        "id": "call_ikxNqZXUIlTtmsB3zy1qb1xP",
+                        "name": "staff_directory_lookup_api"
+                    },
+                    "end_time": 19.931,
+                    "role": "Function Call",
+                    "start_time": 19.931,
+                    "time": "00:19"
+                },
+                {
+                    "data": {
+                        "id": "call_ikxNqZXUIlTtmsB3zy1qb1xP",
+                        "name": "staff_directory_lookup_api",
+                        "result": "{\n  \"result\": \"staff_id: 40\\nName: John Bey\\nRole: lawyer\\nEmail: john@beyandassociates.com\\nPhone: +14043829669\"\n}"
+                    },
+                    "end_time": 28.68,
+                    "role": "Function Call Result",
+                    "start_time": 28.68,
+                    "time": "00:28"
+                }
+            ],
+            "status": "failure",
+            "agent_id": "10779",
+            "evaluation": {
+                "metrics": [
+                    {
+                        "id": 106811,
+                        "name": "Tool Call Success",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "It's a successful call",
+                        "extra": {
+                            "error": "",
+                            "output": ""
+                        },
+                        "vocera_defined_metric_code": "3b99402a",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 113506,
+                        "name": "Disconnection rate",
+                        "type": "binary_qualitative",
+                        "explanation": [
+                            "The main agent successfully engaged with the testing agent, identified the request to speak with John, and initiated a handoff to direct staff. None of the specified failure conditions for disconnection were met. The call ending by the customer after the handoff was initiated does not indicate a failure on the agent's part according to the metric's criteria."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 112114,
+                        "name": "Are you an AI",
+                        "type": "continuous_qualitative",
+                        "explanation": [
+                            "The score is 5 because the main agent's interaction was indistinguishable from a human receptionist.",
+                            "The conversation flowed naturally and efficiently from the greeting to obtaining the caller's name.",
+                            "The main agent successfully obtained the caller's name and initiated the staff lookup/handoff without any repetition or indication of being an AI.",
+                            "There were no instances of the testing agent questioning the main agent's AI nature or expressing frustration.",
+                            "The main agent did not repeat any questions or information requests."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 5
+                    },
+                    {
+                        "id": 108798,
+                        "name": "Topic of Call",
+                        "type": "enum",
+                        "explanation": "Topic identified",
+                        "extra": {},
+                        "vocera_defined_metric_code": "1f9cedf0",
+                        "function_name": "observability_topics",
+                        "thumbs_up": null,
+                        "enum": "Direct Staff Member Request"
+                    },
+                    {
+                        "id": 108797,
+                        "name": "Sentiment",
+                        "type": "enum",
+                        "explanation": [
+                            "The user's responses are consistently polite and appreciative, using phrases like \"Thank you so much!\" and \"That's perfect!\""
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "80cac969",
+                        "function_name": "sentiment_analysis",
+                        "thumbs_up": null,
+                        "enum": "Happy"
+                    },
+                    {
+                        "id": 106872,
+                        "name": "Transcription Accuracy",
+                        "type": "continuous_qualitative",
+                        "explanation": "Transcription errors are: the transcript says \"can I help you?\" but the Main Agent said \"how can I help you?\"; the transcript says \"I speak with John?\" but the Testing Agent said \"hi there this is Nicole can I speak with John?\"; the transcript says \"Oh, it's Nicole.\" but the Testing Agent said \"it's Nicole.\"",
+                        "extra": {
+                            "chargeable": true
+                        },
+                        "vocera_defined_metric_code": "f30e1ab9",
+                        "function_name": "detect_stt_accuracy",
+                        "thumbs_up": null,
+                        "score": 3,
+                        "score_normalized": 3
+                    },
+                    {
+                        "id": 106810,
+                        "name": "Talk Ratio",
+                        "type": "numeric",
+                        "explanation": [
+                            "Talk Ratio (Audio): 0.73",
+                            "Main Agent: 5.15 seconds",
+                            "Total Duration: 7.08 seconds"
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "5d1409b9",
+                        "function_name": "get_talk_ratio",
+                        "thumbs_up": null,
+                        "score": 0.73,
+                        "score_normalized": 0.73
+                    },
+                    {
+                        "id": 106805,
+                        "name": "Average Pitch (in Hz)",
+                        "type": "numeric",
+                        "explanation": "Average pitch: 167.47431374396206 Hz",
+                        "extra": {},
+                        "vocera_defined_metric_code": "944867cb",
+                        "function_name": "get_average_pitch",
+                        "thumbs_up": null,
+                        "score": 167.47431374396206,
+                        "score_normalized": 167.47431374396206
+                    },
+                    {
+                        "id": 106809,
+                        "name": "Stop Time after User Interruption (ms)",
+                        "type": "numeric",
+                        "explanation": "Testing agent didn't interrupt the main agent",
+                        "extra": {
+                            "chargeable": false
+                        },
+                        "vocera_defined_metric_code": "6c0e635a",
+                        "function_name": "get_testing_agent_barge_index",
+                        "thumbs_up": null,
+                        "score": null,
+                        "score_normalized": null
+                    },
+                    {
+                        "id": 106871,
+                        "name": "Response Consistency",
+                        "type": "binary_qualitative",
+                        "explanation": "The Main Agent is consistent in this brief interaction. It acknowledges the Testing Agent's request to speak with 'John' and then logically asks for the Testing Agent's name to proceed. There are no contradictions, memory lapses, or discrepancies with function call results observed.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "96a89a19",
+                        "function_name": "get_agent_consistency",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106870,
+                        "name": "Relevancy",
+                        "type": "binary_qualitative",
+                        "explanation": "All Main agent responses were relevant. The agent provided a standard greeting and then appropriately responded to the user's request to speak with John by asking for their name.",
+                        "extra": {},
+                        "vocera_defined_metric_code": "0b618add",
+                        "function_name": "get_relevancy_score_v2",
+                        "thumbs_up": null,
+                        "score": 5,
+                        "score_normalized": 1
+                    },
+                    {
+                        "id": 106808,
+                        "name": "Latency (in ms)",
+                        "type": "numeric",
+                        "explanation": "",
+                        "extra": {
+                            "graph_data": [
+                                {
+                                    "latency": 2240.0,
+                                    "speaker": "Main Agent",
+                                    "start_time": 10.47
+                                }
+                            ],
+                            "max_latency": 2240.0,
+                            "percentiles": {
+                                "p25": 2240.0,
+                                "p50": 2240.0,
+                                "p75": 2240.0,
+                                "p90": 2240.0,
+                                "p95": 2240.0,
+                                "p99": 2240.0
+                            }
+                        },
+                        "vocera_defined_metric_code": "cfb51b2c",
+                        "function_name": "get_latency",
+                        "thumbs_up": null,
+                        "score": 2240.0,
+                        "score_normalized": 2240.0
+                    },
+                    {
+                        "id": 106804,
+                        "name": "AI interrupting user",
+                        "type": "numeric",
+                        "explanation": "Main agent didn't interrupt the testing agent",
+                        "extra": {},
+                        "vocera_defined_metric_code": "ec29cab5",
+                        "function_name": "get_main_agent_interruption",
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    },
+                    {
+                        "id": 106807,
+                        "name": "Infrastructure Issues",
+                        "type": "binary_workflow_adherence",
+                        "explanation": "Main agent didn't respond within 10 seconds after testing agent spoke at times: 00:16",
+                        "extra": {},
+                        "vocera_defined_metric_code": "b3f8872x",
+                        "function_name": "get_infrastructure_issues",
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    },
+                    {
+                        "id": 108733,
+                        "name": "Transfer Status",
+                        "type": "binary_workflow_adherence",
+                        "explanation": [
+                            "The main agent did not explicitly state that it was performing a transfer.",
+                            "The required 'transfer_call' tool was not found in the transcript. The agent used 'handoff_to_direct_staff' and 'staff_directory_lookup_api' instead, which are not considered for this metric."
+                        ],
+                        "extra": {},
+                        "vocera_defined_metric_code": "",
+                        "function_name": null,
+                        "thumbs_up": null,
+                        "score": 0,
+                        "score_normalized": 0
+                    }
+                ]
+            },
+            "metadata": {},
+            "dynamic_variables": {},
+            "testing_channel_index": 0,
+            "timestamp": "2026-02-05T16:01:04.422345Z",
+            "success": false,
+            "is_reviewed": false,
+            "feedback": "",
+            "transcript": "[00:00] Main Agent: Bay and Associates. This is Emma. can I help you?\n[00:07] Testing Agent: I speak with John?\n[00:10] Main Agent: Sure. I can try to reach John. May I have your name?\n[00:15] Testing Agent: Oh, it's Nicole.\nFunction Call: {'arguments': '{\\n  \"destination\": \"55bad977-4713-4999-8df6-bb9d92b5fcd4\"\\n}', 'id': 'call_iN0296GU9RHl28NYcXMJPRim', 'name': 'handoff_to_direct_staff'}\nFunction Call Result: {'id': 'call_iN0296GU9RHl28NYcXMJPRim', 'name': 'handoff_to_direct_staff', 'result': 'Handoff initiated.'}\nFunction Call: {'arguments': '{\"firm_id\": 1, \"target_staff_name\": \"John\"}', 'id': 'call_ikxNqZXUIlTtmsB3zy1qb1xP', 'name': 'staff_directory_lookup_api'}\nFunction Call Result: {'id': 'call_ikxNqZXUIlTtmsB3zy1qb1xP', 'name': 'staff_directory_lookup_api', 'result': '{\\n  \"result\": \"staff_id: 40\\\\nName: John Bey\\\\nRole: lawyer\\\\nEmail: john@beyandassociates.com\\\\nPhone: +14043829669\"\\n}'}\n",
+            "recording_data": {
+                "shape": [
+                    441920,
+                    2
+                ],
+                "sample_rate": 16000,
+                "main_speaking": [
+                    [
+                        0.23,
+                        2.82
+                    ],
+                    [
+                        10.47,
+                        13.030000000000001
+                    ]
+                ],
+                "has_audio_data": true,
+                "total_duration": 27.62,
+                "testing_speaking": [
+                    [
+                        5.17,
+                        5.79
+                    ],
+                    [
+                        7.3,
+                        7.45
+                    ],
+                    [
+                        7.61,
+                        8.23
+                    ],
+                    [
+                        15.47,
+                        15.59
+                    ],
+                    [
+                        15.96,
+                        16.38
+                    ]
+                ],
+                "separable_channels": true,
+                "testing_channel_index": 0
+            },
+            "call_ended_reason": "customer-ended-call",
+            "dropoff_point": "",
+            "topic": "Direct Staff Member Request",
+            "customer_number": "",
+            "user_generated_transcript": null,
+            "error_message": "",
+            "created_at": "2026-02-05T16:01:04.431631Z",
+            "updated_at": "2026-02-05T16:01:24.237819Z",
+            "call_id": "019c2e88-629a-700a-b868-2f6cf0254df0",
+            "agent": 10779
+        },
+        {
+      "id": 3012161,
+      "duration": "01:54",
+      "voice_recording_url": "https://cekura-prod.s3-accelerate.amazonaws.com/ec0bfdad857c9ce8059bad7b415c1186b260afee7a5c27b0a249ad7f8259b159.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA47CRXRKFNOYNHT2V%2F20260205%2Fus-west-1%2Fs3%2Faws4_request&X-Amz-Date=20260205T170709Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEGgaCXVzLXdlc3QtMSJIMEYCIQD9gcgwE49bi8AihYs0zgNJilHs1Eug5kzh%2BqcRET0ZuwIhAM20YxFO9%2B4Jh2U6Iwb%2B92stmZ8vB1Vv0kVK%2B22HmJ%2BmKt8DCDEQABoMODkxMzc3MTI2MDI2IgwCJIlRpj0RsvnC2BQqvANz4WjEs7IHC%2FaaBdzl%2FqE8cg8QgXKYKBT4Cxz1CaKWuBBc%2FjZ%2BlyveK2AUB%2FqSbSKzbE0cdnZI%2BGssu3tkLLdBu1rMnDiBH3CFU1FsGGNdCnp8bh4LqRrzmWTcDuE3PbyDIsNYxmaaXsz3MiNHyJ490s4IvloSbhjd3aHAr21%2FbZF%2Fnay1c4sNVNlEJe7c6in1O5ct7eMuqWMr5tBOyWQz1jFrtE3XF9STA8weYr%2BRTeN5U7v8G4VVpCawXYAe7mdsCHYydO8q569Wn4GqzJoSFjczcrP%2BXSrA8rmxDa5JQhp40VjblpvWYCNDLhtzXZAGYc2kcWxupHPlgq0EjR0tnVA5%2BLNm3pHsZi4thucGF1aT1rEf0JKPglb7sj2DzI4T5ibvzn03ZH1r%2Bj5q4rGQvPkIaIcD8SFjofSvf6nURU50LuVLVwCkGN2eI%2FzYbd5pGS20eqM7zOd5z2yk8kZQnWkImj2XQgIkaxTMpdRh2BdOTQN5a83HwMm9mkzS2P7xmgNMhkFEY9Ymp7gSTC1mYoKFikBCfkt%2BDBAD862a2%2BpmVfsI14SNqRaUkHH32PSVA9JHF4zjzG90Bggw%2FPSSzAY6pAHRMz5lqH5ioF5hBx90%2Bmz9s2J0n4iFUmwTuSxKcgZoz8HU46rPb4XnOTUIvO9MPb94Z%2Ba%2BLmoq1XdfnZhf7Wc5RruKFCT6z%2Fqplo1rWE68YkhRyh3Z59a6MkNydPZU5zmVVRMGjr2eC4RHUibc232AxEkJcWTZxH5FXkFIG2hTvFqbYn%2BszD%2FO05i1p9Jm3SHNI%2FVcY%2BL9a%2BM%2FH8GwKTr%2BRBAEnQ%3D%3D&X-Amz-Signature=2cd2b28190638b91a542e2b3f87e28de0888d63458551c38120e671159f4a234",
+      "critical_categories": [],
+      "transcript_object": [
+        {
+          "content": "Thank you for calling trial clinics. My name is Devin. Who do I have the pleasure of speaking with?",
+          "end_time": 7.84,
+          "role": "Testing Agent",
+          "start_time": 3.55,
+          "time": "00:03"
+        },
+        {
+          "content": "Hi, Devin. My name is Jenny. I'm a case manager over at Hunter Everidge Law Firm. How are you doing today?",
+          "end_time": 15.376999999999999,
+          "role": "Main Agent",
+          "start_time": 9.383,
+          "time": "00:09"
+        },
+        {
+          "content": "I'm doing well. Thank you. can I help you?",
+          "end_time": 18.603,
+          "role": "Testing Agent",
+          "start_time": 16.946,
+          "time": "00:16"
+        },
+        {
+          "content": "I'm hoping you can help me out with a medical records request for one of our clients, Jordan Smith.",
+          "end_time": 25.857,
+          "role": "Main Agent",
+          "start_time": 20.381,
+          "time": "00:20"
+        },
+        {
+          "content": "Sure. What is the patient's name? Can you repeat",
+          "end_time": 29.92,
+          "role": "Testing Agent",
+          "start_time": 27.928,
+          "time": "00:27"
+        },
+        {
+          "content": "Absolutely. The patient's name is Jordan Smith. That's j o r d a n and s m i t h.",
+          "end_time": 38.177,
+          "role": "Main Agent",
+          "start_time": 31.622,
+          "time": "00:31"
+        },
+        {
+          "content": "Got it.",
+          "end_time": 40.56,
+          "role": "Testing Agent",
+          "start_time": 40.021,
+          "time": "00:40"
+        },
+        {
+          "content": "Great.",
+          "end_time": 42.737,
+          "role": "Main Agent",
+          "start_time": 41.753,
+          "time": "00:41"
+        },
+        {
+          "content": "And what is the patient's date of birth?",
+          "end_time": 43.44,
+          "role": "Testing Agent",
+          "start_time": 41.781,
+          "time": "00:41"
+        },
+        {
+          "content": "March twelfth nineteen ninety two.",
+          "end_time": 46.017,
+          "role": "Main Agent",
+          "start_time": 44.865,
+          "time": "00:44"
+        },
+        {
+          "content": "Got it. And, uh, what are the dates of service you are requesting the records for?",
+          "end_time": 52.96,
+          "role": "Testing Agent",
+          "start_time": 48.231,
+          "time": "00:48"
+        },
+        {
+          "content": "December tenth twenty twenty five through December eighteenth twenty twenty five.",
+          "end_time": 58.897,
+          "role": "Main Agent",
+          "start_time": 54.162,
+          "time": "00:54"
+        },
+        {
+          "content": "Okay. So December tenth through December eighteenth twenty twenty five. Let me pull that up. Um, how would you like to receive the records?",
+          "end_time": 71.75999999999999,
+          "role": "Testing Agent",
+          "start_time": 60.611,
+          "time": "01:00"
+        },
+        {
+          "content": "Email would be great. You can send them to records at hunter dash everidge dot com.",
+          "end_time": 78.737,
+          "role": "Main Agent",
+          "start_time": 73.544,
+          "time": "01:13"
+        },
+        {
+          "content": "Okay. Let me confirm that. It's, uh, records at hunter dash average dot com.",
+          "end_time": 86.72,
+          "role": "Testing Agent",
+          "start_time": 81.819,
+          "time": "01:21"
+        },
+        {
+          "content": "That's correct.",
+          "end_time": 89.057,
+          "role": "Main Agent",
+          "start_time": 87.801,
+          "time": "01:27"
+        },
+        {
+          "content": "Okay. I've submitted that request. It typically takes about five to seven days to process this request.",
+          "end_time": 95.82900000000001,
+          "role": "Testing Agent",
+          "start_time": 90.762,
+          "time": "01:30"
+        },
+        {
+          "content": "Perfect. That works. Thank you for letting me know.",
+          "end_time": 100.81700000000001,
+          "role": "Main Agent",
+          "start_time": 97.876,
+          "time": "01:37"
+        },
+        {
+          "content": "Okay. Thank you.",
+          "end_time": 103.31,
+          "role": "Testing Agent",
+          "start_time": 103.013,
+          "time": "01:43"
+        },
+        {
+          "content": "That's everything I needed. Thank you so much for your help, Devin. Have a great day.",
+          "end_time": 109.137,
+          "role": "Main Agent",
+          "start_time": 105.129,
+          "time": "01:45"
+        },
+        {
+          "content": "You too. Bye.",
+          "end_time": 111.28,
+          "role": "Testing Agent",
+          "start_time": 110.67,
+          "time": "01:50"
+        },
+        {
+          "content": "Bye now.",
+          "end_time": 112.89699999999999,
+          "role": "Main Agent",
+          "start_time": 112.698,
+          "time": "01:52"
+        }
+      ],
+      "status": "reviewed_failure",
+      "agent_id": "11005",
+      "evaluation": {
+        "metrics": [
+          {
+            "id": 108733,
+            "name": "Transfer Status",
+            "type": "binary_workflow_adherence",
+            "explanation": [],
+            "extra": {
+              "trigger_failed": true
+            },
+            "vocera_defined_metric_code": "",
+            "function_name": null,
+            "thumbs_up": null,
+            "score": null,
+            "score_normalized": 1
+          },
+          {
+            "id": 106811,
+            "name": "Tool Call Success",
+            "type": "binary_workflow_adherence",
+            "explanation": "It's a successful call",
+            "extra": {
+              "error": "",
+              "output": ""
+            },
+            "vocera_defined_metric_code": "3b99402a",
+            "function_name": null,
+            "thumbs_up": null,
+            "score": 5,
+            "score_normalized": 1
+          },
+          {
+            "id": 113506,
+            "name": "Disconnection rate",
+            "type": "binary_qualitative",
+            "explanation": [
+              "The conversation concluded successfully with the main agent obtaining the necessary information and the request being processed. The call ended naturally after the main agent confirmed everything was handled, and there were no disconnections due to inefficiency, reluctance to speak with AI, requests for a live person, or conversational breakdown."
+            ],
+            "extra": {},
+            "vocera_defined_metric_code": "",
+            "function_name": null,
+            "thumbs_up": null,
+            "score": 5,
+            "score_normalized": 1
+          },
+          {
+            "id": 112114,
+            "name": "Are you an AI",
+            "type": "continuous_qualitative",
+            "explanation": [
+              "The score is 5 because the main agent's interaction was indistinguishable from a human receptionist. The conversation flowed naturally, with appropriate warmth and efficiency. The main agent successfully provided all necessary information without any repetition or indication of being an AI. The testing agent experienced a seamless and highly satisfactory interaction, perceiving the main agent as fully human. There were no instances of the testing agent questioning the main agent's AI nature or expressing frustration due to robotic behavior or repetition."
+            ],
+            "extra": {},
+            "vocera_defined_metric_code": "",
+            "function_name": null,
+            "thumbs_up": null,
+            "score": 5,
+            "score_normalized": 5
+          },
+          {
+            "id": 108798,
+            "name": "Topic of Call",
+            "type": "enum",
+            "explanation": "Topic identified",
+            "extra": {},
+            "vocera_defined_metric_code": "1f9cedf0",
+            "function_name": "observability_topics",
+            "thumbs_up": null,
+            "enum": "Medical Provider Inquiry"
+          },
+          {
+            "id": 108797,
+            "name": "Sentiment",
+            "type": "enum",
+            "explanation": [
+              "The user's responses are consistently polite and appreciative, using phrases like \"Thank you so much!\" and \"That's perfect!\""
+            ],
+            "extra": {},
+            "vocera_defined_metric_code": "80cac969",
+            "function_name": "sentiment_analysis",
+            "thumbs_up": null,
+            "enum": "Happy"
+          },
+          {
+            "id": 106872,
+            "name": "Transcription Accuracy",
+            "type": "continuous_qualitative",
+            "explanation": "Transcription errors are: the transcript says \"can I help you?\" but the Testing Agent said \"How can I help you?\". Minor variations that do not affect the score: the transcript says \"trial clinics\" but the Testing Agent said \"TriHealth Clinics\"; the transcript says \"can you repeat\" but the Testing Agent said \"Can you repeat?\"; the transcript says \"March twelfth nineteen ninety two\" but the Main Agent said \"03/12/1992\" or \"March twelfth, nineteen ninety-two\"; the transcript says \"December tenth twenty twenty five through December eighteenth twenty twenty five\" but the Main Agent said \"12/10/2025 through 12/18/2025\" or \"December tenth, twenty twenty-five, through December eighteenth, twenty twenty-five\"; the transcript says \"hunter dash everidge dot com\" but the Main Agent said \"hunter-average.com\" or \"hunter-everidge.com\"; the transcript says \"hunter dash average dot com\" but the Testing Agent said \"hunter-average.com\" or \"hunter-everidge.com\"; the transcript says \"Okay\" but the Testing Agent said \"Alright\" or \"All right\".",
+            "extra": {
+              "chargeable": true
+            },
+            "vocera_defined_metric_code": "f30e1ab9",
+            "function_name": "detect_stt_accuracy",
+            "thumbs_up": null,
+            "score": 4,
+            "score_normalized": 4
+          },
+          {
+            "id": 106869,
+            "name": "Hallucination",
+            "type": "binary_qualitative",
+            "explanation": "No knowledge base files available for hallucination check",
+            "extra": {
+              "chargeable": false
+            },
+            "vocera_defined_metric_code": "adf58c69",
+            "function_name": "check_hallucination",
+            "thumbs_up": null,
+            "score": null,
+            "score_normalized": 1
+          },
+          {
+            "id": 106810,
+            "name": "Talk Ratio",
+            "type": "numeric",
+            "explanation": [
+              "Talk Ratio (Audio): 0.51",
+              "Main Agent: 36.78 seconds",
+              "Total Duration: 72.77 seconds"
+            ],
+            "extra": {},
+            "vocera_defined_metric_code": "5d1409b9",
+            "function_name": "get_talk_ratio",
+            "thumbs_up": null,
+            "score": 0.51,
+            "score_normalized": 0.51
+          },
+          {
+            "id": 106805,
+            "name": "Average Pitch (in Hz)",
+            "type": "numeric",
+            "explanation": "Average pitch: 238.9902839512819 Hz",
+            "extra": {},
+            "vocera_defined_metric_code": "944867cb",
+            "function_name": "get_average_pitch",
+            "thumbs_up": null,
+            "score": 238.9902839512819,
+            "score_normalized": 238.9902839512819
+          },
+          {
+            "id": 106809,
+            "name": "Stop Time after User Interruption (ms)",
+            "type": "numeric",
+            "explanation": "Testing agent didn't interrupt the main agent",
+            "extra": {
+              "chargeable": false
+            },
+            "vocera_defined_metric_code": "6c0e635a",
+            "function_name": "get_testing_agent_barge_index",
+            "thumbs_up": null,
+            "score": null,
+            "score_normalized": null
+          },
+          {
+            "id": 106871,
+            "name": "Response Consistency",
+            "type": "binary_qualitative",
+            "explanation": "The Main Agent demonstrates excellent logical consistency throughout the conversation. All information provided, such as the patient's name (\"Jordan Smith\"), date of birth (\"March twelfth nineteen ninety two\"), and the email for records (\"records at hunter dash everidge dot com\"), remains consistent across all mentions and reconfirmations. There are no contradictions, memory lapses, or discrepancies with stated actions.",
+            "extra": {},
+            "vocera_defined_metric_code": "96a89a19",
+            "function_name": "get_agent_consistency",
+            "thumbs_up": null,
+            "score": 5,
+            "score_normalized": 1
+          },
+          {
+            "id": 106870,
+            "name": "Relevancy",
+            "type": "binary_qualitative",
+            "explanation": "All Main agent responses were relevant to the conversation. The agent consistently provided requested information, confirmed details, and maintained appropriate conversational flow without any irrelevant content, code snippets, or random formatting characters.",
+            "extra": {},
+            "vocera_defined_metric_code": "0b618add",
+            "function_name": "get_relevancy_score_v2",
+            "thumbs_up": null,
+            "score": 5,
+            "score_normalized": 1
+          },
+          {
+            "id": 106808,
+            "name": "Latency (in ms)",
+            "type": "numeric",
+            "explanation": "",
+            "extra": {
+              "graph_data": [
+                {
+                  "latency": 1530,
+                  "speaker": "Main Agent",
+                  "start_time": 9.14
+                },
+                {
+                  "latency": 1160,
+                  "speaker": "Main Agent",
+                  "start_time": 20.03
+                },
+                {
+                  "latency": 1280,
+                  "speaker": "Main Agent",
+                  "start_time": 31.21
+                },
+                {
+                  "latency": 1080,
+                  "speaker": "Main Agent",
+                  "start_time": 44.18
+                },
+                {
+                  "latency": 1150,
+                  "speaker": "Main Agent",
+                  "start_time": 53.84
+                },
+                {
+                  "latency": 1460,
+                  "speaker": "Main Agent",
+                  "start_time": 73.13
+                },
+                {
+                  "latency": 1330,
+                  "speaker": "Main Agent",
+                  "start_time": 87.56
+                },
+                {
+                  "latency": 1770,
+                  "speaker": "Main Agent",
+                  "start_time": 97.63
+                },
+                {
+                  "latency": 1120,
+                  "speaker": "Main Agent",
+                  "start_time": 104.82
+                },
+                {
+                  "latency": 980,
+                  "speaker": "Main Agent",
+                  "start_time": 112.13
+                }
+              ],
+              "max_latency": 1769.999999999996,
+              "percentiles": {
+                "p25": 1127.5,
+                "p50": 1220,
+                "p75": 1427.5,
+                "p90": 1554,
+                "p95": 1662,
+                "p99": 1748.4
+              }
+            },
+            "vocera_defined_metric_code": "cfb51b2c",
+            "function_name": "get_latency",
+            "thumbs_up": null,
+            "score": 1286,
+            "score_normalized": 1286
+          },
+          {
+            "id": 106804,
+            "name": "AI interrupting user",
+            "type": "numeric",
+            "explanation": "Main agent interrupted the testing agent at timestamps:\n- 00:41\n",
+            "extra": {},
+            "vocera_defined_metric_code": "ec29cab5",
+            "function_name": "get_main_agent_interruption",
+            "thumbs_up": null,
+            "score": 1,
+            "score_normalized": 1
+          },
+          {
+            "id": 106807,
+            "name": "Infrastructure Issues",
+            "type": "binary_workflow_adherence",
+            "explanation": "No infrastructure issues detected (audio-based check)",
+            "extra": {},
+            "vocera_defined_metric_code": "b3f8872x",
+            "function_name": "get_infrastructure_issues",
+            "thumbs_up": null,
+            "score": 5,
+            "score_normalized": 1
+          }
+        ]
+      },
+      "metadata": {},
+      "dynamic_variables": {},
+      "testing_channel_index": 0,
+      "timestamp": "2026-02-05T15:55:34.231506Z",
+      "success": false,
+      "is_reviewed": true,
+      "feedback": "",
+      "transcript": "[00:03] Testing Agent: Thank you for calling trial clinics. My name is Devin. Who do I have the pleasure of speaking with?\n[00:09] Main Agent: Hi, Devin. My name is Jenny. I'm a case manager over at Hunter Everidge Law Firm. How are you doing today?\n[00:16] Testing Agent: I'm doing well. Thank you. can I help you?\n[00:20] Main Agent: I'm hoping you can help me out with a medical records request for one of our clients, Jordan Smith.\n[00:27] Testing Agent: Sure. What is the patient's name? Can you repeat\n[00:31] Main Agent: Absolutely. The patient's name is Jordan Smith. That's j o r d a n and s m i t h.\n[00:40] Testing Agent: Got it.\n[00:41] Main Agent: Great.\n[00:41] Testing Agent: And what is the patient's date of birth?\n[00:44] Main Agent: March twelfth nineteen ninety two.\n[00:48] Testing Agent: Got it. And, uh, what are the dates of service you are requesting the records for?\n[00:54] Main Agent: December tenth twenty twenty five through December eighteenth twenty twenty five.\n[01:00] Testing Agent: Okay. So December tenth through December eighteenth twenty twenty five. Let me pull that up. Um, how would you like to receive the records?\n[01:13] Main Agent: Email would be great. You can send them to records at hunter dash everidge dot com.\n[01:21] Testing Agent: Okay. Let me confirm that. It's, uh, records at hunter dash average dot com.\n[01:27] Main Agent: That's correct.\n[01:30] Testing Agent: Okay. I've submitted that request. It typically takes about five to seven days to process this request.\n[01:37] Main Agent: Perfect. That works. Thank you for letting me know.\n[01:43] Testing Agent: Okay. Thank you.\n[01:45] Main Agent: That's everything I needed. Thank you so much for your help, Devin. Have a great day.\n[01:50] Testing Agent: You too. Bye.\n[01:52] Main Agent: Bye now.\n",
+      "recording_data": {
+        "shape": [
+          1829440,
+          2
+        ],
+        "sample_rate": 16000,
+        "main_speaking": [
+          [
+            9.14,
+            15.25
+          ],
+          [
+            20.03,
+            25.18
+          ],
+          [
+            31.21,
+            34.07
+          ],
+          [
+            34.62,
+            38.12
+          ],
+          [
+            41.58,
+            41.78
+          ],
+          [
+            44.18,
+            45.86
+          ],
+          [
+            53.84,
+            58.5
+          ],
+          [
+            73.13,
+            74.10000000000001
+          ],
+          [
+            74.60000000000001,
+            78.41
+          ],
+          [
+            87.56,
+            88.07000000000001
+          ],
+          [
+            97.63,
+            100.07000000000001
+          ],
+          [
+            104.82000000000001,
+            109.05
+          ],
+          [
+            112.13,
+            112.79
+          ]
+        ],
+        "has_audio_data": true,
+        "total_duration": 114.34,
+        "testing_speaking": [
+          [
+            2.67,
+            7.61
+          ],
+          [
+            12.88,
+            13.09
+          ],
+          [
+            16.77,
+            18.87
+          ],
+          [
+            27.27,
+            29.93
+          ],
+          [
+            39.45,
+            39.88
+          ],
+          [
+            40.67,
+            43.1
+          ],
+          [
+            47.58,
+            48.01
+          ],
+          [
+            48.76,
+            52.69
+          ],
+          [
+            60.35,
+            64.77
+          ],
+          [
+            65.73,
+            66.55
+          ],
+          [
+            67.05,
+            67.62
+          ],
+          [
+            69.97,
+            71.67
+          ],
+          [
+            81.47,
+            86.23
+          ],
+          [
+            90.58,
+            95.86
+          ],
+          [
+            102.85000000000001,
+            103.11
+          ],
+          [
+            103.32000000000001,
+            103.7
+          ],
+          [
+            110.33,
+            110.67
+          ],
+          [
+            110.82000000000001,
+            111.15
+          ]
+        ],
+        "separable_channels": true,
+        "testing_channel_index": 0
+      },
+      "call_ended_reason": "customer-ended-call",
+      "dropoff_point": "",
+      "topic": "Medical Provider Inquiry",
+      "customer_number": "",
+      "user_generated_transcript": null,
+      "error_message": "",
+      "created_at": "2026-02-05T15:55:34.241815Z",
+      "updated_at": "2026-02-05T17:06:19.140786Z",
+      "call_id": "019c2e82-0064-7229-bab2-4d5e9d937928",
+      "agent": 11005
+    },
+    ]
+}

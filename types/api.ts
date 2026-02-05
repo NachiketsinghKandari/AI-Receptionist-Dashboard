@@ -272,7 +272,6 @@ export interface EODReport {
   id: string;
   report_date: string;
   raw_data: EODRawData;
-  ai_insights: string;
   full_report: string | null;     // AI-generated full report (all calls)
   errors: number | null;          // Error count computed by AI
   success_report: string | null;  // AI-generated report for successful calls

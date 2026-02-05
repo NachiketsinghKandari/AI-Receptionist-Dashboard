@@ -112,7 +112,6 @@ export async function POST(request: NextRequest) {
       .insert({
         report_date: reportDate,
         raw_data: rawData,
-        ai_insights: '',
         trigger_type: triggerType,
         full_report: null,
         errors: null,

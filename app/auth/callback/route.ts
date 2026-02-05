@@ -1,6 +1,6 @@
 /**
- * OAuth callback route for Supabase Google authentication
- * Handles the redirect from Google OAuth and exchanges the code for a session
+ * Auth callback route for Supabase authentication
+ * Handles OAuth redirects and password recovery flows
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,6 +10,7 @@ import { isEmailAllowed } from '@/lib/auth/allowlist';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
+  const type = searchParams.get('type');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
@@ -36,6 +37,11 @@ export async function GET(request: NextRequest) {
     if (exchangeError) {
       console.error('Failed to exchange code for session:', exchangeError.message);
       return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
+    }
+
+    // Handle password recovery flow - redirect to reset password page
+    if (type === 'recovery') {
+      return NextResponse.redirect(`${origin}/reset-password`);
     }
 
     // Get the user's email from the session
