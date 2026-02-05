@@ -20,7 +20,7 @@ import { DEFAULT_PAGE_LIMIT, WEBHOOK_PLATFORMS } from '@/lib/constants';
 import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Webhook } from '@/types/database';
 import type { SortOrder } from '@/types/api';
-import { format } from 'date-fns';
+import { formatUTCTimestamp } from '@/lib/formatting';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
 
@@ -63,10 +63,10 @@ const columns: ColumnDef<Webhook>[] = [
   },
   {
     accessorKey: 'received_at',
-    header: 'Received',
+    header: 'Received (UTC)',
     cell: ({ row }) => {
       const value = row.getValue('received_at') as string;
-      return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+      return formatUTCTimestamp(value);
     },
   },
 ];

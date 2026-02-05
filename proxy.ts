@@ -1,21 +1,14 @@
 /**
  * Auth proxy - protects dashboard routes
  * Next.js 16+ uses proxy.ts instead of middleware.ts
+ * Uses Supabase Auth for session validation
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+import { createServerClient } from '@supabase/ssr';
 
-const PUBLIC_PATHS = ['/login', '/api/auth'];
-
-function getJwtSecret(): Uint8Array | null {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    return null;
-  }
-  return new TextEncoder().encode(secret);
-}
+const PUBLIC_PATHS = ['/login', '/api/auth', '/auth/callback'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(p => pathname.startsWith(p));
@@ -29,28 +22,48 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check session cookie
-  const token = request.cookies.get('session')?.value;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_STAGE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY;
 
-  if (!token) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('NEXT_PUBLIC_SUPABASE_STAGE_URL and NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY must be set');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  const secret = getJwtSecret();
-  if (!secret) {
-    console.error('JWT_SECRET environment variable is not configured');
+  // Create a response that we can modify
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        );
+        response = NextResponse.next({
+          request,
+        });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
+
+  // Refresh session if expired - required for Server Components
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  try {
-    await jwtVerify(token, secret);
-    return NextResponse.next();
-  } catch {
-    // Invalid or expired token - clear cookie and redirect to login
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.delete('session');
-    return response;
-  }
+  return response;
 }
 
 export const config = {

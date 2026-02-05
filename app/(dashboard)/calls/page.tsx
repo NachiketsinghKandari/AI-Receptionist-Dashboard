@@ -24,11 +24,10 @@ import { useFirms } from '@/hooks/use-firms';
 import { useDebounce } from '@/hooks/use-debounce';
 import { DEFAULT_PAGE_LIMIT, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants';
 import { useDateFilter } from '@/components/providers/date-filter-provider';
-import { formatDuration } from '@/lib/formatting';
+import { formatDuration, formatUTCTimestamp } from '@/lib/formatting';
 import type { CallListItem, Firm } from '@/types/database';
 import type { SortOrder, FlaggedCallListItem } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
-import { format } from 'date-fns';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { CALL_FILTER_FIELDS } from '@/lib/filter-fields';
@@ -54,17 +53,10 @@ function createColumns(
     },
     {
       accessorKey: 'platform_call_id',
-      header: 'Correlation ID',
+      header: 'Corr. ID',
       cell: ({ row }) => {
         const value = row.getValue('platform_call_id') as string | null;
-        return value ? (
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-xs truncate max-w-[100px]">{value}</span>
-            <CopyButton value={value} />
-          </div>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        );
+        return value ? <CopyButton value={value} /> : <span className="text-muted-foreground">-</span>;
       },
     },
     {
@@ -121,10 +113,10 @@ function createColumns(
     },
     {
       accessorKey: 'started_at',
-      header: 'Started',
+      header: 'Started (UTC)',
       cell: ({ row }) => {
         const value = row.getValue('started_at') as string;
-        return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+        return formatUTCTimestamp(value);
       },
     },
     {
@@ -735,9 +727,9 @@ export default function CallsPage() {
   };
 
   // Compute correlation IDs to filter by based on Cekura status
-  const cekuraFilteredCorrelationIds = useMemo(() => {
+  const cekuraFilterResult = useMemo(() => {
     if (!cekuraCallsData?.calls) {
-      return null; // No data yet
+      return { include: null, exclude: null }; // No data yet
     }
 
     const statusValues = extractedFilters.cekuraStatusValues;
@@ -747,12 +739,11 @@ export default function CallsPage() {
     const emptyFilter = extractedFilters.cekuraStatusEmpty;
 
     // Handle is_empty (calls without Cekura data)
-    // When is_empty is true, we need calls NOT in cekuraCallsData
-    // Return empty array to signal "use negative filter" - actual filtering happens at API level
+    // Return special object to signal exclude filter
     if (emptyFilter === false) {
-      // is_empty: return empty array to indicate no Cekura correlation IDs should match
-      // The API will then return calls that DON'T have matching correlation IDs
-      return [];
+      // is_empty: return all Cekura IDs as 'exclude' - calls NOT in this list will be returned
+      const allCekuraIds = Array.from(cekuraCallsData.calls.keys());
+      return { include: null, exclude: allCekuraIds };
     }
 
     // Handle is_not_empty (calls with Cekura data)
@@ -762,19 +753,19 @@ export default function CallsPage() {
       cekuraCallsData.calls.forEach((_, correlationId) => {
         matchingIds.push(correlationId);
       });
-      return matchingIds;
+      return { include: matchingIds, exclude: null };
     }
 
     // If neither include, exclude, nor sidebar filter is set, no Cekura filtering
     if (effectiveCekuraStatus === 'all' && !statusValues && !excludeValues) {
-      return null;
+      return { include: null, exclude: null };
     }
 
     // Handle multiple values with AND/OR logic
     if (statusValues && statusValues.length > 1) {
       if (!useUnion) {
         // AND with different values = impossible (a call can only have one status)
-        if (new Set(statusValues).size > 1) return [];
+        if (new Set(statusValues).size > 1) return { include: [], exclude: null };
       }
       // OR logic: match any of the categories
       const matchingIds: string[] = [];
@@ -785,7 +776,7 @@ export default function CallsPage() {
         );
         if (matches) matchingIds.push(correlationId);
       });
-      return matchingIds;
+      return { include: matchingIds, exclude: null };
     }
 
     // Handle multiple exclude values with AND/OR logic
@@ -805,7 +796,7 @@ export default function CallsPage() {
           matchingIds.push(correlationId);
         }
       });
-      return matchingIds;
+      return { include: matchingIds, exclude: null };
     }
 
     // Single value filtering (original logic)
@@ -828,8 +819,12 @@ export default function CallsPage() {
       }
     });
 
-    return matchingIds;
+    return { include: matchingIds, exclude: null };
   }, [effectiveCekuraStatus, effectiveExcludeCekuraStatus, cekuraCallsData, extractedFilters.cekuraStatusValues, extractedFilters.cekuraStatusUseUnion, extractedFilters.excludeCekuraStatusValues, extractedFilters.excludeCekuraStatusUseUnion, extractedFilters.cekuraStatusEmpty]);
+
+  // Extract include/exclude correlation IDs from the filter result
+  const cekuraFilteredCorrelationIds = cekuraFilterResult?.include ?? null;
+  const cekuraExcludeCorrelationIds = cekuraFilterResult?.exclude ?? null;
 
   // Date-only filters for total count (no other filters applied)
   const dateOnlyFilters = useMemo(
@@ -919,13 +914,14 @@ export default function CallsPage() {
       sortBy,
       sortOrder,
       correlationIds: cekuraFilteredCorrelationIds,
+      excludeCorrelationIds: cekuraExcludeCorrelationIds,
       dynamicFilters: extractedFilters.standardFilters,
       // Flag for impossible filter conditions (e.g., is_empty AND is_not_empty)
       hasImpossibleCondition: extractedFilters.hasImpossibleCondition,
       // Include hash of raw filters to ensure cache invalidation when combinators change
       _filtersHash: dynamicFiltersHash,
     }),
-    [effectiveFirmId, effectiveCallType, effectiveCallTypeValues, extractedFilters.callTypeUseUnion, effectiveTransferType, effectiveTransferTypeValues, effectiveMultipleTransfers, extractedFilters.transferTypeUseUnion, extractedFilters.excludeTransferType, extractedFilters.excludeTransferTypeValues, extractedFilters.excludeTransferTypeUseUnion, extractedFilters.excludeCallType, extractedFilters.excludeCallTypeValues, extractedFilters.excludeCallTypeUseUnion, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, extractedFilters.toolCallResultValues, extractedFilters.toolCallResultUseUnion, extractedFilters.excludeToolCallResult, extractedFilters.excludeToolCallResultValues, extractedFilters.excludeToolCallResultUseUnion, extractedFilters.status, extractedFilters.statusValues, extractedFilters.statusUseUnion, extractedFilters.excludeStatus, extractedFilters.excludeStatusValues, extractedFilters.excludeStatusUseUnion, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, extractedFilters.standardFilters, extractedFilters.hasImpossibleCondition, dynamicFiltersHash]
+    [effectiveFirmId, effectiveCallType, effectiveCallTypeValues, extractedFilters.callTypeUseUnion, effectiveTransferType, effectiveTransferTypeValues, effectiveMultipleTransfers, extractedFilters.transferTypeUseUnion, extractedFilters.excludeTransferType, extractedFilters.excludeTransferTypeValues, extractedFilters.excludeTransferTypeUseUnion, extractedFilters.excludeCallType, extractedFilters.excludeCallTypeValues, extractedFilters.excludeCallTypeUseUnion, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, extractedFilters.toolCallResultValues, extractedFilters.toolCallResultUseUnion, extractedFilters.excludeToolCallResult, extractedFilters.excludeToolCallResultValues, extractedFilters.excludeToolCallResultUseUnion, extractedFilters.status, extractedFilters.statusValues, extractedFilters.statusUseUnion, extractedFilters.excludeStatus, extractedFilters.excludeStatusValues, extractedFilters.excludeStatusUseUnion, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, cekuraExcludeCorrelationIds, extractedFilters.standardFilters, extractedFilters.hasImpossibleCondition, dynamicFiltersHash]
   );
 
   // Build filters for flagged calls

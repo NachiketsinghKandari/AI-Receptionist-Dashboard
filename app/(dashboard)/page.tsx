@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Phone,
@@ -32,6 +32,58 @@ import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZ
 
 type TimeRange = 'yesterday' | 'day' | 'week' | 'month' | 'all';
 type StatsPeriod = 'Yesterday' | 'Today' | 'This Month';
+
+// Typing effect hook - animates on reload/new session, instant on client navigation
+function useTypingEffect(text: string | null, speed: number = 100) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [shouldAnimate, setShouldAnimate] = useState(true);
+
+  // Check on mount if this is a reload/new session or client-side navigation
+  useEffect(() => {
+    const sessionKey = 'welcome-typed';
+    const hasTypedThisSession = sessionStorage.getItem(sessionKey);
+
+    // Detect if this is a page reload
+    const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+
+    // Animate on: new session OR reload
+    // Don't animate on: client-side navigation within same session
+    if (hasTypedThisSession && !isReload) {
+      setShouldAnimate(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!text) {
+      setDisplayedText('');
+      return;
+    }
+
+    // If we shouldn't animate, show full text immediately
+    if (!shouldAnimate) {
+      setDisplayedText(text);
+      return;
+    }
+
+    let index = 0;
+    setDisplayedText('');
+
+    const interval = setInterval(() => {
+      if (index < text.length) {
+        setDisplayedText(text.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(interval);
+        sessionStorage.setItem('welcome-typed', 'true');
+      }
+    }, speed);
+
+    return () => clearInterval(interval);
+  }, [text, speed, shouldAnimate]);
+
+  return displayedText;
+}
 
 const quickLinks = [
   {
@@ -88,6 +140,14 @@ export default function HomePage() {
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('Yesterday');
   const [timeRange, setTimeRange] = useState<TimeRange>('yesterday');
   const { user } = useUser();
+
+  // Capitalize first letter of username
+  const displayName = user?.username
+    ? user.username.charAt(0).toUpperCase() + user.username.slice(1)
+    : null;
+
+  // Typing effect for welcome message
+  const typedName = useTypingEffect(displayName);
   const { environment } = useEnvironment();
 
   // Prefetch all chart and overview data for instant tab switching
@@ -211,7 +271,7 @@ export default function HomePage() {
           HelloCounsel {environment.charAt(0).toUpperCase() + environment.slice(1)}
         </p>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-          Welcome {user?.username || 'User'}
+          Welcome{typedName ? ` ${typedName}` : ''}
         </h1>
         <p className="text-sm md:text-base text-muted-foreground mt-1">
           Call routing and management dashboard

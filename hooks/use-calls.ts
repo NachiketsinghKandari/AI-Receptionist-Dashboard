@@ -37,6 +37,9 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   if (filters.correlationIds && filters.correlationIds.length > 0) {
     params.set('correlationIds', filters.correlationIds.join(','));
   }
+  if (filters.excludeCorrelationIds && filters.excludeCorrelationIds.length > 0) {
+    params.set('excludeCorrelationIds', filters.excludeCorrelationIds.join(','));
+  }
   if (filters.dynamicFilters && filters.dynamicFilters.length > 0) {
     params.set('dynamicFilters', JSON.stringify(filters.dynamicFilters));
   }

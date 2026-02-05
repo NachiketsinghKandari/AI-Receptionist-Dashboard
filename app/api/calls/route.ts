@@ -84,6 +84,8 @@ export async function GET(request: NextRequest) {
     const excludeToolCallResultUseUnion = searchParams.get('excludeToolCallResultUseUnion') === 'true';
     // Cekura status filter - comma-separated list of correlation IDs
     const correlationIds = searchParams.get('correlationIds')?.trim() || null;
+    // Exclude correlation IDs (for is_empty filter - exclude calls WITH Cekura data)
+    const excludeCorrelationIds = searchParams.get('excludeCorrelationIds')?.trim() || null;
 
     // Status filter parameters (for call status field)
     const status = searchParams.get('status')?.trim() || null;
@@ -749,6 +751,15 @@ export async function GET(request: NextRequest) {
         });
       }
       query = query.in('platform_call_id', ids);
+    }
+    // Exclude specific correlation IDs (for is_empty filter - calls WITHOUT Cekura data)
+    if (excludeCorrelationIds) {
+      const excludeIds = excludeCorrelationIds.split(',').filter(id => id.length > 0);
+      if (excludeIds.length > 0) {
+        // Use NOT IN to exclude calls that have these correlation IDs
+        // Supabase doesn't have a direct 'not.in' so we use 'or' with 'is.null' and 'not.in'
+        query = query.or(`platform_call_id.is.null,platform_call_id.not.in.(${excludeIds.join(',')})`);
+      }
     }
     if (startDate) {
       query = query.gte('started_at', startDate);

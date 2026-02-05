@@ -16,7 +16,7 @@ import { DEFAULT_PAGE_LIMIT, TRANSFER_STATUSES, TRANSFER_TYPES } from '@/lib/con
 import { useDateFilter } from '@/components/providers/date-filter-provider';
 import type { Transfer } from '@/types/database';
 import type { SortOrder, DynamicFilter } from '@/types/api';
-import { format } from 'date-fns';
+import { formatUTCTimestamp } from '@/lib/formatting';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { TRANSFER_FILTER_FIELDS } from '@/lib/filter-fields';
@@ -59,10 +59,10 @@ const columns: ColumnDef<Transfer>[] = [
   },
   {
     accessorKey: 'transfer_started_at',
-    header: 'Started',
+    header: 'Started (UTC)',
     cell: ({ row }) => {
       const value = row.getValue('transfer_started_at') as string;
-      return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+      return formatUTCTimestamp(value);
     },
   },
 ];

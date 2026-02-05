@@ -16,7 +16,7 @@ import type { Email } from '@/types/database';
 import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import type { SortOrder, DynamicFilter } from '@/types/api';
-import { format } from 'date-fns';
+import { formatUTCTimestamp } from '@/lib/formatting';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { EMAIL_FILTER_FIELDS } from '@/lib/filter-fields';
@@ -77,10 +77,10 @@ const columns: ColumnDef<Email>[] = [
   },
   {
     accessorKey: 'sent_at',
-    header: 'Sent At',
+    header: 'Sent At (UTC)',
     cell: ({ row }) => {
       const value = row.getValue('sent_at') as string;
-      return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+      return formatUTCTimestamp(value);
     },
   },
 ];
@@ -347,9 +347,7 @@ export default function EmailsPage() {
                   <div className="flex">
                     <span className="w-16 text-muted-foreground font-medium shrink-0">Date:</span>
                     <span className="flex-1">
-                      {selectedEmail.sent_at
-                        ? format(new Date(selectedEmail.sent_at), 'PPpp')
-                        : '-'}
+                      {formatUTCTimestamp(selectedEmail.sent_at)} UTC
                     </span>
                   </div>
                   <div className="flex">

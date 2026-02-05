@@ -53,6 +53,7 @@ import { DEFAULT_PAGE_LIMIT } from '@/lib/constants';
 import { JsonViewer } from '@/components/ui/json-viewer';
 import type { EODReport, EODRawData, SortOrder } from '@/types/api';
 import { format } from 'date-fns';
+import { formatUTCTimestamp } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 
 // Panel resize constants
@@ -127,10 +128,10 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
     },
     {
       accessorKey: 'generated_at',
-      header: 'Generated At',
+      header: 'Generated At (UTC)',
       cell: ({ row }) => {
         const value = row.getValue('generated_at') as string;
-        return value ? format(new Date(value), 'yyyy-MM-dd HH:mm') : '-';
+        return formatUTCTimestamp(value);
       },
     },
     {
@@ -619,7 +620,7 @@ function EODReportDetailPanel({
                 <span className="truncate">EOD Report - {report.report_date}</span>
               </h2>
               <p className="text-xs text-muted-foreground truncate">
-                Generated: {report.generated_at ? format(new Date(report.generated_at), 'PPpp') : 'N/A'}
+                Generated: {formatUTCTimestamp(report.generated_at)} UTC
               </p>
             </div>
           </div>
@@ -864,7 +865,7 @@ function EODLeftPanel({
           </div>
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">Generated:</span>
-            <span className="truncate">{rawData?.generated_at ? format(new Date(rawData.generated_at), isMobile ? 'PP' : 'PP HH:mm') : 'N/A'}</span>
+            <span className="truncate">{rawData?.generated_at ? `${formatUTCTimestamp(rawData.generated_at)} UTC` : 'N/A'}</span>
           </div>
         </CardContent>
       </Card>

@@ -54,6 +54,7 @@ export interface CallFilters extends BaseFilters {
   platformCallId?: string | null;
   multipleTransfers?: boolean;
   correlationIds?: string[] | null;
+  excludeCorrelationIds?: string[] | null; // For is_empty filter: exclude calls WITH these correlation IDs
   dynamicFilters?: DynamicFilter[] | null;
   excludeTransferType?: string | null;
   excludeTransferTypeValues?: string[] | null; // multiple exclude values for OR combinator
@@ -167,7 +168,9 @@ export interface SentryEventsResponse {
 // Auth types
 export interface User {
   username: string;
-  apps: string[];
+  email?: string;
+  id?: string;
+  apps?: string[];
 }
 
 export interface Session {

@@ -1,19 +1,28 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth/session';
+import { createAuthServerClient } from '@/lib/supabase/auth-server';
 
 export async function GET() {
   try {
-    const session = await getSession();
+    const supabase = await createAuthServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
+
+    // Get display name from user metadata, or fall back to email username
+    const displayName =
+      user.user_metadata?.name ||
+      user.user_metadata?.full_name ||
+      user.email?.split('@')[0] ||
+      'User';
 
     return NextResponse.json({
       authenticated: true,
       user: {
-        username: session.username,
-        apps: session.apps,
+        email: user.email,
+        id: user.id,
+        username: displayName,
       },
     });
   } catch (error) {

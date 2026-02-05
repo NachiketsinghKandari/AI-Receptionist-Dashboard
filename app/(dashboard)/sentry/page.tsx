@@ -38,7 +38,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useSentryBrowse, type SentryGroupedSummary, type SentryParsedEvent } from '@/hooks/use-sentry-events';
 import { useDebounce } from '@/hooks/use-debounce';
-import { format } from 'date-fns';
+import { formatUTCTimestamp } from '@/lib/formatting';
 
 const EVENT_TYPES = ['All', 'transfer', 'webhook', 'search_case', 'take_message', 'schedule_callback'];
 const LEVELS = ['All', 'error', 'warning', 'info', 'debug'];
@@ -139,12 +139,7 @@ const columns: ColumnDef<SentryGroupedSummary>[] = [
     header: 'Last Event',
     cell: ({ row }) => {
       const value = row.getValue('last_timestamp') as string;
-      if (!value) return '-';
-      try {
-        return format(new Date(value), 'yyyy-MM-dd HH:mm:ss');
-      } catch {
-        return value;
-      }
+      return formatUTCTimestamp(value, 'datetime-seconds');
     },
   },
 ];
@@ -168,7 +163,7 @@ function EventCard({ event }: { event: SentryParsedEvent }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const timeStr = event.timestamp
-    ? format(new Date(event.timestamp), 'HH:mm:ss')
+    ? formatUTCTimestamp(event.timestamp, 'datetime-seconds').split(' ')[1] || ''
     : '';
 
   return (
