@@ -267,6 +267,7 @@ export function CallDetailSheet({
         {isMobile && (
           <CallDetailCarousel
             callId={callId}
+            currentIndex={currentIndex}
             highlightReasons={highlightReasons}
             dateRange={dateRange}
             onShare={onShare}

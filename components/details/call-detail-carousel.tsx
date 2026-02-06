@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { Info, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import {
 
 interface CallDetailCarouselProps {
   callId: number | string;
+  currentIndex: number;
   highlightReasons: HighlightReasons;
   dateRange: {
     startDate: string | null;
@@ -54,6 +55,7 @@ const VELOCITY_THRESHOLD = 500; // pixels/second
 
 export function CallDetailCarousel({
   callId,
+  currentIndex,
   highlightReasons,
   dateRange,
   onShare,
@@ -63,13 +65,15 @@ export function CallDetailCarousel({
   hasNext,
 }: CallDetailCarouselProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'transcript'>('details');
-  const [direction, setDirection] = useState(0);
-  // Use callId as the animation key to trigger transitions
-  const [animationKey, setAnimationKey] = useState(callId);
+  const [direction, setDirection] = useState(1);
+  const prevIndexRef = useRef(currentIndex);
 
-  // Update animation key when callId changes (from external navigation like buttons)
-  if (callId !== animationKey) {
-    setAnimationKey(callId);
+  // Detect direction from index change (for button navigation)
+  // This runs during render to update direction before animation starts
+  if (currentIndex !== prevIndexRef.current) {
+    const newDirection = currentIndex > prevIndexRef.current ? 1 : -1;
+    setDirection(newDirection);
+    prevIndexRef.current = currentIndex;
   }
 
   const handleDragEnd = useCallback(
@@ -95,7 +99,7 @@ export function CallDetailCarousel({
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <AnimatePresence initial={false} custom={direction} mode="wait">
         <motion.div
-          key={animationKey}
+          key={callId}
           custom={direction}
           variants={slideVariants}
           initial="enter"
