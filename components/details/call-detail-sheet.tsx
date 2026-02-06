@@ -209,8 +209,8 @@ export function CallDetailSheet({
                 </h2>
                 {call?.platform_call_id && (
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50">
-                    <span className="text-sm font-mono">
-                      {call.platform_call_id}
+                    <span className="text-sm font-mono" title={call.platform_call_id}>
+                      {isMobile ? `${call.platform_call_id.slice(0, 8)}...` : call.platform_call_id}
                     </span>
                     <CopyButton value={call.platform_call_id} />
                   </div>
