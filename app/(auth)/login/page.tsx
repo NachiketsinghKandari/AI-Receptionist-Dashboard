@@ -191,6 +191,15 @@ function LoginContent() {
           <Button type="submit" className="w-full h-12 text-base" disabled={isAnyLoading}>
             {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>
+
+          <div className="text-center">
+            <a
+              href="/forgot-password"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Forgot your password?
+            </a>
+          </div>
         </form>
 
         {/* Google OAuth - hidden for now, enable when configured */}

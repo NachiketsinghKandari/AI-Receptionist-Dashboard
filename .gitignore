@@ -51,4 +51,10 @@ next-env.d.ts
 .windsurf
 .cursor
 
+<<<<<<< fix/report-generation-issue
+# local scripts and data
+scripts/
+misc-ignore/
+=======
+>>>>>>> main
 

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -53,6 +54,7 @@ import {
   MessageSquareText,
   Voicemail,
   PhoneOff,
+  Maximize2,
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
@@ -867,6 +869,7 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
   const [isOpen, setIsOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [transfersAcknowledged, setTransfersAcknowledged] = useState(false);
+  const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -1023,6 +1026,19 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
                   </span>
                   <div className="flex items-center gap-1">
                     <CopyButton value={JSON.stringify(webhook.payload, null, 2)} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsPayloadModalOpen(true);
+                      }}
+                      title="Expand payload"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </Button>
                     <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                   </div>
                 </summary>
@@ -1032,6 +1048,24 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
                   </div>
                 </div>
               </details>
+
+              {/* Full Payload Modal */}
+              <Dialog open={isPayloadModalOpen} onOpenChange={setIsPayloadModalOpen}>
+                <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0">
+                  <DialogHeader className="px-6 py-4 border-b shrink-0">
+                    <div className="flex items-center justify-between">
+                      <DialogTitle className="flex items-center gap-2 text-base">
+                        <FileText className="h-4 w-4" />
+                        Full Payload
+                      </DialogTitle>
+                      <CopyButton value={JSON.stringify(webhook.payload, null, 2)} />
+                    </div>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-auto min-h-0">
+                    <JsonViewer data={webhook.payload} className="rounded-none border-0" />
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </CollapsibleContent>
