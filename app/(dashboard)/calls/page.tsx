@@ -1027,6 +1027,15 @@ export default function CallsPage() {
   // Global index across all pages
   const globalIndex = localIndex >= 0 ? offset + localIndex : -1;
 
+  // Adjacent call IDs for prefetching (only within current page)
+  const adjacentCallIds = useMemo(() => {
+    if (localIndex < 0) return undefined;
+    return {
+      previous: localIndex > 0 ? getCallIdentifier(dataArray[localIndex - 1]) : null,
+      next: localIndex < dataArray.length - 1 ? getCallIdentifier(dataArray[localIndex + 1]) : null,
+    };
+  }, [localIndex, dataArray]);
+
   // Can always navigate if there are multiple items (wrap-around enabled)
   const hasPrevious = totalFiltered > 1;
   const hasNext = totalFiltered > 1;
@@ -1332,6 +1341,7 @@ export default function CallsPage() {
           endDate: effectiveDateRange.endDate ? `${effectiveDateRange.endDate.split('T')[0]}T23:59:59Z` : null,
         }}
         onShare={handleShareCall}
+        adjacentCallIds={adjacentCallIds}
       />
 
       {/* Share Toast */}

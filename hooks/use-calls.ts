@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import type { CallFilters, CallsResponse, CallDetailResponse } from '@/types/api';
 import { CACHE_TTL_DATA } from '@/lib/constants';
@@ -201,4 +202,34 @@ export function useTransferEmailMismatchIds() {
     staleTime: 60 * 1000, // 1 minute
     select: (data) => new Set(data.callIds),
   });
+}
+
+/**
+ * Hook to prefetch call details for smooth carousel navigation.
+ * Returns a function that can be called with call IDs to prefetch.
+ */
+export function usePrefetchCallDetails() {
+  const { environment } = useEnvironment();
+  const queryClient = useQueryClient();
+
+  const prefetch = useCallback(
+    (callIds: (number | string)[]) => {
+      callIds.forEach((id) => {
+        if (id === null || id === undefined) return;
+
+        // Only prefetch if not already in cache
+        const cached = queryClient.getQueryData(['calls', 'detail', environment, id]);
+        if (!cached) {
+          queryClient.prefetchQuery({
+            queryKey: ['calls', 'detail', environment, id],
+            queryFn: () => fetchCallDetail(id, environment),
+            staleTime: CACHE_TTL_DATA * 1000,
+          });
+        }
+      });
+    },
+    [environment, queryClient]
+  );
+
+  return prefetch;
 }
