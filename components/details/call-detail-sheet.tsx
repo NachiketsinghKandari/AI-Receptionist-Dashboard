@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCallDetail } from '@/hooks/use-calls';
 import { usePanelSize } from '@/hooks/use-panel-size';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useSwipe } from '@/hooks/use-swipe';
 import { cn } from '@/lib/utils';
 import {
   CallDetailLeftPanel,
@@ -55,6 +56,14 @@ export function CallDetailSheet({
   const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<'details' | 'transcript'>('details');
+
+  // Swipe navigation for mobile
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: hasNext ? onNext : undefined,
+    onSwipeRight: hasPrevious ? onPrevious : undefined,
+    threshold: 50,
+    enabled: isMobile,
+  });
 
   // Resizable panel state
   const [leftPercent, setLeftPercent] = useState(initialLayout.left ?? 55);
@@ -244,12 +253,13 @@ export function CallDetailSheet({
           </div>
         </div>
 
-        {/* Mobile: Tabbed layout */}
+        {/* Mobile: Tabbed layout with swipe navigation */}
         {isMobile && (
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as 'details' | 'transcript')}
             className="flex-1 flex flex-col min-h-0"
+            {...swipeHandlers}
           >
             <TabsList className="grid w-full grid-cols-2 mx-4 mt-2" style={{ width: 'calc(100% - 2rem)' }}>
               <TabsTrigger value="details" className="flex items-center gap-2">
