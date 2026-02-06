@@ -87,3 +87,7 @@ Optional (for Sentry integration):
 
 Optional (for Cekura integration):
 - `CEKURA_API_KEY` - API key for Cekura call observability
+
+## Git Commit Guidelines
+
+- **Do NOT add `Co-Authored-By: Claude` lines** to commit messages
