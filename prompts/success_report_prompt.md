@@ -13,30 +13,36 @@ You will receive a JSON object containing only successful calls:
 
 {
   "count": <number>,           // Number of successful calls in this report
-  "total": <number>,           // Total calls for the day (including failed)
+  "total": <number>,           // Total calls for the day (same as count in raw_data)
   "report_type": "success",    // Report type indicator
   "generated_at": "<ISO timestamp>",
   "environment": "production" | "staging",
   "calls": [
     {
-      "correlation_id": "<string>",   // Unique call identifier (links VAPI and Cekura)
+      "correlation_id": "<string>",        // Unique call identifier (links VAPI and Cekura)
+      "caller_type": "<string or null>",   // From calls.call_type in database
+      "no_action_needed": <boolean>,       // True if email subject contains "No action needed"
+      "message_taken": <boolean>,          // True if email body contains "took a message"
+      "is_disconnected": <boolean>,        // True if cekura "Disconnection rate" metric score != 5
       "cekura": {
         "id": <number>,
         "call_id": "<string>",
-        "status": "success",               // Will be "success" for these calls
-        "success": true,                   // Will be true for these calls
-        "agent": "<string or null>",
         "call_ended_reason": "<string or null>",
+        "status": "success",               // Will be "success" for these calls
+        "is_reviewed": <boolean>,          // Whether the call has been reviewed
+        "feedback": "<string or null>",    // Reviewer feedback if any
+        "duration": "<string or null>",    // Duration as string (e.g., "01:26")
+        "agent": "<string or null>",
         "dropoff_point": "<string or null>",
         "error_message": "<string or null>",
         "critical_categories": ["<string>", ...],
-        "duration": <number or null>,      // Duration in seconds
         "evaluation": {
           "metrics": [
             {
-              "name": "<string>",          // e.g., "Latency (in ms)", "Transcription Accuracy", "Tool Call Success", "Infrastructure Issues"
-              "score": <number>,
-              "explanation": "<string>"
+              "id": <number>,
+              "name": "<string>",          // e.g., "Latency (in ms)", "Transcription Accuracy", "Tool Call Success", "Disconnection rate"
+              "score": <number or null>,   // Present for non-enum metrics
+              "enum": "<string or null>"   // Present for enum-type metrics
             },
             ...
           ]
@@ -44,7 +50,15 @@ You will receive a JSON object containing only successful calls:
       },
       "sentry": {
         "errors": [...]                    // Usually empty for successful calls
-      }
+      },
+      "transfers": [                       // Extracted from end-of-call webhook
+        {
+          "destination": "<string>",       // staff_name or "Customer Success"
+          "mode": "transfer_direct" | "transfer_experimental_voicemail" | "transfer_experimental_pickup",
+          "result": "<string>"             // e.g., "completed", "cancelled"
+        },
+        ...
+      ]
     },
     ...
   ]

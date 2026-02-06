@@ -1,12 +1,12 @@
 /**
  * EOD Report generation API route
- * Fetches data from Cekura, Sentry, and local database (calls, webhooks)
+ * Fetches data from Cekura, Sentry, and local database (calls, transfers_details)
  * Merges by correlation_id
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse, decodeBase64Payload } from '@/lib/api/utils';
+import { errorResponse } from '@/lib/api/utils';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import type { Environment } from '@/lib/constants';
 import type {
@@ -76,124 +76,32 @@ interface SentryDiscoverResponse {
 }
 
 /**
- * Extract transfer details from webhook artifact
- * Implements the Python logic provided for transfer extraction
+ * Map DB transfer_type to EODTransferData mode
  */
-function extractTransferDetails(
-  artifact: Record<string, unknown>
-): EODTransferData[] {
-  const messages = (artifact.messages as Array<Record<string, unknown>>) || [];
-  const transfers = (artifact.transfers as Array<Record<string, unknown>>) || [];
-
-  // Find all transfer_call tool calls
-  const transferToolCalls: Array<{ id: string; arguments: Record<string, unknown> }> = [];
-  const toolCallResults: Record<string, string> = {};
-
-  for (const msg of messages) {
-    if (msg.role === 'tool_calls' && msg.toolCalls) {
-      const toolCalls = msg.toolCalls as Array<Record<string, unknown>>;
-      for (const tc of toolCalls) {
-        const func = tc.function as Record<string, unknown> | undefined;
-        if (func?.name === 'transfer_call') {
-          const argsRaw = func.arguments as string | Record<string, unknown>;
-          let args: Record<string, unknown>;
-          try {
-            args = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
-          } catch {
-            args = {};
-          }
-          transferToolCalls.push({ id: tc.id as string, arguments: args });
-        }
-      }
-    }
-
-    if (msg.role === 'tool_call_result') {
-      toolCallResults[msg.toolCallId as string] = (msg.result as string) || '';
-    }
+function mapTransferType(transferType: string | null): EODTransferData['mode'] {
+  switch (transferType) {
+    case 'voicemail':
+      return 'transfer_experimental_voicemail';
+    case 'has_conversation':
+    case 'two_way_opt_in':
+      return 'transfer_experimental_pickup';
+    default:
+      return 'transfer_direct';
   }
+}
 
-  if (transferToolCalls.length === 0) {
-    return [];
+/**
+ * Derive transfer result from DB status and error message.
+ * "failed due to user hangup" in error_message → cancelled.
+ */
+function deriveTransferResult(
+  transferStatus: string | null,
+  errorMessage: string | null
+): string {
+  if (errorMessage?.toLowerCase().includes('failed due to user hangup')) {
+    return 'cancelled';
   }
-
-  // Build destination string from arguments
-  function buildDestination(args: Record<string, unknown>): string {
-    // If staff_name exists, use it
-    if (args.staff_name) {
-      return args.staff_name as string;
-    }
-    // If caller_type is "customer_success", return "Customer Success"
-    if (args.caller_type === 'customer_success') {
-      return 'Customer Success';
-    }
-    return 'Unknown';
-  }
-
-  const results: EODTransferData[] = [];
-
-  if (transfers.length === 0) {
-    // No artifact.transfers - use tool call results
-    for (const tc of transferToolCalls) {
-      const rawResult = toolCallResults[tc.id] || '';
-      const resultLower = rawResult.toLowerCase();
-
-      let transferResult: string;
-      if (resultLower.includes('executed')) {
-        transferResult = 'completed';
-      } else if (resultLower.includes('cancel')) {
-        transferResult = 'cancelled';
-      } else {
-        transferResult = rawResult.trim().replace(/\.$/, '') || 'unknown';
-      }
-
-      results.push({
-        destination: buildDestination(tc.arguments),
-        mode: 'transfer_direct',
-        transfer_result: transferResult,
-      });
-    }
-  } else {
-    // Have artifact.transfers - match with tool calls
-    for (let i = 0; i < transferToolCalls.length; i++) {
-      const tc = transferToolCalls[i];
-      const transferEntry = i < transfers.length ? transfers[i] : null;
-
-      let mode: EODTransferData['mode'];
-      let transferResult: string;
-
-      if (transferEntry) {
-        const transcript = ((transferEntry.transcript as string) || '').toLowerCase();
-        const status = (transferEntry.status as string) || 'unknown';
-
-        if (transcript.includes('voicemail') || transcript.includes('voice mail')) {
-          mode = 'transfer_experimental_voicemail';
-        } else {
-          mode = 'transfer_experimental_pickup';
-        }
-        transferResult = status;
-      } else {
-        const rawResult = toolCallResults[tc.id] || '';
-        mode = 'transfer_direct';
-        const resultLower = rawResult.toLowerCase();
-
-        if (resultLower.includes('executed')) {
-          transferResult = 'completed';
-        } else if (resultLower.includes('cancel')) {
-          transferResult = 'cancelled';
-        } else {
-          transferResult = rawResult.trim().replace(/\.$/, '') || 'unknown';
-        }
-      }
-
-      results.push({
-        destination: buildDestination(tc.arguments),
-        mode,
-        transfer_result: transferResult,
-      });
-    }
-  }
-
-  return results;
+  return transferStatus || 'unknown';
 }
 
 /**
@@ -212,7 +120,7 @@ async function fetchCekuraCalls(
   const agentId = CEKURA_AGENT_IDS[environment];
   const allResults: CekuraApiResult[] = [];
 
-  let nextUrl: string | null = `https://api.cekura.ai/observability/v1/call-logs/?timestamp_from=${encodeURIComponent(startDate)}&timestamp_to=${encodeURIComponent(endDate)}&agent_id=${agentId}`;
+  let nextUrl: string | null = `https://api.cekura.ai/observability/v1/call-logs/?timestamp_from=${encodeURIComponent(startDate)}&timestamp_to=${encodeURIComponent(endDate)}&agent_id=${agentId}&page_size=100`;
 
   while (nextUrl) {
     const response = await fetch(nextUrl, {
@@ -281,6 +189,8 @@ async function fetchCekuraCalls(
  * Fetch error events from Sentry Discover API
  */
 async function fetchSentryErrors(
+  startDate: string,
+  endDate: string,
   environment: Environment
 ): Promise<Map<string, SentryErrorRawData[]>> {
   const org = process.env.SENTRY_ORG;
@@ -304,7 +214,8 @@ async function fetchSentryErrors(
   params.append('field', 'environment');
   params.set('query', 'level:error');
   params.set('environment', sentryEnv);
-  params.set('statsPeriod', '1d');
+  params.set('start', startDate);
+  params.set('end', endDate);
   params.set('per_page', '100');
 
   const errorsMap = new Map<string, SentryErrorRawData[]>();
@@ -388,45 +299,132 @@ async function fetchSentryErrors(
 }
 
 /**
- * Fetch caller_type (call_type) from calls table for given correlation IDs
+ * Parse duration string "MM:SS" or "HH:MM:SS" to seconds
  */
-async function fetchCallerTypes(
+function parseDurationToSeconds(duration: string | null): number {
+  if (!duration) return 0;
+  const parts = duration.split(':').map(Number);
+  if (parts.length === 2) {
+    // MM:SS
+    return parts[0] * 60 + parts[1];
+  } else if (parts.length === 3) {
+    // HH:MM:SS
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return 0;
+}
+
+/**
+ * Check if cekura evaluation indicates disconnection
+ * Disconnection rate metric: score = 5 means NOT disconnected, anything else means disconnected
+ */
+function checkIsDisconnected(cekura: CekuraCallRawData): boolean {
+  if (!cekura.evaluation?.metrics) return false;
+  const metric = cekura.evaluation.metrics.find(m => m.name === 'Disconnection rate');
+  if (!metric || metric.score === undefined || metric.score === null) return false;
+  return metric.score !== 5;
+}
+
+interface EmailInfo {
+  no_action_needed: boolean;
+  message_taken: boolean;
+}
+
+/**
+ * Fetch caller_type and email info from calls + email_logs tables
+ * Combined into one function to avoid duplicate calls table queries
+ */
+async function fetchCallsInfo(
   correlationIds: string[],
   environment: Environment
-): Promise<Map<string, string>> {
+): Promise<{ callerTypes: Map<string, string>; emailInfo: Map<string, EmailInfo> }> {
+  const callerTypes = new Map<string, string>();
+  const emailInfo = new Map<string, EmailInfo>();
+
   if (correlationIds.length === 0) {
-    return new Map();
+    return { callerTypes, emailInfo };
   }
 
   const supabase = getSupabaseClient(environment);
-  const callerTypeMap = new Map<string, string>();
 
-  // Fetch in batches of 100 to avoid query size limits
+  // Initialize all email info as false
+  for (const id of correlationIds) {
+    emailInfo.set(id, { no_action_needed: false, message_taken: false });
+  }
+
+  // Single query to calls table for both caller_type AND call IDs (for email_logs join)
   const batchSize = 100;
+  const callIdToCorrelationId = new Map<number, string>();
+
   for (let i = 0; i < correlationIds.length; i += batchSize) {
     const batch = correlationIds.slice(i, i + batchSize);
     const { data, error } = await supabase
       .from('calls')
-      .select('platform_call_id, call_type')
+      .select('id, platform_call_id, call_type')
       .in('platform_call_id', batch);
 
     if (error) {
-      console.error('Error fetching caller types:', error);
+      console.error('Error fetching calls info:', error);
       continue;
     }
 
     for (const row of data || []) {
-      if (row.platform_call_id && row.call_type) {
-        callerTypeMap.set(row.platform_call_id, row.call_type);
+      if (row.platform_call_id) {
+        if (row.id) {
+          callIdToCorrelationId.set(row.id, row.platform_call_id);
+        }
+        if (row.call_type) {
+          callerTypes.set(row.platform_call_id, row.call_type);
+        }
       }
     }
   }
 
-  return callerTypeMap;
+  if (callIdToCorrelationId.size === 0) {
+    return { callerTypes, emailInfo };
+  }
+
+  // Fetch email_logs for these call_ids
+  const callIds = [...callIdToCorrelationId.keys()];
+  for (let i = 0; i < callIds.length; i += batchSize) {
+    const batch = callIds.slice(i, i + batchSize);
+    const { data, error } = await supabase
+      .from('email_logs')
+      .select('call_id, subject, body')
+      .in('call_id', batch);
+
+    if (error) {
+      console.error('Error fetching email logs:', error);
+      continue;
+    }
+
+    for (const row of data || []) {
+      if (!row.call_id) continue;
+      const correlationId = callIdToCorrelationId.get(row.call_id);
+      if (!correlationId) continue;
+
+      const current = emailInfo.get(correlationId) || { no_action_needed: false, message_taken: false };
+
+      // Check subject for "No action needed" (case insensitive)
+      if (row.subject && row.subject.toLowerCase().includes('no action needed')) {
+        current.no_action_needed = true;
+      }
+
+      // Check body for "took a message" (case insensitive)
+      if (row.body && row.body.toLowerCase().includes('took a message')) {
+        current.message_taken = true;
+      }
+
+      emailInfo.set(correlationId, current);
+    }
+  }
+
+  return { callerTypes, emailInfo };
 }
 
 /**
- * Fetch end-of-call webhooks and extract transfer data for given correlation IDs
+ * Fetch transfer data from the transfers_details table for given correlation IDs.
+ * Uses transferred_to_name as the destination instead of parsing webhook payloads.
  */
 async function fetchTransfers(
   correlationIds: string[],
@@ -439,37 +437,31 @@ async function fetchTransfers(
   const supabase = getSupabaseClient(environment);
   const transfersMap = new Map<string, EODTransferData[]>();
 
-  // Fetch in batches of 100
   const batchSize = 100;
   for (let i = 0; i < correlationIds.length; i += batchSize) {
     const batch = correlationIds.slice(i, i + batchSize);
     const { data, error } = await supabase
-      .from('webhook_dumps')
-      .select('platform_call_id, payload')
-      .in('platform_call_id', batch)
-      .eq('webhook_type', 'end-of-call-report');
+      .from('transfers_details')
+      .select('transferred_to_name, transfer_type, transfer_status, error_message, calls!inner(platform_call_id)')
+      .in('calls.platform_call_id', batch);
 
     if (error) {
-      console.error('Error fetching webhooks:', error);
+      console.error('Error fetching transfers:', error);
       continue;
     }
 
     for (const row of data || []) {
-      if (!row.platform_call_id) continue;
+      const calls = row.calls as unknown as { platform_call_id: string } | null;
+      const correlationId = calls?.platform_call_id;
+      if (!correlationId) continue;
 
-      try {
-        const decodedPayload = decodeBase64Payload(row.payload);
-        const message = decodedPayload?.message as Record<string, unknown> | undefined;
-        const artifact = message?.artifact as Record<string, unknown> | undefined;
-
-        if (artifact) {
-          const transfers = extractTransferDetails(artifact);
-          transfersMap.set(row.platform_call_id, transfers);
-        }
-      } catch {
-        // Skip webhooks with parsing errors
-        transfersMap.set(row.platform_call_id, []);
-      }
+      const existing = transfersMap.get(correlationId) || [];
+      existing.push({
+        destination: row.transferred_to_name || 'Unknown',
+        mode: mapTransferType(row.transfer_type),
+        result: deriveTransferResult(row.transfer_status, row.error_message),
+      });
+      transfersMap.set(correlationId, existing);
     }
   }
 
@@ -504,36 +496,80 @@ export async function POST(request: NextRequest) {
     // Fetch Cekura and Sentry data in parallel
     const [cekuraResult, sentryErrors] = await Promise.all([
       fetchCekuraCalls(startDate, endDate, environment),
-      fetchSentryErrors(environment),
+      fetchSentryErrors(startDate, endDate, environment),
     ]);
 
     // Get all correlation IDs for additional data fetches
     const correlationIds = [...cekuraResult.calls.keys()];
 
-    // Fetch caller_type and transfers from database in parallel
-    const [callerTypeMap, transfersMap] = await Promise.all([
-      fetchCallerTypes(correlationIds, environment),
+    // Fetch calls info (caller_type + email info) and transfers in parallel
+    const [callsInfo, transfersMap] = await Promise.all([
+      fetchCallsInfo(correlationIds, environment),
       fetchTransfers(correlationIds, environment),
     ]);
+    const { callerTypes: callerTypeMap, emailInfo: emailInfoMap } = callsInfo;
 
     // Merge all data by correlation_id and separate by status
     const successCalls: EODCallRawData[] = [];
     const failureCalls: EODCallRawData[] = [];
 
+    // Aggregate counters
+    let timeSavedSeconds = 0;
+    let totalCallTimeSeconds = 0;
+    let messagesTakenCount = 0;
+    let disconnectedCount = 0;
+
+    // Transfer report counters
+    let transferAttemptCount = 0;
+    let transferSuccessCount = 0;
+    const transferDestinationStats = new Map<string, { attempts: number; failed: number }>();
+
     for (const [correlationId, cekuraData] of cekuraResult.calls) {
       const sentryErrorsForCall = sentryErrors.get(correlationId) || [];
       const callerType = callerTypeMap.get(correlationId) || null;
       const transfers = transfersMap.get(correlationId) || [];
+      const emailInfo = emailInfoMap.get(correlationId) || { no_action_needed: false, message_taken: false };
+      const isDisconnected = checkIsDisconnected(cekuraData);
 
       const callData: EODCallRawData = {
         correlation_id: correlationId,
+        caller_type: callerType,
+        no_action_needed: emailInfo.no_action_needed,
+        message_taken: emailInfo.message_taken,
+        is_disconnected: isDisconnected,
         cekura: cekuraData,
         sentry: {
           errors: sentryErrorsForCall,
         },
-        caller_type: callerType,
         transfers,
       };
+
+      // Calculate aggregates
+      const callDuration = parseDurationToSeconds(cekuraData.duration);
+      totalCallTimeSeconds += callDuration;
+      if (emailInfo.no_action_needed) {
+        timeSavedSeconds += callDuration;
+      }
+      if (emailInfo.message_taken) {
+        messagesTakenCount++;
+      }
+      if (isDisconnected) {
+        disconnectedCount++;
+      }
+
+      // Calculate transfer report aggregates
+      for (const transfer of transfers) {
+        transferAttemptCount++;
+        if (transfer.result === 'completed') {
+          transferSuccessCount++;
+        }
+        const current = transferDestinationStats.get(transfer.destination) || { attempts: 0, failed: 0 };
+        current.attempts++;
+        if (transfer.result !== 'completed') {
+          current.failed++;
+        }
+        transferDestinationStats.set(transfer.destination, current);
+      }
 
       // Separate calls by cekura status
       if (cekuraData.status === 'success') {
@@ -547,10 +583,30 @@ export async function POST(request: NextRequest) {
     successCalls.sort((a, b) => b.cekura.id - a.cekura.id);
     failureCalls.sort((a, b) => b.cekura.id - a.cekura.id);
 
+    // Calculate disconnection rate as percentage
+    const totalCalls = cekuraResult.count;
+    const disconnectionRate = totalCalls > 0 ? (disconnectedCount / totalCalls) * 100 : 0;
+
+    // Build transfer_map sorted by count descending
+    const sortedTransferEntries = [...transferDestinationStats.entries()]
+      .sort((a, b) => b[1].attempts - a[1].attempts);
+    const transferMap: Record<string, { attempts: number; failed: number }> = {};
+    for (const [destination, stats] of sortedTransferEntries) {
+      transferMap[destination] = stats;
+    }
+
     const rawData: EODRawData = {
       count: cekuraResult.count,
-      total: cekuraResult.count,
-      errors: failureCalls.length,
+      time_saved: timeSavedSeconds,
+      total_call_time: totalCallTimeSeconds,
+      messages_taken: messagesTakenCount,
+      disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places
+      failure_count: failureCalls.length,
+      transfers_report: {
+        attempt_count: transferAttemptCount,
+        success_count: transferSuccessCount,
+        transfer_map: transferMap,
+      },
       success: successCalls,
       failure: failureCalls,
       generated_at: new Date().toISOString(),

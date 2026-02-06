@@ -248,27 +248,45 @@ export interface SentryErrorRawData {
   environment: string;
 }
 
-// Transfer data extracted from end-of-call webhooks
+// Transfer data sourced from transfers_details table
 export interface EODTransferData {
-  destination: string;  // staff_name or "Customer Success" if caller_type is "customer_success"
+  destination: string;  // transferred_to_name from transfers_details
   mode: 'transfer_direct' | 'transfer_experimental_voicemail' | 'transfer_experimental_pickup';
-  transfer_result: string;
+  result: string;       // transfer_status; "cancelled" if error_message contains "failed due to user hangup"
 }
 
 export interface EODCallRawData {
   correlation_id: string;
+  caller_type: string | null;  // From calls.call_type in database
+  no_action_needed: boolean;  // True if email subject contains "No action needed"
+  message_taken: boolean;     // True if email body contains "took a message"
+  is_disconnected: boolean;   // True if cekura "Disconnection rate" metric score != 5
   cekura: CekuraCallRawData;
   sentry: {
     errors: SentryErrorRawData[];
   };
-  caller_type: string | null;  // From calls.call_type in database
-  transfers: EODTransferData[];  // Extracted from end-of-call webhook
+  transfers: EODTransferData[];  // From transfers_details table
+}
+
+export interface EODTransferDestinationStats {
+  attempts: number;  // total transfer attempts to this destination
+  failed: number;    // transfers where result !== 'completed'
+}
+
+export interface EODTransferReport {
+  attempt_count: number;                                        // total transfer attempts across all calls
+  success_count: number;                                        // transfers with result === 'completed'
+  transfer_map: Record<string, EODTransferDestinationStats>;    // destination -> stats, sorted by count descending
 }
 
 export interface EODRawData {
   count: number;              // total calls
-  total: number;              // same as count (for clarity)
-  errors: number;             // count of calls where status !== 'success'
+  time_saved: number;         // sum of durations (in seconds) where no_action_needed is true
+  total_call_time: number;    // sum of all call durations (in seconds)
+  messages_taken: number;     // count of calls where message_taken is true
+  disconnection_rate: number; // percentage of calls where is_disconnected is true
+  failure_count: number;      // count of calls where status !== 'success'
+  transfers_report: EODTransferReport;  // aggregate transfer statistics
   success: EODCallRawData[];  // calls where cekura.status === 'success'
   failure: EODCallRawData[];  // calls where cekura.status !== 'success'
   generated_at: string;

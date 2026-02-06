@@ -172,7 +172,7 @@ export async function generateAIReportForEOD(
     // Build input data with only the relevant calls
     const inputData = {
       count: calls.length,
-      total: rawData.total,
+      total: rawData.count,
       report_type: reportType,
       calls,
       generated_at: rawData.generated_at,
@@ -231,10 +231,10 @@ export async function generateAIReportForEOD(
     aiResult.ai_response = processedMarkdown;
 
     // Calculate error count from raw data (for updating errors column)
-    // Use rawData.errors if available, otherwise count from failure array or filter old calls
+    // Use rawData.failure_count if available, otherwise count from failure array or filter old calls
     let errorCount: number;
-    if (typeof rawData.errors === 'number') {
-      errorCount = rawData.errors;
+    if (typeof rawData.failure_count === 'number') {
+      errorCount = rawData.failure_count;
     } else if (hasNewStructure) {
       errorCount = (rawData.failure || []).length;
     } else {

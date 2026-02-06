@@ -97,7 +97,7 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
       header: 'Calls',
       cell: ({ row }) => {
         const rawData = row.original.raw_data as EODRawData;
-        return <span className="font-mono">{rawData?.count ?? rawData?.total ?? 0}</span>;
+        return <span className="font-mono">{rawData?.count ?? 0}</span>;
       },
     },
     {
@@ -107,7 +107,7 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
         const rawData = row.original.raw_data as EODRawData;
         // Handle both new structure (errors/failure) and old structure (calls array)
         const oldCalls = (rawData as unknown as { calls?: typeof rawData.failure })?.calls;
-        const errorCount = rawData?.errors
+        const errorCount = rawData?.failure_count
           ?? rawData?.failure?.length
           ?? oldCalls?.filter(c => c.cekura?.status !== 'success').length
           ?? 0;
@@ -782,8 +782,8 @@ function EODLeftPanel({
     ? (rawData?.failure ?? [])
     : oldCalls.filter(c => c.cekura?.status !== 'success');
 
-  const totalCalls = rawData?.count ?? rawData?.total ?? (successCalls.length + failureCalls.length);
-  const errorCount = rawData?.errors ?? failureCalls.length;
+  const totalCalls = rawData?.count ?? (successCalls.length + failureCalls.length);
+  const errorCount = rawData?.failure_count ?? failureCalls.length;
   const successCount = successCalls.length;
 
   // Calculate previous report stats for comparison
@@ -795,11 +795,11 @@ function EODLeftPanel({
     ? (prevRawData?.success?.length ?? 0)
     : prevOldCalls.filter(c => c.cekura?.status === 'success').length;
 
-  const prevErrorCount = prevRawData?.errors ?? (prevHasNewStructure
+  const prevErrorCount = prevRawData?.failure_count ?? (prevHasNewStructure
     ? (prevRawData?.failure?.length ?? 0)
     : prevOldCalls.filter(c => c.cekura?.status !== 'success').length);
 
-  const prevTotalCalls = prevRawData?.count ?? prevRawData?.total ?? (prevSuccessCount + prevErrorCount);
+  const prevTotalCalls = prevRawData?.count ?? (prevSuccessCount + prevErrorCount);
 
   // Calculate percentage changes
   const totalChange = previousReport ? calcPercentChange(totalCalls, prevTotalCalls) : null;
