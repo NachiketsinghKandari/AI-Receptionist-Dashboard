@@ -6,12 +6,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse } from '@/lib/api/utils';
+import { decodeBase64Payload, errorResponse } from '@/lib/api/utils';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import type { Environment } from '@/lib/constants';
 import type {
   EODRawData,
   EODCallRawData,
+  EODStructuredOutput,
   CekuraCallRawData,
   CekuraEvaluationFiltered,
   CekuraMetricFiltered,
@@ -102,6 +103,96 @@ function deriveTransferResult(
     return 'cancelled';
   }
   return transferStatus || 'unknown';
+}
+
+/**
+ * Check if a structured output result indicates a tool call failure.
+ * Failure cases:
+ * - result === "failure" (string)
+ * - result === false (boolean)
+ * - result is an object with a "failure" key whose value is not "0"
+ * Ignored: result === "no_search" (not a failure)
+ */
+function isStructuredOutputFailure(result: unknown): boolean {
+  if (result === 'no_search') return false;
+  if (result === 'failure') return true;
+  if (result === false) return true;
+  if (typeof result === 'object' && result !== null && 'failure' in result) {
+    const failureVal = (result as Record<string, unknown>).failure;
+    return failureVal !== '0' && failureVal !== 0;
+  }
+  return false;
+}
+
+/**
+ * Parse structuredOutputs from a webhook payload into EODStructuredOutput array.
+ * structuredOutputs is a Record of UUID keys, each containing { name, result }.
+ * Returns the parsed outputs and whether any indicate failure.
+ */
+function parseStructuredOutputs(
+  structuredOutputs: Record<string, unknown> | undefined
+): { outputs: EODStructuredOutput[]; hasFailure: boolean } {
+  if (!structuredOutputs) return { outputs: [], hasFailure: false };
+
+  const outputs: EODStructuredOutput[] = [];
+  let hasFailure = false;
+
+  for (const value of Object.values(structuredOutputs)) {
+    if (typeof value !== 'object' || value === null) continue;
+    const entry = value as Record<string, unknown>;
+    const name = entry.name;
+    const result = entry.result;
+    if (typeof name !== 'string') continue;
+
+    outputs.push({ name, result });
+
+    if (result !== 'no_search' && isStructuredOutputFailure(result)) {
+      hasFailure = true;
+    }
+  }
+
+  return { outputs, hasFailure };
+}
+
+/**
+ * Fetch webhook payloads (end-of-call-report) for given correlation IDs
+ * and extract structuredOutputs from each.
+ */
+async function fetchStructuredOutputs(
+  correlationIds: string[],
+  environment: Environment
+): Promise<Map<string, { outputs: EODStructuredOutput[]; hasFailure: boolean }>> {
+  const result = new Map<string, { outputs: EODStructuredOutput[]; hasFailure: boolean }>();
+  if (correlationIds.length === 0) return result;
+
+  const supabase = getSupabaseClient(environment);
+  const batchSize = 100;
+
+  for (let i = 0; i < correlationIds.length; i += batchSize) {
+    const batch = correlationIds.slice(i, i + batchSize);
+    const { data, error } = await supabase
+      .from('webhook_dumps')
+      .select('platform_call_id, payload')
+      .in('platform_call_id', batch)
+      .eq('webhook_type', 'end-of-call-report');
+
+    if (error) {
+      console.error('Error fetching webhook payloads:', error);
+      continue;
+    }
+
+    for (const row of data || []) {
+      if (!row.platform_call_id) continue;
+      const decoded = decodeBase64Payload(row.payload);
+      const message = decoded?.message as Record<string, unknown> | undefined;
+      const artifact = message?.artifact as Record<string, unknown> | undefined;
+      const structuredOutputs = artifact?.structuredOutputs as Record<string, unknown> | undefined;
+      const parsed = parseStructuredOutputs(structuredOutputs);
+      result.set(row.platform_call_id, parsed);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -502,10 +593,11 @@ export async function POST(request: NextRequest) {
     // Get all correlation IDs for additional data fetches
     const correlationIds = [...cekuraResult.calls.keys()];
 
-    // Fetch calls info (caller_type + email info) and transfers in parallel
-    const [callsInfo, transfersMap] = await Promise.all([
+    // Fetch calls info (caller_type + email info), transfers, and structured outputs in parallel
+    const [callsInfo, transfersMap, structuredOutputsMap] = await Promise.all([
       fetchCallsInfo(correlationIds, environment),
       fetchTransfers(correlationIds, environment),
+      fetchStructuredOutputs(correlationIds, environment),
     ]);
     const { callerTypes: callerTypeMap, emailInfo: emailInfoMap } = callsInfo;
 
@@ -518,6 +610,7 @@ export async function POST(request: NextRequest) {
     let totalCallTimeSeconds = 0;
     let messagesTakenCount = 0;
     let disconnectedCount = 0;
+    let csEscalationCount = 0;
 
     // Transfer report counters
     let transferAttemptCount = 0;
@@ -530,6 +623,7 @@ export async function POST(request: NextRequest) {
       const transfers = transfersMap.get(correlationId) || [];
       const emailInfo = emailInfoMap.get(correlationId) || { no_action_needed: false, message_taken: false };
       const isDisconnected = checkIsDisconnected(cekuraData);
+      const structuredOutputData = structuredOutputsMap.get(correlationId) || { outputs: [], hasFailure: false };
 
       const callData: EODCallRawData = {
         correlation_id: correlationId,
@@ -537,6 +631,8 @@ export async function POST(request: NextRequest) {
         no_action_needed: emailInfo.no_action_needed,
         message_taken: emailInfo.message_taken,
         is_disconnected: isDisconnected,
+        structured_outputs: structuredOutputData.outputs,
+        structured_output_failure: structuredOutputData.hasFailure,
         cekura: cekuraData,
         sentry: {
           errors: sentryErrorsForCall,
@@ -571,6 +667,16 @@ export async function POST(request: NextRequest) {
         transferDestinationStats.set(transfer.destination, current);
       }
 
+      // Count CS escalations: transferred to "Customer Success" AND has structured output failure
+      if (structuredOutputData.hasFailure) {
+        const hasCSTransfer = transfers.some(
+          t => t.destination.toLowerCase() === 'customer success'
+        );
+        if (hasCSTransfer) {
+          csEscalationCount++;
+        }
+      }
+
       // Separate calls by cekura status
       if (cekuraData.status === 'success') {
         successCalls.push(callData);
@@ -602,6 +708,7 @@ export async function POST(request: NextRequest) {
       messages_taken: messagesTakenCount,
       disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places
       failure_count: failureCalls.length,
+      cs_escalation_count: csEscalationCount,
       transfers_report: {
         attempt_count: transferAttemptCount,
         success_count: transferSuccessCount,

@@ -169,11 +169,18 @@ export async function generateAIReportForEOD(
     const provider = promptData.llm_provider as LLMProvider;
     const model = promptData.llm_model as LLMModel;
 
-    // Build input data with only the relevant calls
+    // Build input data with relevant calls and pre-computed aggregates
     const inputData = {
       count: calls.length,
       total: rawData.count,
       report_type: reportType,
+      time_saved: rawData.time_saved,
+      total_call_time: rawData.total_call_time,
+      messages_taken: rawData.messages_taken,
+      disconnection_rate: rawData.disconnection_rate,
+      failure_count: rawData.failure_count,
+      cs_escalation_count: rawData.cs_escalation_count,
+      transfers_report: rawData.transfers_report,
       calls,
       generated_at: rawData.generated_at,
       environment: rawData.environment,

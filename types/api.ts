@@ -255,12 +255,19 @@ export interface EODTransferData {
   result: string;       // transfer_status; "cancelled" if error_message contains "failed due to user hangup"
 }
 
+export interface EODStructuredOutput {
+  name: string;
+  result: unknown;  // Can be string, boolean, or object
+}
+
 export interface EODCallRawData {
   correlation_id: string;
   caller_type: string | null;  // From calls.call_type in database
   no_action_needed: boolean;  // True if email subject contains "No action needed"
   message_taken: boolean;     // True if email body contains "took a message"
   is_disconnected: boolean;   // True if cekura "Disconnection rate" metric score != 5
+  structured_outputs: EODStructuredOutput[];  // From webhook payload structuredOutputs
+  structured_output_failure: boolean;  // True if any structured output indicates a failure
   cekura: CekuraCallRawData;
   sentry: {
     errors: SentryErrorRawData[];
@@ -286,6 +293,7 @@ export interface EODRawData {
   messages_taken: number;     // count of calls where message_taken is true
   disconnection_rate: number; // percentage of calls where is_disconnected is true
   failure_count: number;      // count of calls where status !== 'success'
+  cs_escalation_count: number; // calls transferred to "Customer Success" with structured_output_failure
   transfers_report: EODTransferReport;  // aggregate transfer statistics
   success: EODCallRawData[];  // calls where cekura.status === 'success'
   failure: EODCallRawData[];  // calls where cekura.status !== 'success'
