@@ -21,6 +21,13 @@ You will receive a JSON object with this structure:
   "disconnection_rate": <number>,      // Percentage of disconnected calls
   "failure_count": <number>,           // Count of failed calls
   "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure
+  "cs_escalation_map": [              // Details of each CS escalation
+    {
+      "correlation_id": "<string>",
+      "failed_tool_calls": ["<function_name>", ...]
+    },
+    ...
+  ],
   "transfers_report": {
     "attempt_count": <number>,         // Total transfer attempts
     "success_count": <number>,         // Transfers with result === 'completed'
@@ -156,10 +163,10 @@ Analyze failure calls and rank the top issues by frequency:
 - A call is a problem if: `cekura.status` !== "success", or has Tool Call Success score = 0, or has Infrastructure Issues score = 0, or has sentry errors
 
 ## 8) Customer Success Escalations
-Use the pre-computed `cs_escalation_count` aggregate — this counts calls that were transferred to "Customer Success" AND had a `structured_output_failure` (tool call failure such as failed case lookup).
+Use the pre-computed `cs_escalation_count` and `cs_escalation_map` aggregates.
 - Total CS escalations: `cs_escalation_count`
-- List the specific calls by scanning for `structured_output_failure === true` AND any transfer with `destination` containing "Customer Success"
-- For each, show: correlation ID, caller type, which tool calls failed (from `structured_outputs`), error message
+- For each entry in `cs_escalation_map`, show: correlation ID and which tool calls failed (`failed_tool_calls`)
+- Cross-reference with the calls array by `correlation_id` to include caller type and error message
 - This indicates cases where the AI couldn't resolve the issue (e.g., couldn't look up case file)
 
 ## 9) Problem Calls Detail

@@ -21,6 +21,13 @@ You will receive a JSON object containing only successful calls along with day-l
   "disconnection_rate": <number>,      // Percentage of disconnected calls (day-level)
   "failure_count": <number>,           // Count of failed calls (day-level)
   "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure (day-level)
+  "cs_escalation_map": [              // Details of each CS escalation (day-level)
+    {
+      "correlation_id": "<string>",
+      "failed_tool_calls": ["<function_name>", ...]
+    },
+    ...
+  ],
   "transfers_report": {
     "attempt_count": <number>,
     "success_count": <number>,

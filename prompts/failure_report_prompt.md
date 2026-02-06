@@ -21,6 +21,13 @@ You will receive a JSON object containing only failed calls along with day-level
   "disconnection_rate": <number>,      // Percentage of disconnected calls (day-level)
   "failure_count": <number>,           // Count of failed calls (day-level, same as count here)
   "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure (day-level)
+  "cs_escalation_map": [              // Details of each CS escalation (day-level)
+    {
+      "correlation_id": "<string>",
+      "failed_tool_calls": ["<function_name>", ...]
+    },
+    ...
+  ],
   "transfers_report": {
     "attempt_count": <number>,
     "success_count": <number>,
@@ -136,10 +143,10 @@ Rank the top issues by frequency using the failure categorization above:
 For each category, provide 1-2 actionable recommendations.
 
 ## 3) Customer Success Escalations
-Use the pre-computed `cs_escalation_count` aggregate — this counts calls that were transferred to "Customer Success" AND had a `structured_output_failure` (tool call failure such as failed case lookup).
+Use the pre-computed `cs_escalation_count` and `cs_escalation_map` aggregates.
 - Total CS escalations: `cs_escalation_count`
-- List the specific calls by scanning for `structured_output_failure === true` AND any transfer with `destination` containing "Customer Success"
-- For each, show: correlation ID, caller type, which tool calls failed (from `structured_outputs`), error message
+- For each entry in `cs_escalation_map`, show: correlation ID and which tool calls failed (`failed_tool_calls`)
+- Cross-reference with the calls array by `correlation_id` to include caller type and error message
 - These indicate cases where the AI couldn't handle the request (e.g., couldn't look up a case file, caller type mismatch)
 
 ## 4) Caller Type Breakdown of Failures

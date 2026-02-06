@@ -13,6 +13,7 @@ import type {
   EODRawData,
   EODCallRawData,
   EODStructuredOutput,
+  EODCSEscalation,
   CekuraCallRawData,
   CekuraEvaluationFiltered,
   CekuraMetricFiltered,
@@ -559,6 +560,50 @@ async function fetchTransfers(
   return transfersMap;
 }
 
+/**
+ * Fetch correlation IDs and firm name for a specific firm within a date range.
+ * Returns the set of correlation IDs belonging to the firm.
+ */
+async function fetchCorrelationIdsByFirm(
+  firmId: number,
+  startDate: string,
+  endDate: string,
+  environment: Environment
+): Promise<{ correlationIds: Set<string>; firmName: string | null }> {
+  const supabase = getSupabaseClient(environment);
+
+  // First get the firm name
+  const { data: firmData } = await supabase
+    .from('firms')
+    .select('name')
+    .eq('id', firmId)
+    .single();
+
+  const firmName = firmData?.name || null;
+
+  // Fetch calls for this firm within the date range
+  const { data, error } = await supabase
+    .from('calls')
+    .select('platform_call_id')
+    .eq('firm_id', firmId)
+    .gte('created_at', startDate)
+    .lt('created_at', endDate);
+
+  if (error) {
+    console.error('Error fetching calls by firm:', error);
+    return { correlationIds: new Set(), firmName };
+  }
+
+  const correlationIds = new Set<string>();
+  for (const row of data || []) {
+    if (row.platform_call_id) {
+      correlationIds.add(row.platform_call_id);
+    }
+  }
+
+  return { correlationIds, firmName };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await authenticateRequest(request);
@@ -571,6 +616,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const reportDate = body.reportDate as string;
+    const firmId = body.firmId as number | null | undefined;
 
     if (!reportDate || !/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) {
       return errorResponse('Invalid reportDate format. Use YYYY-MM-DD', 400, 'INVALID_DATE');
@@ -589,6 +635,22 @@ export async function POST(request: NextRequest) {
       fetchCekuraCalls(startDate, endDate, environment),
       fetchSentryErrors(startDate, endDate, environment),
     ]);
+
+    // If firmId is provided, filter Cekura results to only include calls from that firm
+    let firmName: string | null = null;
+    if (firmId) {
+      const firmFilter = await fetchCorrelationIdsByFirm(firmId, startDate, endDate, environment);
+      firmName = firmFilter.firmName;
+
+      // Remove calls that don't belong to this firm
+      for (const correlationId of cekuraResult.calls.keys()) {
+        if (!firmFilter.correlationIds.has(correlationId)) {
+          cekuraResult.calls.delete(correlationId);
+        }
+      }
+      // Update the count to reflect filtered results
+      cekuraResult.count = cekuraResult.calls.size;
+    }
 
     // Get all correlation IDs for additional data fetches
     const correlationIds = [...cekuraResult.calls.keys()];
@@ -611,6 +673,7 @@ export async function POST(request: NextRequest) {
     let messagesTakenCount = 0;
     let disconnectedCount = 0;
     let csEscalationCount = 0;
+    const csEscalationMap: EODCSEscalation[] = [];
 
     // Transfer report counters
     let transferAttemptCount = 0;
@@ -670,10 +733,17 @@ export async function POST(request: NextRequest) {
       // Count CS escalations: transferred to "Customer Success" AND has structured output failure
       if (structuredOutputData.hasFailure) {
         const hasCSTransfer = transfers.some(
-          t => t.destination.toLowerCase() === 'customer success'
+          t => t.destination.toLowerCase().includes('customer success')
         );
         if (hasCSTransfer) {
           csEscalationCount++;
+          const failedToolCalls = structuredOutputData.outputs
+            .filter(o => isStructuredOutputFailure(o.result))
+            .map(o => o.name);
+          csEscalationMap.push({
+            correlation_id: correlationId,
+            failed_tool_calls: failedToolCalls,
+          });
         }
       }
 
@@ -709,6 +779,7 @@ export async function POST(request: NextRequest) {
       disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places
       failure_count: failureCalls.length,
       cs_escalation_count: csEscalationCount,
+      cs_escalation_map: csEscalationMap,
       transfers_report: {
         attempt_count: transferAttemptCount,
         success_count: transferSuccessCount,
@@ -718,6 +789,8 @@ export async function POST(request: NextRequest) {
       failure: failureCalls,
       generated_at: new Date().toISOString(),
       environment,
+      firm_id: firmId || null,
+      firm_name: firmName,
     };
 
     return NextResponse.json({ raw_data: rawData });

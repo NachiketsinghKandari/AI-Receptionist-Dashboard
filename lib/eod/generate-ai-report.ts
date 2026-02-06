@@ -181,6 +181,7 @@ export async function generateAIReportForEOD(
       disconnection_rate: rawData.disconnection_rate,
       failure_count: rawData.failure_count,
       cs_escalation_count: rawData.cs_escalation_count,
+      cs_escalation_map: rawData.cs_escalation_map,
       transfers_report: rawData.transfers_report,
       calls,
       generated_at: rawData.generated_at,

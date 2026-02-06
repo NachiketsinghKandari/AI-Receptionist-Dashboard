@@ -207,8 +207,12 @@ export interface FlaggedCountResponse {
 export type FlaggedCallsResponse = PaginatedResponse<FlaggedCallListItem>;
 
 // EOD Reports types
+export type EODReportCategory = 'eod' | 'weekly';
+
 export interface EODReportFilters extends BaseFilters {
   reportDate?: string | null;
+  firmId?: number | null;
+  reportCategory?: EODReportCategory | null;
 }
 
 // Filtered metric structure for EOD reports
@@ -286,6 +290,11 @@ export interface EODTransferReport {
   transfer_map: Record<string, EODTransferDestinationStats>;    // destination -> stats, sorted by count descending
 }
 
+export interface EODCSEscalation {
+  correlation_id: string;
+  failed_tool_calls: string[];  // names of tool calls that failed
+}
+
 export interface EODRawData {
   count: number;              // total calls
   time_saved: number;         // sum of durations (in seconds) where no_action_needed is true
@@ -294,11 +303,14 @@ export interface EODRawData {
   disconnection_rate: number; // percentage of calls where is_disconnected is true
   failure_count: number;      // count of calls where status !== 'success'
   cs_escalation_count: number; // calls transferred to "Customer Success" with structured_output_failure
+  cs_escalation_map: EODCSEscalation[];  // details of each CS escalation
   transfers_report: EODTransferReport;  // aggregate transfer statistics
   success: EODCallRawData[];  // calls where cekura.status === 'success'
   failure: EODCallRawData[];  // calls where cekura.status !== 'success'
   generated_at: string;
   environment: string;
+  firm_id?: number | null;    // optional firm filter used during generation
+  firm_name?: string | null;  // firm name for display purposes
 }
 
 export interface EODReport {
