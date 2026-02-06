@@ -39,6 +39,7 @@ You will receive a JSON object containing only successful calls along with day-l
       ...
     }
   },
+  "report_date": "<YYYY-MM-DD>",        // The date this report covers
   "generated_at": "<ISO timestamp>",
   "environment": "production" | "staging",
   "calls": [
@@ -108,8 +109,8 @@ The `ai_response` must be a valid JSON string containing the full Markdown repor
 === MARKDOWN REPORT STRUCTURE ===
 Create an insightful success analysis report with these sections:
 
-# Success Report — {date from generated_at}
-Show both ISO UTC timestamp and Asia/Kolkata local time.
+# Success Report — {report_date}
+Use `report_date` for the heading. Show `generated_at` timestamp (both UTC and Asia/Kolkata local time) as a subtitle.
 
 ## 1) Success Summary
 - Total successful calls: {count} out of {total} total calls

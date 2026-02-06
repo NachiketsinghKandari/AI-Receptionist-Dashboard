@@ -787,6 +787,7 @@ export async function POST(request: NextRequest) {
       },
       success: successCalls,
       failure: failureCalls,
+      report_date: reportDate,
       generated_at: new Date().toISOString(),
       environment,
       firm_id: firmId || null,

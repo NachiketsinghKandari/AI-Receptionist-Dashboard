@@ -184,6 +184,7 @@ export async function generateAIReportForEOD(
       cs_escalation_map: rawData.cs_escalation_map,
       transfers_report: rawData.transfers_report,
       calls,
+      report_date: rawData.report_date,
       generated_at: rawData.generated_at,
       environment: rawData.environment,
     };

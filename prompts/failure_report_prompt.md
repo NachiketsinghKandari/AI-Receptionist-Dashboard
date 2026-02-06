@@ -39,6 +39,7 @@ You will receive a JSON object containing only failed calls along with day-level
       ...
     }
   },
+  "report_date": "<YYYY-MM-DD>",        // The date this report covers
   "generated_at": "<ISO timestamp>",
   "environment": "production" | "staging",
   "calls": [

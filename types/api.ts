@@ -307,6 +307,7 @@ export interface EODRawData {
   transfers_report: EODTransferReport;  // aggregate transfer statistics
   success: EODCallRawData[];  // calls where cekura.status === 'success'
   failure: EODCallRawData[];  // calls where cekura.status !== 'success'
+  report_date: string;        // YYYY-MM-DD date for this report
   generated_at: string;
   environment: string;
   firm_id?: number | null;    // optional firm filter used during generation

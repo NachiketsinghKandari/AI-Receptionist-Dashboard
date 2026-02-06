@@ -39,6 +39,7 @@ You will receive a JSON object with this structure:
       ...
     }
   },
+  "report_date": "<YYYY-MM-DD>",        // The date this report covers
   "generated_at": "<ISO timestamp>",
   "environment": "production" | "staging",
   "calls": [
@@ -118,8 +119,8 @@ The `ai_response` must be a valid JSON string containing the full Markdown repor
 === MARKDOWN REPORT STRUCTURE ===
 Create a clear, scannable report with these sections:
 
-# EOD Report — {date from generated_at}
-Show both ISO UTC timestamp and Asia/Kolkata local time.
+# EOD Report — {report_date}
+Use `report_date` for the heading. Show `generated_at` timestamp (both UTC and Asia/Kolkata local time) as a subtitle.
 
 ## 1) Executive Summary
 - Total calls handled (from `total`)
