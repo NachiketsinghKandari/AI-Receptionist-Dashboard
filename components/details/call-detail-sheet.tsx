@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, Phone, Info, FileText, GripVertical } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Phone, GripVertical } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCallDetail } from '@/hooks/use-calls';
+import { useCallDetail, usePrefetchCallDetails } from '@/hooks/use-calls';
 import { usePanelSize } from '@/hooks/use-panel-size';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { cn } from '@/lib/utils';
@@ -14,6 +13,7 @@ import {
   CallDetailRightPanel,
   type HighlightReasons,
 } from '@/components/details/call-detail-panel';
+import { CallDetailCarousel } from '@/components/details/call-detail-carousel';
 
 interface CallDetailSheetProps {
   callId: number | string | null;  // Supports both numeric ID and correlation ID
@@ -30,6 +30,11 @@ interface CallDetailSheetProps {
     endDate: string | null;
   };
   onShare?: (correlationId: string) => void;
+  // Adjacent call IDs for prefetching (smooth carousel transitions)
+  adjacentCallIds?: {
+    previous: number | string | null;
+    next: number | string | null;
+  };
 }
 
 const MIN_LEFT_PERCENT = 35;
@@ -47,6 +52,7 @@ export function CallDetailSheet({
   totalCount,
   dateRange,
   onShare,
+  adjacentCallIds,
 }: CallDetailSheetProps) {
   const { data } = useCallDetail(callId);
   const call = data?.call;
@@ -54,7 +60,20 @@ export function CallDetailSheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState<'details' | 'transcript'>('details');
+  const prefetchCallDetails = usePrefetchCallDetails();
+
+  // Prefetch adjacent call details for smooth carousel navigation
+  useEffect(() => {
+    if (callId === null || !adjacentCallIds) return;
+
+    const callsToPrefetech: (number | string)[] = [];
+    if (adjacentCallIds.previous) callsToPrefetech.push(adjacentCallIds.previous);
+    if (adjacentCallIds.next) callsToPrefetech.push(adjacentCallIds.next);
+
+    if (callsToPrefetech.length > 0) {
+      prefetchCallDetails(callsToPrefetech);
+    }
+  }, [callId, adjacentCallIds, prefetchCallDetails]);
 
   // Resizable panel state
   const [leftPercent, setLeftPercent] = useState(initialLayout.left ?? 55);
@@ -190,8 +209,8 @@ export function CallDetailSheet({
                 </h2>
                 {call?.platform_call_id && (
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50">
-                    <span className="text-sm font-mono">
-                      {call.platform_call_id}
+                    <span className="text-sm font-mono" title={call.platform_call_id}>
+                      {isMobile ? `${call.platform_call_id.slice(0, 8)}...` : call.platform_call_id}
                     </span>
                     <CopyButton value={call.platform_call_id} />
                   </div>
@@ -244,39 +263,19 @@ export function CallDetailSheet({
           </div>
         </div>
 
-        {/* Mobile: Tabbed layout */}
+        {/* Mobile: Carousel layout with swipe navigation */}
         {isMobile && (
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setActiveTab(v as 'details' | 'transcript')}
-            className="flex-1 flex flex-col min-h-0"
-          >
-            <TabsList className="grid w-full grid-cols-2 mx-4 mt-2" style={{ width: 'calc(100% - 2rem)' }}>
-              <TabsTrigger value="details" className="flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Details
-              </TabsTrigger>
-              <TabsTrigger value="transcript" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Transcript
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="details" className="flex-1 min-h-0 mt-0 overflow-hidden">
-              <CallDetailLeftPanel
-                callId={callId}
-                highlightReasons={highlightReasons}
-                dateRange={dateRange}
-                onShare={onShare}
-              />
-            </TabsContent>
-            <TabsContent value="transcript" className="flex-1 min-h-0 mt-0 overflow-hidden">
-              <CallDetailRightPanel
-                callId={callId}
-                highlightReasons={highlightReasons}
-                dateRange={dateRange}
-              />
-            </TabsContent>
-          </Tabs>
+          <CallDetailCarousel
+            callId={callId}
+            currentIndex={currentIndex}
+            highlightReasons={highlightReasons}
+            dateRange={dateRange}
+            onShare={onShare}
+            onPrevious={onPrevious}
+            onNext={onNext}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+          />
         )}
 
         {/* Desktop: Two-panel resizable content */}

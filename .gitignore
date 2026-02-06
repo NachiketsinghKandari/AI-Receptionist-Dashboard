@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+./scripts
+./misc-ignore
 
 # debug
 npm-debug.log*
@@ -48,4 +50,5 @@ next-env.d.ts
 .opencode
 .windsurf
 .cursor
+
 
