@@ -49,3 +49,7 @@ next-env.d.ts
 .windsurf
 .cursor
 
+# local scripts and data
+scripts/
+misc-ignore/
+

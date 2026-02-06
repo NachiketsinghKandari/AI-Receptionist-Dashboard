@@ -5,13 +5,17 @@ A Next.js 16 dashboard application migrated from the Streamlit `unified_dashboar
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router) + TypeScript
-- **UI:** Tailwind CSS + shadcn/ui
+- **UI:** Tailwind CSS v4 + shadcn/ui + Framer Motion
 - **Tables:** TanStack Table v8 (server-side pagination)
 - **Data Fetching:** TanStack Query (caching, background refetch)
 - **Charts:** Recharts
-- **Auth:** JWT sessions with hardcoded users
+- **Auth:** JWT sessions with Supabase user authentication
 - **Database:** Supabase PostgreSQL
 - **Monitoring:** Sentry API integration (server-side proxy)
+- **AI/LLM:** OpenAI + Google Gemini (for report generation)
+- **Call Observability:** Cekura integration
+- **PDF Export:** html2pdf.js
+- **Markdown:** react-markdown + remark-gfm + rehype-highlight
 
 ## Quick Start
 
@@ -72,40 +76,65 @@ Login credentials (from `lib/auth/config.ts`):
 ## Project Structure
 
 ```
-next-dashboard/
 ├── app/
-│   ├── (auth)/login/          # Login page
+│   ├── (auth)/                # Public auth pages
+│   │   ├── login/             # Login page
+│   │   ├── forgot-password/   # Password reset request
+│   │   └── reset-password/    # Password reset confirmation
 │   ├── (dashboard)/           # Protected dashboard pages
 │   │   ├── page.tsx           # Home (KPIs + chart)
 │   │   ├── calls/             # Calls table + drill-down
 │   │   ├── emails/            # Emails table
 │   │   ├── transfers/         # Transfers table
 │   │   ├── webhooks/          # Webhooks table
-│   │   └── sentry/            # Sentry event search
+│   │   ├── sentry/            # Sentry event search
+│   │   └── eod-reports/       # AI-powered end-of-day reports
 │   └── api/                   # BFF API routes
 │       ├── auth/              # Login/logout/session
-│       ├── calls/             # Calls list + detail
+│       ├── calls/             # Calls list, detail, flagged, important
+│       ├── cekura/            # Cekura call observability integration
 │       ├── emails/            # Emails list
+│       ├── eod-reports/       # End-of-day report generation (including AI)
 │       ├── transfers/         # Transfers list
 │       ├── webhooks/          # Webhooks list
 │       ├── firms/             # Firms dropdown
-│       ├── stats/             # KPI statistics
-│       └── sentry/events/     # Sentry proxy (keeps tokens private)
+│       ├── stats/             # KPI statistics (overview, chart)
+│       └── sentry/            # Sentry proxy (keeps tokens private)
 ├── components/
 │   ├── ui/                    # shadcn/ui components
 │   ├── layout/                # Sidebar, Header
 │   ├── tables/                # DataTable (generic)
 │   ├── details/               # CallDetailPanel
 │   ├── filters/               # FilterSidebar
-│   └── charts/                # KPICard, CallVolumeChart
+│   ├── charts/                # KPICard, CallVolumeChart
+│   ├── cekura/                # Cekura feedback and status components
+│   ├── email/                 # Email body display, recipients
+│   ├── eod/                   # Markdown report, PDF export
+│   └── providers/             # Context providers (environment, date, theme, query)
 ├── hooks/                     # TanStack Query hooks
+│   ├── use-calls.ts           # Calls data fetching
+│   ├── use-emails.ts          # Emails data fetching
+│   ├── use-transfers.ts       # Transfers data fetching
+│   ├── use-cekura.ts          # Cekura integration
+│   ├── use-eod-reports.ts     # End-of-day reports
+│   ├── use-flagged-calls.ts   # Flagged calls
+│   ├── use-is-mobile.ts       # Mobile detection
+│   └── ...                    # Additional hooks
 ├── lib/
 │   ├── api/utils.ts           # API utilities (validation, error handling)
-│   ├── auth/                  # Auth config + session management
-│   ├── supabase/              # Supabase client
+│   ├── auth/                  # Auth config + session management + allowlist
+│   ├── supabase/              # Supabase client (auth-client, auth-server)
 │   ├── sentry/                # Sentry API client (server-only)
+│   ├── llm/                   # LLM provider abstraction (OpenAI, Gemini)
+│   ├── eod/                   # End-of-day report generation logic
+│   ├── share-url.ts           # URL sharing functionality
+│   ├── date-utils.ts          # Date manipulation utilities
+│   ├── formatting.ts          # Text formatting helpers
+│   ├── webhook-utils.ts       # Webhook parsing utilities
 │   └── constants.ts           # App constants
 ├── types/                     # TypeScript interfaces
+├── design_principles/         # Design system documentation
+├── docs/                      # Product requirements and documentation
 ├── proxy.ts                   # Auth proxy (Next.js 16 pattern)
 └── next.config.ts             # Next.js configuration
 ```
@@ -154,6 +183,19 @@ next-dashboard/
   - Context/extra data
   - Exception info
 
+### EOD Reports Page (`/eod-reports`)
+- AI-powered end-of-day report generation
+- Multiple LLM provider support (OpenAI, Gemini)
+- Markdown report rendering with syntax highlighting
+- PDF export functionality
+- Historical report viewing
+
+### Cekura Integration
+- Call observability and quality scoring
+- Feedback submission for call quality
+- Status tracking and filtering
+- Integration with call details panel
+
 ## Architecture Decisions
 
 ### BFF Pattern (Backend-for-Frontend)
@@ -183,6 +225,23 @@ TanStack Query caching:
 - Firms list: 300 second stale time
 - Background refetch on window focus
 
+### LLM Provider Pattern
+Abstraction layer in `lib/llm/` supports multiple AI providers:
+- Pluggable provider interface (OpenAI, Gemini)
+- Graceful fallback and error handling
+- Used for AI-powered EOD report generation
+
+### Environment Switching
+`components/providers/environment-provider.tsx` enables switching between production and staging Supabase environments:
+- Stored in localStorage
+- Invalidates all TanStack Query caches on switch
+
+### Responsive Design
+Mobile-first responsive design with:
+- Custom hooks (`use-is-mobile.ts`, `use-media-query.ts`)
+- Framer Motion animations for mobile interactions
+- Design documentation in `design_principles/`
+
 ## Scripts
 
 ```bash
@@ -198,10 +257,13 @@ npm run lint     # Run ESLint
 |----------|----------|-------------|
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_KEY` | Yes | Supabase anon/service key |
+| `JWT_SECRET` | Yes | Secret for signing JWT sessions |
 | `SENTRY_ORG` | No | Sentry organization slug |
 | `SENTRY_PROJECT` | No | Sentry project slug |
 | `SENTRY_AUTH_TOKEN` | No | Sentry API auth token |
-| `JWT_SECRET` | Yes | Secret for signing JWT sessions |
+| `OPENAI_API_KEY` | No | OpenAI API key (for AI report generation) |
+| `GOOGLE_AI_API_KEY` | No | Google Gemini API key (for AI report generation) |
+| `CEKURA_API_KEY` | No | Cekura API key (for call observability) |
 
 ## Migration from Streamlit
 
