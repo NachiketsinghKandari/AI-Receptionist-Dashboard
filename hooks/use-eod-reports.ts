@@ -32,7 +32,7 @@ async function generateEODReport(
   reportDate: string,
   environment: string
 ): Promise<GenerateEODReportResponse> {
-  const response = await fetch(`/api/eod-reports/generate?env=${environment}`, {
+  const response = await fetch(`/api/eod-reports/payload-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reportDate }),
