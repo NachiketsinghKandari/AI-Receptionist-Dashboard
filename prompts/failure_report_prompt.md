@@ -175,7 +175,7 @@ Include suggested owners (Engineering, Ops).
 - Use proper Markdown: headings (##), tables, bullet lists, code blocks
 - Be thorough — this is a diagnostic report, detail matters
 - Highlight critical issues prominently
-- **IMPORTANT: Correlation IDs** — Always write correlation IDs in their FULL form (e.g., `019c05e4-728f-700b-b104-856190eb6a95`). Never abbreviate or truncate them. They will be automatically converted to clickable links.
+- **IMPORTANT: Correlation IDs** — Always write correlation IDs as plain text in their FULL form (e.g., 019c05e4-728f-700b-b104-856190eb6a95). Do NOT wrap them in backticks, code blocks, or markdown links. They will be automatically converted to clickable links in post-processing.
 
 === INPUT ===
 {input_json}

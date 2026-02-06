@@ -38,15 +38,15 @@ const COLUMN_MAP: Record<EODReportType, string> = {
   full: 'full_report',
 };
 
-// VAPI dashboard base URL
-const VAPI_DASHBOARD_URL = 'https://dashboard.vapi.ai/calls';
+// Dashboard base URL for correlation ID links
+const DASHBOARD_URL = 'https://hellocounsel-dashboard.vercel.app/calls';
 
 /**
- * Post-process the AI-generated markdown to convert correlation IDs into clickable VAPI links.
+ * Post-process the AI-generated markdown to convert correlation IDs into clickable dashboard links.
  * Matches UUID format correlation IDs and wraps them in markdown links.
  * Skips IDs that are already inside markdown links or URLs.
  */
-function convertCorrelationIdsToLinks(markdown: string, validIds: Set<string>): string {
+function convertCorrelationIdsToLinks(markdown: string, validIds: Set<string>, environment: Environment): string {
   // First, temporarily replace existing markdown links to protect them
   const linkPlaceholders: string[] = [];
   const protectedMarkdown = markdown.replace(/\[([^\]]+)\]\([^)]+\)/g, (match) => {
@@ -61,13 +61,14 @@ function convertCorrelationIdsToLinks(markdown: string, validIds: Set<string>): 
     return `__URL_PLACEHOLDER_${urlPlaceholders.length - 1}__`;
   });
 
-  // Now replace UUIDs that are valid correlation IDs
-  const uuidPattern = /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/gi;
+  // Replace UUIDs that are valid correlation IDs (including backtick-wrapped ones)
+  // Matches optional surrounding backticks so `uuid` becomes a proper link instead of inline code
+  const uuidPattern = /`?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`?/gi;
   const withLinks = doubleProtected.replace(uuidPattern, (match, uuid) => {
     if (!validIds.has(uuid.toLowerCase())) {
       return match;
     }
-    return `[${uuid}](${VAPI_DASHBOARD_URL}/${uuid})`;
+    return `[${uuid}](${DASHBOARD_URL}?f=0&e=${environment}&c=${uuid})`;
   });
 
   // Restore URL placeholders
@@ -226,14 +227,15 @@ export async function generateAIReportForEOD(
       }
     }
 
-    // Post-process: Convert correlation IDs to clickable VAPI links
+    // Post-process: Convert correlation IDs to clickable dashboard links
     // Collect all valid correlation IDs from the calls data
     const validCorrelationIds = new Set(
       calls.map(call => call.correlation_id.toLowerCase())
     );
     const processedMarkdown = convertCorrelationIdsToLinks(
       aiResult.ai_response,
-      validCorrelationIds
+      validCorrelationIds,
+      environment
     );
     aiResult.ai_response = processedMarkdown;
 

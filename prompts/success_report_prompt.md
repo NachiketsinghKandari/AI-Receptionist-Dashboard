@@ -136,16 +136,16 @@ Compute acceptance rate as `(attempts - failed) / attempts * 100`.
 
 ## 6) Key Performance Metrics
 Present metrics computed from successful calls only:
-- **Latency**: average, median, 95th percentile (from `Latency (in ms)` metric)
 - **Transcription Accuracy**: average score (from `Transcription Accuracy` metric)
 - **Call Duration**: average, shortest, longest
+- **Latency**: average and 95th percentile (from `Latency (in ms)` metric) — include for reference but this is a lower-priority metric
 
 ## 7) Optimization Opportunities
 Even in successful calls, identify areas for improvement:
-- Calls with high latency (>2000ms) despite success
 - Calls with lower transcription scores
 - Calls with unusually long durations
 - Any calls with non-empty Sentry errors despite success
+- Notably high latency (>2000ms) — mention briefly but do not flag as a major concern
 
 ## 8) Recommendations
 Provide 3-5 recommendations:
@@ -157,7 +157,7 @@ Provide 3-5 recommendations:
 - Use proper Markdown: headings (##), tables, bullet lists, code blocks
 - Focus on positive insights while noting optimization opportunities
 - Keep the tone constructive and forward-looking
-- **IMPORTANT: Correlation IDs** — Always write correlation IDs in their FULL form (e.g., `019c05e4-728f-700b-b104-856190eb6a95`). Never abbreviate or truncate them. They will be automatically converted to clickable links.
+- **IMPORTANT: Correlation IDs** — Always write correlation IDs as plain text in their FULL form (e.g., 019c05e4-728f-700b-b104-856190eb6a95). Do NOT wrap them in backticks, code blocks, or markdown links. They will be automatically converted to clickable links in post-processing.
 
 === INPUT ===
 {input_json}
