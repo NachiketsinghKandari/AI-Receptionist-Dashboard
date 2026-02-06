@@ -1,0 +1,537 @@
+{
+	"info": {
+		"_postman_id": "hellocounsel-dashboard-api",
+		"name": "HelloCounsel Dashboard API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000"
+		},
+		{
+			"key": "email",
+			"value": ""
+		},
+		{
+			"key": "password",
+			"value": ""
+		},
+		{
+			"key": "access_token",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const response = pm.response.json();",
+									"if (response.access_token) {",
+									"    pm.collectionVariables.set(\"access_token\", response.access_token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Calls",
+			"item": [
+				{
+					"name": "List Calls",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls?env=staging&limit=20&offset=0&firmId=1&callType=inbound&startDate=2025-01-01&endDate=2025-01-31&search=example&sortBy=created_at&sortOrder=desc",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true },
+								{ "key": "firmId", "value": "1", "disabled": true },
+								{ "key": "callType", "value": "inbound", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "search", "value": "example", "disabled": true },
+								{ "key": "sortBy", "value": "created_at", "disabled": true },
+								{ "key": "sortOrder", "value": "desc", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Call by ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls/:id?env=staging",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", ":id"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true }
+							],
+							"variable": [
+								{ "key": "id", "value": "1" }
+							]
+						}
+					}
+				},
+				{
+					"name": "List Flagged Calls",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls/flagged?env=staging&limit=20&offset=0&firmId=1&flagType=silence",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", "flagged"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true },
+								{ "key": "firmId", "value": "1", "disabled": true },
+								{ "key": "flagType", "value": "silence", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Flagged Calls Count",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls/flagged/count?env=staging&firmId=1",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", "flagged", "count"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "firmId", "value": "1", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "List Important Calls",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls/important?env=staging&limit=20&offset=0",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", "important"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "List Transfer-Email Mismatch Calls",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls/transfer-email-mismatch?env=staging&limit=20&offset=0",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", "transfer-email-mismatch"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Emails",
+			"item": [
+				{
+					"name": "List Emails",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/emails?env=staging&limit=20&offset=0&firmId=1&callId=1&search=example",
+							"host": ["{{base_url}}"],
+							"path": ["api", "emails"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true },
+								{ "key": "firmId", "value": "1", "disabled": true },
+								{ "key": "callId", "value": "1", "disabled": true },
+								{ "key": "search", "value": "example", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Transfers",
+			"item": [
+				{
+					"name": "List Transfers",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/transfers?env=staging&limit=20&offset=0&firmId=1&callId=1&status=completed&transferType=warm",
+							"host": ["{{base_url}}"],
+							"path": ["api", "transfers"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true },
+								{ "key": "firmId", "value": "1", "disabled": true },
+								{ "key": "callId", "value": "1", "disabled": true },
+								{ "key": "status", "value": "completed", "disabled": true },
+								{ "key": "transferType", "value": "warm", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Webhooks",
+			"item": [
+				{
+					"name": "List Webhooks",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/webhooks?env=staging&limit=20&offset=0&platform=bland&callId=1&platformCallId=abc123",
+							"host": ["{{base_url}}"],
+							"path": ["api", "webhooks"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true },
+								{ "key": "platform", "value": "bland", "disabled": true },
+								{ "key": "callId", "value": "1", "disabled": true },
+								{ "key": "platformCallId", "value": "abc123", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Stats",
+			"item": [
+				{
+					"name": "Get Stats",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/stats?env=staging&startDate=2025-01-01&endDate=2025-01-31",
+							"host": ["{{base_url}}"],
+							"path": ["api", "stats"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Stats Overview",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/stats/overview?env=staging&startDate=2025-01-01&endDate=2025-01-31",
+							"host": ["{{base_url}}"],
+							"path": ["api", "stats", "overview"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Stats Chart",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/stats/chart?env=staging&startDate=2025-01-01&endDate=2025-01-31",
+							"host": ["{{base_url}}"],
+							"path": ["api", "stats", "chart"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Firms",
+			"item": [
+				{
+					"name": "List Firms",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/firms?env=staging",
+							"host": ["{{base_url}}"],
+							"path": ["api", "firms"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Sentry",
+			"item": [
+				{
+					"name": "Get Sentry Events",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/sentry/events?query=error&limit=20&cursor=",
+							"host": ["{{base_url}}"],
+							"path": ["api", "sentry", "events"],
+							"query": [
+								{ "key": "query", "value": "error", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "cursor", "value": "", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Check Sentry Error",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/sentry/error-check?correlationId=abc123",
+							"host": ["{{base_url}}"],
+							"path": ["api", "sentry", "error-check"],
+							"query": [
+								{ "key": "correlationId", "value": "abc123", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Browse Sentry Issues",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/sentry/browse?query=error&limit=20&cursor=",
+							"host": ["{{base_url}}"],
+							"path": ["api", "sentry", "browse"],
+							"query": [
+								{ "key": "query", "value": "error", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "cursor", "value": "", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Cekura",
+			"item": [
+				{
+					"name": "Get Call Mapping",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/cekura/call-mapping?startDate=2025-01-01T00:00:00Z&endDate=2025-01-02T00:00:00Z&environment=staging&page=1&pageSize=25&fetchAll=false",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cekura", "call-mapping"],
+							"query": [
+								{ "key": "startDate", "value": "2025-01-01T00:00:00Z" },
+								{ "key": "endDate", "value": "2025-01-02T00:00:00Z" },
+								{ "key": "environment", "value": "staging", "disabled": true },
+								{ "key": "page", "value": "1", "disabled": true },
+								{ "key": "pageSize", "value": "25", "disabled": true },
+								{ "key": "fetchAll", "value": "false", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Cekura Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": 1,\n  \"status\": \"reviewed\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cekura/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cekura", "status"]
+						}
+					}
+				},
+				{
+					"name": "Update Cekura Feedback",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": 1,\n  \"feedback\": \"example feedback\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cekura/feedback",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cekura", "feedback"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "EOD Reports",
+			"item": [
+				{
+					"name": "List EOD Reports",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/eod-reports?env=staging&limit=20&offset=0&reportDate=2025-01-15",
+							"host": ["{{base_url}}"],
+							"path": ["api", "eod-reports"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true },
+								{ "key": "reportDate", "value": "2025-01-15", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Create EOD Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/eod-reports",
+							"host": ["{{base_url}}"],
+							"path": ["api", "eod-reports"]
+						}
+					}
+				},
+				{
+					"name": "Generate EOD Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/eod-reports/payload-generate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "eod-reports", "payload-generate"]
+						}
+					}
+				},
+				{
+					"name": "AI Generate EOD Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"reportType\": \"full\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/eod-reports/ai-generate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "eod-reports", "ai-generate"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

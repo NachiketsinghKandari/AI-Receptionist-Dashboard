@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse } from '@/lib/api/utils';
 
 type Period = 'Today' | 'This Month';
@@ -35,6 +36,11 @@ function calculateAverage(values: (number | null)[]): number {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const period = (searchParams.get('period') || 'Today') as Period;
     const chartStartDate = searchParams.get('chartStartDate');

@@ -5,12 +5,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSentryClient } from '@/lib/sentry/client';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseIntOrDefault, clamp } from '@/lib/api/utils';
 
 const MAX_SENTRY_LIMIT = 100;
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const correlationId = searchParams.get('correlationId')?.trim() || null;
     const query = searchParams.get('query')?.trim() || null;

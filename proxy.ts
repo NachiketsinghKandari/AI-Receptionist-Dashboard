@@ -22,6 +22,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // API routes with Authorization header bypass cookie auth
+  // Route handlers validate credentials via authenticateRequest()
+  if (pathname.startsWith('/api/') && request.headers.get('authorization')) {
+    return NextResponse.next();
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_STAGE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY;
 
@@ -60,6 +66,13 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
+    // API routes get JSON 401 instead of redirect (better for external tools)
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

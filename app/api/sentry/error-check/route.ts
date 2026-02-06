@@ -6,10 +6,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSentryClient } from '@/lib/sentry/client';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse } from '@/lib/api/utils';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const environment = searchParams.get('environment')?.trim() || undefined;
     const statsPeriod = searchParams.get('statsPeriod')?.trim() || '7d';

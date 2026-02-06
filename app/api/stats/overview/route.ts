@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { type Environment } from '@/lib/constants';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse } from '@/lib/api/utils';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
 
@@ -92,6 +93,11 @@ function calculateAverage(values: (number | null)[]): number {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const env = (searchParams.get('env') || 'production') as Environment;
     const period = (searchParams.get('period') || 'Today') as Period;

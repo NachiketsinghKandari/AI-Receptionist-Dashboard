@@ -212,15 +212,12 @@ export interface EODReportFilters extends BaseFilters {
 }
 
 // Filtered metric structure for EOD reports
-// Only includes essential fields, excludes: extra, vocera_defined_metric_code
+// Only includes essential fields: id, name, and score OR enum (mutually exclusive)
 export interface CekuraMetricFiltered {
   id: number;
   name: string;
-  type: string;
-  score: number | null;
-  score_normalized: number | null;
-  explanation: string | null;
-  function_name: string | null;
+  score?: number | null;  // Present when metric type is not 'enum'
+  enum?: string | null;   // Present when metric type is 'enum'
 }
 
 export interface CekuraEvaluationFiltered {
@@ -232,13 +229,14 @@ export interface CekuraCallRawData {
   call_id: string;
   call_ended_reason: string | null;
   status: string;
-  success: boolean;
+  is_reviewed: boolean;
+  feedback: string | null;
+  duration: string | null;  // Duration as string (e.g., "01:26")
   agent: string | null;
   dropoff_point: string | null;
   error_message: string | null;
   critical_categories: string[];
   evaluation: CekuraEvaluationFiltered | null;
-  duration: number | null;
 }
 
 export interface SentryErrorRawData {
@@ -250,12 +248,21 @@ export interface SentryErrorRawData {
   environment: string;
 }
 
+// Transfer data extracted from end-of-call webhooks
+export interface EODTransferData {
+  destination: string;  // staff_name or "Customer Success" if caller_type is "customer_success"
+  mode: 'transfer_direct' | 'transfer_experimental_voicemail' | 'transfer_experimental_pickup';
+  transfer_result: string;
+}
+
 export interface EODCallRawData {
   correlation_id: string;
   cekura: CekuraCallRawData;
   sentry: {
     errors: SentryErrorRawData[];
   };
+  caller_type: string | null;  // From calls.call_type in database
+  transfers: EODTransferData[];  // Extracted from end-of-call webhook
 }
 
 export interface EODRawData {
@@ -290,4 +297,22 @@ export interface GenerateEODReportRequest {
 
 export interface GenerateEODReportResponse {
   raw_data: EODRawData;
+}
+
+// Login API types
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  expires_at: number;
+  token_type: 'bearer';
+  user: {
+    id: string;
+    email: string;
+  };
 }

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, type Environment } from '@/lib/constants';
+import { authenticateRequest } from '@/lib/api/auth';
 import {
   errorResponse,
   parseIntOrNull,
@@ -18,6 +19,11 @@ import { hasMultipleTransfers } from '@/lib/webhook-utils';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const env = (searchParams.get('env') || 'production') as Environment;
 
