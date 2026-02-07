@@ -145,12 +145,9 @@ function parseStructuredOutputs(
     const result = entry.result;
     if (typeof name !== 'string') continue;
 
-    // Skip no_search — means the tool wasn't used, not a success or failure
-    if (result === 'no_search') continue;
-
     outputs.push({ name, result });
 
-    if (isStructuredOutputFailure(result)) {
+    if (result !== 'no_search' && isStructuredOutputFailure(result)) {
       hasFailure = true;
     }
   }
