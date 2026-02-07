@@ -163,7 +163,15 @@ function createColumns(
 export default function CallsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { environment } = useEnvironment();
+  const { environment, setEnvironment } = useEnvironment();
+
+  // === Sync environment from URL (e.g., shared links from a different environment) ===
+  const urlEnv = searchParams.get('e');
+  useEffect(() => {
+    if (urlEnv && (urlEnv === 'production' || urlEnv === 'staging') && urlEnv !== environment) {
+      setEnvironment(urlEnv);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- Only run on mount to avoid loops
 
   // === URL Parameter Parsing (supports both compressed and legacy formats) ===
   const urlFilters = useMemo(() => {
