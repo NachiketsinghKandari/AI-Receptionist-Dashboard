@@ -286,7 +286,7 @@ export interface EODTransferDestinationStats {
 
 export interface EODTransferReport {
   attempt_count: number;                                        // total transfer attempts across all calls
-  success_count: number;                                        // transfers with result === 'completed'
+  failure_count: number;                                        // transfers with result !== 'completed'
   transfer_map: Record<string, EODTransferDestinationStats>;    // destination -> stats, sorted by count descending
 }
 
@@ -297,11 +297,11 @@ export interface EODCSEscalation {
 
 export interface EODRawData {
   count: number;              // total calls
+  failure_count: number;      // count of calls where status !== 'success'
   time_saved: number;         // sum of durations (in seconds) where no_action_needed is true
   total_call_time: number;    // sum of all call durations (in seconds)
   messages_taken: number;     // count of calls where message_taken is true
   disconnection_rate: number; // percentage of calls where is_disconnected is true
-  failure_count: number;      // count of calls where status !== 'success'
   cs_escalation_count: number; // calls transferred to "Customer Success" with structured_output_failure
   cs_escalation_map: EODCSEscalation[];  // details of each CS escalation
   transfers_report: EODTransferReport;  // aggregate transfer statistics

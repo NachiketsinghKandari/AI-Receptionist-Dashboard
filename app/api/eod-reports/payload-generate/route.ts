@@ -677,7 +677,7 @@ export async function POST(request: NextRequest) {
 
     // Transfer report counters
     let transferAttemptCount = 0;
-    let transferSuccessCount = 0;
+    let transferFailureCount = 0;
     const transferDestinationStats = new Map<string, { attempts: number; failed: number }>();
 
     for (const [correlationId, cekuraData] of cekuraResult.calls) {
@@ -719,8 +719,8 @@ export async function POST(request: NextRequest) {
       // Calculate transfer report aggregates
       for (const transfer of transfers) {
         transferAttemptCount++;
-        if (transfer.result === 'completed') {
-          transferSuccessCount++;
+        if (transfer.result !== 'completed') {
+          transferFailureCount++;
         }
         const current = transferDestinationStats.get(transfer.destination) || { attempts: 0, failed: 0 };
         current.attempts++;
@@ -747,8 +747,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Separate calls by cekura status
-      if (cekuraData.status === 'success') {
+      // Separate calls by cekura status — failure is when status does not contain "success"
+      if (cekuraData.status?.toLowerCase().includes('success')) {
         successCalls.push(callData);
       } else {
         failureCalls.push(callData);
@@ -773,16 +773,16 @@ export async function POST(request: NextRequest) {
 
     const rawData: EODRawData = {
       count: cekuraResult.count,
+      failure_count: failureCalls.length,
       time_saved: timeSavedSeconds,
       total_call_time: totalCallTimeSeconds,
       messages_taken: messagesTakenCount,
       disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places
-      failure_count: failureCalls.length,
       cs_escalation_count: csEscalationCount,
       cs_escalation_map: csEscalationMap,
       transfers_report: {
         attempt_count: transferAttemptCount,
-        success_count: transferSuccessCount,
+        failure_count: transferFailureCount,
         transfer_map: transferMap,
       },
       success: successCalls,

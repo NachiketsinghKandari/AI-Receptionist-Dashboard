@@ -13,13 +13,13 @@ You will receive a JSON object with this structure:
 
 {
   "count": <number>,                    // Number of calls in this report
+  "failure_count": <number>,           // Count of failed calls (status does not contain "success")
   "total": <number>,                    // Total calls for the day
   "report_type": "full",
   "time_saved": <number>,              // Seconds saved (calls where no_action_needed is true)
   "total_call_time": <number>,         // Total call duration in seconds
   "messages_taken": <number>,          // Count of calls where a message was taken
   "disconnection_rate": <number>,      // Percentage of disconnected calls
-  "failure_count": <number>,           // Count of failed calls
   "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure
   "cs_escalation_map": [              // Details of each CS escalation
     {
@@ -30,7 +30,7 @@ You will receive a JSON object with this structure:
   ],
   "transfers_report": {
     "attempt_count": <number>,         // Total transfer attempts
-    "success_count": <number>,         // Transfers with result === 'completed'
+    "failure_count": <number>,          // Transfers with result !== 'completed'
     "transfer_map": {                  // Destination -> stats, sorted by attempts descending
       "<destination_name>": {
         "attempts": <number>,
@@ -136,7 +136,7 @@ Include all caller types present in the data. Use human-readable labels (e.g., "
 ## 3) Calls Transferred — Acceptance Rate by Team Member
 Use the `transfers_report` aggregate data to build this section:
 - Total transfer attempts: `transfers_report.attempt_count`
-- Overall transfer success rate: `transfers_report.success_count / attempt_count`
+- Overall transfer failure rate: `transfers_report.failure_count / attempt_count`
 
 Present `transfers_report.transfer_map` as a table:
 | Team Member | Attempts | Failed | Acceptance Rate |

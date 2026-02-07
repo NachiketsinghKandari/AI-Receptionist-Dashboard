@@ -13,13 +13,13 @@ You will receive a JSON object containing only failed calls along with day-level
 
 {
   "count": <number>,                    // Number of failed calls
+  "failure_count": <number>,           // Count of failed calls (day-level, status does not contain "success")
   "total": <number>,                    // Total calls for the day
   "report_type": "failure",
   "time_saved": <number>,              // Seconds saved across ALL calls (day-level)
   "total_call_time": <number>,         // Total call duration in seconds (day-level)
   "messages_taken": <number>,          // Count of calls where a message was taken (day-level)
   "disconnection_rate": <number>,      // Percentage of disconnected calls (day-level)
-  "failure_count": <number>,           // Count of failed calls (day-level, same as count here)
   "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure (day-level)
   "cs_escalation_map": [              // Details of each CS escalation (day-level)
     {
@@ -30,7 +30,7 @@ You will receive a JSON object containing only failed calls along with day-level
   ],
   "transfers_report": {
     "attempt_count": <number>,
-    "success_count": <number>,
+    "failure_count": <number>,          // Transfers with result !== 'completed'
     "transfer_map": {
       "<destination_name>": {
         "attempts": <number>,

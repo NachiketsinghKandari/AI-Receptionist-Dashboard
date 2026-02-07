@@ -118,15 +118,15 @@ export async function generateAIReportForEOD(
       if (hasNewStructure) {
         calls = rawData.success || [];
       } else {
-        // Old structure: filter calls where cekura.status === 'success'
-        calls = oldCalls.filter(call => call.cekura?.status === 'success');
+        // Old structure: filter calls where status contains 'success'
+        calls = oldCalls.filter(call => call.cekura?.status?.toLowerCase().includes('success'));
       }
     } else {
       if (hasNewStructure) {
         calls = rawData.failure || [];
       } else {
-        // Old structure: filter calls where cekura.status !== 'success'
-        calls = oldCalls.filter(call => call.cekura?.status !== 'success');
+        // Old structure: filter calls where status does not contain 'success'
+        calls = oldCalls.filter(call => !call.cekura?.status?.toLowerCase().includes('success'));
       }
     }
 
@@ -249,7 +249,7 @@ export async function generateAIReportForEOD(
     } else if (hasNewStructure) {
       errorCount = (rawData.failure || []).length;
     } else {
-      errorCount = oldCalls.filter(call => call.cekura?.status !== 'success').length;
+      errorCount = oldCalls.filter(call => !call.cekura?.status?.toLowerCase().includes('success')).length;
     }
 
     // Update the appropriate column based on report type, and also update errors count

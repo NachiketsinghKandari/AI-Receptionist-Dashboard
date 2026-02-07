@@ -13,13 +13,13 @@ You will receive a JSON object containing only successful calls along with day-l
 
 {
   "count": <number>,                    // Number of successful calls
+  "failure_count": <number>,           // Count of failed calls (day-level, status does not contain "success")
   "total": <number>,                    // Total calls for the day
   "report_type": "success",
   "time_saved": <number>,              // Seconds saved across ALL calls (day-level)
   "total_call_time": <number>,         // Total call duration in seconds (day-level)
   "messages_taken": <number>,          // Count of calls where a message was taken (day-level)
   "disconnection_rate": <number>,      // Percentage of disconnected calls (day-level)
-  "failure_count": <number>,           // Count of failed calls (day-level)
   "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure (day-level)
   "cs_escalation_map": [              // Details of each CS escalation (day-level)
     {
@@ -30,7 +30,7 @@ You will receive a JSON object containing only successful calls along with day-l
   ],
   "transfers_report": {
     "attempt_count": <number>,
-    "success_count": <number>,
+    "failure_count": <number>,          // Transfers with result !== 'completed'
     "transfer_map": {
       "<destination_name>": {
         "attempts": <number>,
@@ -126,7 +126,7 @@ Use human-readable labels (e.g., "New Case" for "new_case").
 ## 3) Calls Transferred — Acceptance Rate by Team Member
 Use the `transfers_report` aggregate data:
 - Total transfer attempts: `transfers_report.attempt_count`
-- Overall acceptance rate: `transfers_report.success_count / attempt_count`
+- Overall transfer failure rate: `transfers_report.failure_count / attempt_count`
 
 Present `transfers_report.transfer_map` as a table:
 | Team Member | Attempts | Failed | Acceptance Rate |
