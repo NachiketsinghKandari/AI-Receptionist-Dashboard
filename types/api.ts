@@ -207,20 +207,21 @@ export interface FlaggedCountResponse {
 export type FlaggedCallsResponse = PaginatedResponse<FlaggedCallListItem>;
 
 // EOD Reports types
+export type EODReportCategory = 'eod' | 'weekly';
+
 export interface EODReportFilters extends BaseFilters {
   reportDate?: string | null;
+  firmId?: number | null;
+  reportCategory?: EODReportCategory | null;
 }
 
 // Filtered metric structure for EOD reports
-// Only includes essential fields, excludes: extra, vocera_defined_metric_code
+// Only includes essential fields: id, name, and score OR enum (mutually exclusive)
 export interface CekuraMetricFiltered {
   id: number;
   name: string;
-  type: string;
-  score: number | null;
-  score_normalized: number | null;
-  explanation: string | null;
-  function_name: string | null;
+  score?: number | null;  // Present when metric type is not 'enum'
+  enum?: string | null;   // Present when metric type is 'enum'
 }
 
 export interface CekuraEvaluationFiltered {
@@ -232,13 +233,14 @@ export interface CekuraCallRawData {
   call_id: string;
   call_ended_reason: string | null;
   status: string;
-  success: boolean;
+  is_reviewed: boolean;
+  feedback: string | null;
+  duration: string | null;  // Duration as string (e.g., "01:26")
   agent: string | null;
   dropoff_point: string | null;
   error_message: string | null;
   critical_categories: string[];
   evaluation: CekuraEvaluationFiltered | null;
-  duration: number | null;
 }
 
 export interface SentryErrorRawData {
@@ -250,37 +252,94 @@ export interface SentryErrorRawData {
   environment: string;
 }
 
+// Transfer data sourced from transfers_details table
+export interface EODTransferData {
+  destination: string;  // transferred_to_name from transfers_details
+  mode: 'transfer_direct' | 'transfer_experimental_voicemail' | 'transfer_experimental_pickup';
+  result: string;       // transfer_status; "cancelled" if error_message contains "failed due to user hangup"
+}
+
+export interface EODStructuredOutput {
+  name: string;
+  result: unknown;  // Can be string, boolean, or object
+}
+
 export interface EODCallRawData {
   correlation_id: string;
+  caller_type: string | null;  // From calls.call_type in database
+  no_action_needed: boolean;  // True if email subject contains "No action needed"
+  message_taken: boolean;     // True if email body contains "took a message"
+  is_disconnected: boolean;   // True if cekura "Disconnection rate" metric score != 5
+  structured_outputs: EODStructuredOutput[];  // From webhook payload structuredOutputs
+  structured_output_failure: boolean;  // True if any structured output indicates a failure
   cekura: CekuraCallRawData;
   sentry: {
     errors: SentryErrorRawData[];
   };
+  transfers: EODTransferData[];  // From transfers_details table
+}
+
+export interface EODTransferDestinationStats {
+  attempts: number;  // total transfer attempts to this destination
+  failed: number;    // transfers where result !== 'completed'
+}
+
+export interface EODTransferReport {
+  attempts_count: number;                                        // total transfer attempts across all calls
+  failure_count: number;                                        // transfers with result !== 'completed'
+  transfers_map: Record<string, EODTransferDestinationStats>;    // destination -> stats, sorted by count descending
+}
+
+export interface EODCSEscalation {
+  correlation_id: string;
+  failed_tool_calls: string[];  // names of tool calls that failed
 }
 
 export interface EODRawData {
+  // Metrics
   count: number;              // total calls
-  total: number;              // same as count (for clarity)
-  errors: number;             // count of calls where status !== 'success'
-  success: EODCallRawData[];  // calls where cekura.status === 'success'
-  failure: EODCallRawData[];  // calls where cekura.status !== 'success'
+  failure_count: number;      // count of calls where status !== 'success'
+  total_call_time: number;    // sum of all call durations (in seconds)
+  time_saved: number;         // sum of durations (in seconds) where no_action_needed is true
+  messages_taken: number;     // count of calls where message_taken is true
+  disconnection_rate: number; // percentage of calls where is_disconnected is true
+  cs_escalation_count: number; // calls transferred to "Customer Success" with structured_output_failure
+  cs_escalation_map: EODCSEscalation[];  // details of each CS escalation
+  transfers_report: EODTransferReport;  // aggregate transfer statistics
+  // Context
+  firm_id?: number | null;    // optional firm filter used during generation
+  firm_name?: string | null;  // firm name for display purposes
+  report_date: string;        // YYYY-MM-DD date for this report
   generated_at: string;
   environment: string;
+  // Call data
+  success: EODCallRawData[];  // calls where cekura.status === 'success'
+  failure: EODCallRawData[];  // calls where cekura.status !== 'success'
+  // Weekly report fields
+  week_start?: string;        // YYYY-MM-DD Monday of the week (weekly reports only)
+  week_end?: string;          // YYYY-MM-DD Sunday of the week (weekly reports only)
 }
+
+// Weekly reports omit individual call arrays — only aggregated metrics
+export type WeeklyRawData = Omit<EODRawData, 'success' | 'failure'> & {
+  week_start: string;   // YYYY-MM-DD Monday
+  week_end: string;     // YYYY-MM-DD Sunday
+};
 
 export interface EODReport {
   id: string;
   report_date: string;
-  raw_data: EODRawData;
+  raw_data: EODRawData | WeeklyRawData;
   full_report: string | null;     // AI-generated full report (all calls)
   errors: number | null;          // Error count computed by AI
   success_report: string | null;  // AI-generated report for successful calls
   failure_report: string | null;  // AI-generated report for failed calls
   generated_at: string;
   trigger_type: 'scheduled' | 'manual';
+  report_type?: EODReportCategory; // 'eod' or 'weekly' — optional for backward compat
 }
 
-export type EODReportType = 'success' | 'failure' | 'full';
+export type EODReportType = 'success' | 'failure' | 'full' | 'weekly';
 
 export type EODReportsResponse = PaginatedResponse<EODReport>;
 
@@ -290,4 +349,29 @@ export interface GenerateEODReportRequest {
 
 export interface GenerateEODReportResponse {
   raw_data: EODRawData;
+}
+
+export interface GenerateWeeklyReportResponse {
+  raw_data: WeeklyRawData;
+  week_start: string;
+  week_end: string;
+  eod_reports_used: number;
+}
+
+// Login API types
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  expires_at: number;
+  token_type: 'bearer';
+  user: {
+    id: string;
+    email: string;
+  };
 }

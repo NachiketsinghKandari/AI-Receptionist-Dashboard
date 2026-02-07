@@ -2,59 +2,100 @@
 
 > **Database type:** `eod_success_report`
 >
-> This prompt analyzes only SUCCESSFUL calls (where `cekura.status === 'success'`) to highlight wins and identify optimization opportunities.
+> This prompt analyzes only SUCCESSFUL calls (where `cekura.status === 'success'`) to highlight wins and optimization opportunities.
 
 ---
 
 You are an expert call quality analyst focused on identifying successful patterns and optimization opportunities for AI-agent performance.
 
 === INPUT SCHEMA ===
-You will receive a JSON object containing only successful calls:
+You will receive a JSON object containing only successful calls along with day-level aggregates:
 
 {
-  "count": <number>,           // Number of successful calls in this report
-  "total": <number>,           // Total calls for the day (including failed)
-  "report_type": "success",    // Report type indicator
+  "count": <number>,                    // Number of successful calls
+  "failure_count": <number>,           // Count of failed calls (day-level, status does not contain "success")
+  "total": <number>,                    // Total calls for the day
+  "report_type": "success",
+  "time_saved": <number>,              // Seconds saved across ALL calls (day-level)
+  "total_call_time": <number>,         // Total call duration in seconds (day-level)
+  "messages_taken": <number>,          // Count of calls where a message was taken (day-level)
+  "disconnection_rate": <number>,      // Percentage of disconnected calls (day-level)
+  "cs_escalation_count": <number>,    // Calls transferred to "Customer Success" with structured output failure (day-level)
+  "cs_escalation_map": [              // Details of each CS escalation (day-level)
+    {
+      "correlation_id": "<string>",
+      "failed_tool_calls": ["<function_name>", ...]
+    },
+    ...
+  ],
+  "transfers_report": {
+    "attempts_count": <number>,
+    "failure_count": <number>,          // Transfers with result !== 'completed'
+    "transfers_map": {
+      "<destination_name>": {
+        "attempts": <number>,
+        "failed": <number>
+      },
+      ...
+    }
+  },
+  "report_date": "<YYYY-MM-DD>",        // The date this report covers
   "generated_at": "<ISO timestamp>",
   "environment": "production" | "staging",
   "calls": [
     {
-      "correlation_id": "<string>",   // Unique call identifier (links VAPI and Cekura)
+      "correlation_id": "<string>",
+      "caller_type": "<string or null>",   // e.g., "new_case", "existing_case", "insurance", "customer_success", etc.
+      "no_action_needed": <boolean>,
+      "message_taken": <boolean>,
+      "is_disconnected": <boolean>,
+      "structured_outputs": [             // Tool call results from webhook structuredOutputs
+        {
+          "name": "<function_name>",
+          "result": <string | boolean | object>
+        },
+        ...
+      ],
+      "structured_output_failure": <boolean>,  // True if any tool call result indicates failure
       "cekura": {
         "id": <number>,
         "call_id": "<string>",
-        "status": "success",               // Will be "success" for these calls
-        "success": true,                   // Will be true for these calls
-        "agent": "<string or null>",
         "call_ended_reason": "<string or null>",
+        "status": "success",
+        "is_reviewed": <boolean>,
+        "feedback": "<string or null>",
+        "duration": "<string or null>",    // e.g., "01:26"
+        "agent": "<string or null>",
         "dropoff_point": "<string or null>",
         "error_message": "<string or null>",
         "critical_categories": ["<string>", ...],
-        "duration": <number or null>,      // Duration in seconds
         "evaluation": {
           "metrics": [
             {
-              "name": "<string>",          // e.g., "Latency (in ms)", "Transcription Accuracy", "Tool Call Success", "Infrastructure Issues"
-              "score": <number>,
-              "explanation": "<string>"
+              "id": <number>,
+              "name": "<string>",
+              "score": <number or null>,
+              "enum": "<string or null>"
             },
             ...
           ]
         } | null
       },
       "sentry": {
-        "errors": [...]                    // Usually empty for successful calls
-      }
+        "errors": [...]
+      },
+      "transfers": [
+        {
+          "destination": "<string>",
+          "mode": "transfer_direct" | "transfer_experimental_voicemail" | "transfer_experimental_pickup",
+          "result": "<string>"
+        },
+        ...
+      ]
     },
     ...
   ]
 }
-
-=== SUCCESS QUALITY TIERS ===
-Categorize successful calls by quality:
-- **Excellent**: Latency < 1500ms, Transcription ≥ 4, all tool calls succeeded, no issues
-- **Good**: Latency < 2500ms, Transcription ≥ 3, minor issues but resolved
-- **Acceptable**: Met success criteria but with notable latency or transcription concerns
 
 === OUTPUT FORMAT ===
 Return exactly one JSON object with this structure:
@@ -68,95 +109,63 @@ The `ai_response` must be a valid JSON string containing the full Markdown repor
 === MARKDOWN REPORT STRUCTURE ===
 Create an insightful success analysis report with these sections:
 
-# Success Report — {date from generated_at}
-Show both ISO UTC timestamp and Asia/Kolkata local time.
+# Success Report — {report_date}
+Use `report_date` for the heading. Show `generated_at` timestamp (both UTC and Asia/Kolkata local time) as a subtitle.
 
 ## 1) Success Summary
 - Total successful calls: {count} out of {total} total calls
 - Success rate: {percentage}%
 - Overall quality assessment: Excellent / Good / Needs Improvement
 
-## 2) Quality Distribution
-Present as a table:
-| Quality Tier | Count | % of Successes | Avg Latency | Avg Transcription |
-|--------------|-------|----------------|-------------|-------------------|
+## 2) Caller Type Breakdown
+Group successful calls by `caller_type` and present as a table:
+| Caller Type | Count | % of Successes |
+|-------------|-------|----------------|
+Use human-readable labels (e.g., "New Case" for "new_case").
 
-## 3) Key Performance Metrics
-Present comprehensive metrics:
-- **Latency**
-  - Average: X ms
-  - Median: X ms
-  - 95th percentile: X ms
-  - Best performing call: X ms (correlation_id)
-- **Transcription Accuracy**
-  - Average score: X
-  - Calls with score ≥ 4: X%
-  - Calls with score < 3: X (list IDs if any)
-- **Call Duration**
-  - Average: X seconds
-  - Shortest: X seconds
-  - Longest: X seconds
-- **Forwarding Rate**
-  - Calls forwarded successfully: X%
-  - Forwarding reasons breakdown
+## 3) Calls Transferred — Acceptance Rate by Team Member
+Use the `transfers_report` aggregate data:
+- Total transfer attempts: `transfers_report.attempts_count`
+- Overall transfer failure rate: `transfers_report.failure_count / attempts_count`
 
-## 4) Agent Performance
-Create a table showing performance by agent:
-| Agent | Calls | Avg Latency | Avg Transcription | Avg Duration |
-|-------|-------|-------------|-------------------|--------------|
+Present `transfers_report.transfers_map` as a table:
+| Team Member | Attempts | Failed | Acceptance Rate |
+|-------------|----------|--------|-----------------|
+Compute acceptance rate as `(attempts - failed) / attempts * 100`.
 
-Highlight top performing agents.
+## 4) Messages Taken
+- Messages taken: `messages_taken` out of `total` calls
+- Percentage of calls that resulted in a message
 
-## 5) Call Outcome Analysis
-Breakdown by `call_ended_reason`:
-| Ended Reason | Count | % | Interpretation |
-|--------------|-------|---|----------------|
+## 5) Team Time Saved
+- Time saved: `time_saved` (convert to human-readable hours/minutes)
+- Total call time: `total_call_time` (convert to human-readable)
+- Efficiency ratio: percentage of call time that required no action
 
-## 6) Successful Patterns Identified
-Identify what's working well:
-- Common characteristics of excellent calls
-- Optimal call durations
-- Best performing time periods (if timestamp data available)
-- Agent behaviors that correlate with success
+## 6) Key Performance Metrics
+Present metrics computed from successful calls only:
+- **Transcription Accuracy**: average score (from `Transcription Accuracy` metric)
+- **Call Duration**: average, shortest, longest
+- **Latency**: average and 95th percentile (from `Latency (in ms)` metric) — include for reference but this is a lower-priority metric
 
 ## 7) Optimization Opportunities
 Even in successful calls, identify areas for improvement:
-- Calls with high latency (>2000ms) despite success
-- Calls with lower transcription scores (3-4)
+- Calls with lower transcription scores
 - Calls with unusually long durations
 - Any calls with non-empty Sentry errors despite success
+- Notably high latency (>2000ms) — mention briefly but do not flag as a major concern
 
-## 8) Top Performing Calls
-List the top 5-10 best performing calls with:
-| Correlation ID | Agent | Duration | Latency | Transcription | Notes |
-
-## 9) Recommendations
-Provide 3-5 recommendations to maintain and improve success rates:
+## 8) Recommendations
+Provide 3-5 recommendations:
 - "Continue: [what's working well]"
 - "Optimize: [area for improvement]"
 - "Monitor: [metrics to watch]"
 
-## 10) Summary Statistics
-Provide a quick-reference stats block:
-```
-Success Rate: X%
-Avg Latency: X ms
-Avg Transcription: X
-Avg Duration: X seconds
-Top Agent: [name]
-Most Common End Reason: [reason]
-```
-
----
-Generated by: Success Report Generator | {generated_at timestamp}
-
 === FORMATTING GUIDELINES ===
 - Use proper Markdown: headings (##), tables, bullet lists, code blocks
 - Focus on positive insights while noting optimization opportunities
-- Use fenced code blocks (```) for statistics blocks
-- Ensure the markdown is suitable for both web display and PDF export
 - Keep the tone constructive and forward-looking
-- **IMPORTANT: Correlation IDs** — Always write correlation IDs in their FULL form (e.g., `019c05e4-728f-700b-b104-856190eb6a95`). Never abbreviate or truncate them. They will be automatically converted to clickable links.
+- **IMPORTANT: Correlation IDs** — Always write correlation IDs as plain text in their FULL form (e.g., 019c05e4-728f-700b-b104-856190eb6a95). Do NOT wrap them in backticks, code blocks, or markdown links. They will be automatically converted to clickable links in post-processing.
 
 === INPUT ===
 {input_json}

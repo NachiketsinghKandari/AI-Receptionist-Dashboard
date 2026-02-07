@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse } from '@/lib/api/utils';
 
 const SENTRY_BASE_URL = 'https://sentry.io/api/0';
@@ -92,6 +93,11 @@ function groupEvents(events: ParsedEvent[]): { summary: GroupedSummary[]; groups
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const eventType = searchParams.get('eventType')?.trim() || null;
     const level = searchParams.get('level')?.trim() || null;

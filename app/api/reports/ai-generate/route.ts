@@ -6,12 +6,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAIReportForEOD } from '@/lib/eod/generate-ai-report';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse } from '@/lib/api/utils';
 import type { Environment } from '@/lib/constants';
 import type { EODReportType } from '@/types/api';
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const { searchParams } = new URL(request.url);
     const environment = (searchParams.get('env') || 'production') as Environment;
 
@@ -26,8 +32,8 @@ export async function POST(request: NextRequest) {
       return errorResponse('rawData is required', 400, 'MISSING_PARAMS');
     }
 
-    if (!reportType || (reportType !== 'success' && reportType !== 'failure' && reportType !== 'full')) {
-      return errorResponse('reportType must be "success", "failure", or "full"', 400, 'INVALID_PARAMS');
+    if (!reportType || (reportType !== 'success' && reportType !== 'failure' && reportType !== 'full' && reportType !== 'weekly')) {
+      return errorResponse('reportType must be "success", "failure", "full", or "weekly"', 400, 'INVALID_PARAMS');
     }
 
     // Use shared AI generation function with reportType

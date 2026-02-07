@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse } from '@/lib/api/utils';
 
 interface UpdateStatusRequest {
@@ -13,6 +14,11 @@ interface UpdateStatusRequest {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const apiKey = process.env.CEKURA_API_KEY;
     if (!apiKey) {
       return errorResponse('Cekura API key not configured', 503, 'CEKURA_NOT_CONFIGURED');
