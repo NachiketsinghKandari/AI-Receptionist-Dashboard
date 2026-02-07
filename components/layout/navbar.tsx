@@ -45,7 +45,7 @@ import type { User } from '@/types/api';
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/calls', label: 'Calls', icon: Phone },
-  { href: '/eod-reports', label: 'Reports', icon: FileText },
+  { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/emails', label: 'Emails', icon: Mail },
   { href: '/transfers', label: 'Transfers', icon: ArrowLeftRight },
   { href: '/sentry', label: 'Sentry', icon: Bug },

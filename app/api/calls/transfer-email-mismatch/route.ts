@@ -8,9 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse, decodeBase64Payload } from '@/lib/api/utils';
+import { errorResponse, decodeBase64Payload, parseEnvironment } from '@/lib/api/utils';
 import { extractTransfersFromMessages, isFailedTransferResult } from '@/lib/webhook-utils';
-import type { Environment } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const env = (searchParams.get('env') || 'production') as Environment;
+    const env = parseEnvironment(searchParams.get('env'));
 
     const client = getSupabaseClient(env);
 

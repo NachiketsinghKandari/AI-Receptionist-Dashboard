@@ -17,6 +17,7 @@ import {
   buildSearchOrCondition,
   isValidInt4,
   decodeBase64Payload,
+  parseEnvironment,
 } from '@/lib/api/utils';
 import { extractTransfersFromMessages } from '@/lib/webhook-utils';
 import type { FlagType, FlagReasons, FlaggedCallListItem } from '@/types/api';
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const env = (searchParams.get('env') || 'production') as Environment;
+    const env = parseEnvironment(searchParams.get('env'));
 
     // Parse parameters
     const firmId = parseIntOrNull(searchParams.get('firmId'));

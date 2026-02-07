@@ -456,9 +456,9 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports?env=staging&limit=20&offset=0&reportDate=2025-01-15",
+							"raw": "{{base_url}}/api/reports?env=staging&limit=20&offset=0&reportDate=2025-01-15",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports"],
+							"path": ["api", "reports"],
 							"query": [
 								{ "key": "env", "value": "staging", "disabled": true },
 								{ "key": "limit", "value": "20", "disabled": true },
@@ -483,9 +483,9 @@
 							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports",
+							"raw": "{{base_url}}/api/reports",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports"]
+							"path": ["api", "reports"]
 						}
 					}
 				},
@@ -504,9 +504,9 @@
 							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports/payload-generate",
+							"raw": "{{base_url}}/api/reports/payload-generate",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports", "payload-generate"]
+							"path": ["api", "reports", "payload-generate"]
 						}
 					}
 				},
@@ -525,9 +525,9 @@
 							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"reportType\": \"full\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports/ai-generate",
+							"raw": "{{base_url}}/api/reports/ai-generate",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports", "ai-generate"]
+							"path": ["api", "reports", "ai-generate"]
 						}
 					}
 				}

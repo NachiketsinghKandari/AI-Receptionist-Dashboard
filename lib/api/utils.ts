@@ -3,6 +3,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { ENVIRONMENTS, DEFAULT_ENVIRONMENT, type Environment } from '@/lib/constants';
 
 /**
  * Standard API error response structure
@@ -110,6 +111,17 @@ export function isValidInt4(value: string): boolean {
   if (!/^\d+$/.test(value)) return false;
   const num = parseInt(value, 10);
   return num >= -2147483648 && num <= 2147483647;
+}
+
+/**
+ * Parse and validate an environment parameter from API request search params.
+ * Returns DEFAULT_ENVIRONMENT if the param is missing or invalid.
+ */
+export function parseEnvironment(param: string | null): Environment {
+  if (param && (ENVIRONMENTS as readonly string[]).includes(param)) {
+    return param as Environment;
+  }
+  return DEFAULT_ENVIRONMENT;
 }
 
 /**

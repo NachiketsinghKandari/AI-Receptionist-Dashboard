@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEnvironment } from '@/components/providers/environment-provider';
+import { useSyncEnvironmentFromUrl } from '@/hooks/use-sync-environment';
 import { ColumnDef } from '@tanstack/react-table';
 import { Phone, Loader2, Flag, RotateCcw, Share2, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -163,15 +164,10 @@ function createColumns(
 export default function CallsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { environment, setEnvironment } = useEnvironment();
+  const { environment } = useEnvironment();
 
   // === Sync environment from URL (e.g., shared links from a different environment) ===
-  const urlEnv = searchParams.get('e');
-  useEffect(() => {
-    if (urlEnv && (urlEnv === 'production' || urlEnv === 'staging') && urlEnv !== environment) {
-      setEnvironment(urlEnv);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- Only run on mount to avoid loops
+  useSyncEnvironmentFromUrl(searchParams.get('e'));
 
   // === URL Parameter Parsing (supports both compressed and legacy formats) ===
   const urlFilters = useMemo(() => {

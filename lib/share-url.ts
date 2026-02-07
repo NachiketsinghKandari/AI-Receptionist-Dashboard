@@ -98,7 +98,7 @@ export function parseShareableUrl(searchParams: URLSearchParams): Partial<Sharea
 
   // Parse basic params
   const firmId = searchParams.get('f') || searchParams.get('firm_id');
-  if (firmId) {
+  if (firmId != null) {
     const parsed = parseInt(firmId, 10);
     result.firmId = parsed === 0 ? 0 : parsed;
   }

@@ -7,8 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse, parseIntOrDefault, clamp } from '@/lib/api/utils';
-import type { Environment } from '@/lib/constants';
+import { errorResponse, parseIntOrDefault, clamp, parseEnvironment } from '@/lib/api/utils';
 import { MAX_PAGE_LIMIT, DEFAULT_PAGE_LIMIT } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const environment = (searchParams.get('env') || 'production') as Environment;
+    const environment = parseEnvironment(searchParams.get('env'));
     const limit = clamp(parseIntOrDefault(searchParams.get('limit'), DEFAULT_PAGE_LIMIT), 1, MAX_PAGE_LIMIT);
     const offset = parseIntOrDefault(searchParams.get('offset'), 0);
     const sortBy = searchParams.get('sortBy') || 'report_date';
@@ -41,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by firmId if provided (stored in raw_data.firm_id)
-    if (firmId) {
+    if (firmId != null) {
       countQuery = countQuery.eq('raw_data->firm_id', firmId);
       dataQuery = dataQuery.eq('raw_data->firm_id', firmId);
     }
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const environment = (searchParams.get('env') || 'production') as Environment;
+    const environment = parseEnvironment(searchParams.get('env'));
 
     const body = await request.json();
     const { reportDate, rawData, triggerType = 'manual', reportType = 'eod' } = body;

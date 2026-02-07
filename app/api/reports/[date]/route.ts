@@ -6,8 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse } from '@/lib/api/utils';
-import type { Environment } from '@/lib/constants';
+import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +20,7 @@ export async function GET(
 
     const { date: dateParam } = await params;
     const { searchParams } = new URL(request.url);
-    const environment = (searchParams.get('env') || 'production') as Environment;
+    const environment = parseEnvironment(searchParams.get('env'));
     const reportType = searchParams.get('type') || 'eod';
 
     // Parse date from DDMMYYYY format to YYYY-MM-DD

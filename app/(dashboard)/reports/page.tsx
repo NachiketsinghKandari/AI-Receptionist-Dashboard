@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { ColumnDef } from '@tanstack/react-table';
 import {
   FileText,
@@ -50,10 +51,12 @@ import {
   useGenerateFullReport,
   useGenerateWeeklyReport,
   useGenerateWeeklyAIReport,
+  useReportByDate,
 } from '@/hooks/use-eod-reports';
 import { useFirms } from '@/hooks/use-firms';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useEnvironment } from '@/components/providers/environment-provider';
+import { useSyncEnvironmentFromUrl } from '@/hooks/use-sync-environment';
 import {
   Select,
   SelectContent,
@@ -226,7 +229,8 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
 
 export default function EODReportsPage() {
   const searchParams = useSearchParams();
-  const { environment, setEnvironment } = useEnvironment();
+  const { environment } = useEnvironment();
+  const queryClient = useQueryClient();
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<string | null>('report_date');
@@ -240,13 +244,26 @@ export default function EODReportsPage() {
   const [firmId, setFirmId] = useState<number | null>(null);
   const [reportCategory, setReportCategory] = useState<EODReportCategory>('eod');
 
+  // Shared report link params (date stays in DDMMYYYY format — the API expects it)
+  const sharedReportDate = searchParams.get('report');
+  const sharedReportType = searchParams.get('type') as 'eod' | 'weekly' | null;
+
   // Sync environment from URL (for shared links)
-  const urlEnv = searchParams.get('e');
+  useSyncEnvironmentFromUrl(searchParams.get('e'));
+
+  // Fetch shared report by date (when opening a shared link)
+  const { data: sharedReportData } = useReportByDate(
+    sharedReportDate,
+    sharedReportType || 'eod',
+    searchParams.get('e') || undefined
+  );
+
+  // Auto-open the detail panel when shared report loads
   useEffect(() => {
-    if (urlEnv && (urlEnv === 'production' || urlEnv === 'staging') && urlEnv !== environment) {
-      setEnvironment(urlEnv);
+    if (sharedReportData?.report && !selectedReport) {
+      setSelectedReport(sharedReportData.report);
     }
-  }, []); // Only run on mount to avoid loops
+  }, [sharedReportData?.report]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch firms list
   const { data: firmsData } = useFirms();
@@ -342,17 +359,28 @@ export default function EODReportsPage() {
         cursor.setDate(cursor.getDate() + 1);
       }
 
-      // Generate & save each day in parallel
+      // Generate & save each day in parallel using raw fetch (mutations share internal state)
       await Promise.allSettled(
         days.map(async (day) => {
           try {
-            const genResult = await generateMutation.mutateAsync({ reportDate: day, firmId });
-            await saveMutation.mutateAsync({ reportDate: day, rawData: genResult.raw_data, firmId });
+            const genRes = await fetch(`/api/reports/payload-generate?env=${environment}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reportDate: day, firmId }),
+            });
+            if (!genRes.ok) return;
+            const genResult = await genRes.json();
+            await fetch(`/api/reports?env=${environment}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reportDate: day, rawData: genResult.raw_data, triggerType: 'manual', firmId, reportType: 'eod' }),
+            });
           } catch {
             // Individual day failures are acceptable — aggregation uses whatever exists
           }
         })
       );
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
 
       // Step 2: Aggregate EOD reports for the week
       setWeeklyProgress('Aggregating weekly data...');
@@ -857,7 +885,7 @@ function EODReportDetailPanel({
                 <FileText className="h-4 w-4 shrink-0" />
                 <span className="truncate">
                   {isWeeklyReport
-                    ? `Weekly Report - ${format(new Date(rawData.week_start + 'T12:00:00Z'), 'MMM d')} to ${format(new Date(rawData.week_end! + 'T12:00:00Z'), 'MMM d')}`
+                    ? `Weekly Report - ${format(new Date(rawData.week_start + 'T12:00:00Z'), 'MMM d')} to ${format(new Date((rawData.week_end ?? rawData.week_start) + 'T12:00:00Z'), 'MMM d')}`
                     : `EOD Report - ${report.report_date}`
                   }
                 </span>

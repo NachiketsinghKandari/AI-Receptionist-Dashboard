@@ -15,8 +15,12 @@ interface AuthResult {
 export async function authenticateRequest(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');
 
-  // No Authorization header = request came through proxy with valid cookies
+  // No Authorization header — verify Supabase session cookies exist (set by proxy.ts auth)
   if (!authHeader) {
+    const hasSupabaseCookies = request.cookies.getAll().some(c => c.name.startsWith('sb-'));
+    if (!hasSupabaseCookies) {
+      return { authenticated: false, error: 'No authorization credentials provided' };
+    }
     return { authenticated: true };
   }
 

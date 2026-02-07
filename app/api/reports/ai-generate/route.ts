@@ -7,8 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAIReportForEOD } from '@/lib/eod/generate-ai-report';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse } from '@/lib/api/utils';
-import type { Environment } from '@/lib/constants';
+import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 import type { EODReportType } from '@/types/api';
 
 export async function POST(request: NextRequest) {
@@ -19,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const environment = (searchParams.get('env') || 'production') as Environment;
+    const environment = parseEnvironment(searchParams.get('env'));
 
     const body = await request.json();
     const { reportId, rawData, reportType } = body;

@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
-import { decodeBase64Payload, errorResponse } from '@/lib/api/utils';
+import { decodeBase64Payload, errorResponse, parseEnvironment } from '@/lib/api/utils';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import type { Environment } from '@/lib/constants';
 import type {
@@ -612,7 +612,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const environment = (searchParams.get('env') || 'production') as Environment;
+    const environment = parseEnvironment(searchParams.get('env'));
 
     const body = await request.json();
     const reportDate = body.reportDate as string;
@@ -638,7 +638,7 @@ export async function POST(request: NextRequest) {
 
     // If firmId is provided, filter Cekura results to only include calls from that firm
     let firmName: string | null = null;
-    if (firmId) {
+    if (firmId != null) {
       const firmFilter = await fetchCorrelationIdsByFirm(firmId, startDate, endDate, environment);
       firmName = firmFilter.firmName;
 

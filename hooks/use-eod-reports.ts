@@ -121,7 +121,7 @@ export function useEODReports(filters: EODReportFilters) {
   const { environment } = useEnvironment();
 
   return useQuery({
-    queryKey: ['eod-reports', 'list', environment, filters],
+    queryKey: ['reports', 'list', environment, filters],
     queryFn: () => fetchEODReports(filters, environment),
     staleTime: CACHE_TTL_DATA * 1000,
     placeholderData: (prev) => prev,
@@ -137,7 +137,7 @@ export function useGenerateEODReport() {
       generateEODReport(reportDate, environment, firmId),
     onSuccess: () => {
       // Invalidate the reports list to refetch
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }
@@ -150,7 +150,7 @@ export function useSaveReport() {
     mutationFn: ({ reportDate, rawData, firmId, reportType }: { reportDate: string; rawData: EODRawData | WeeklyRawData; firmId?: number | null; reportType?: EODReportCategory }) =>
       saveReport(reportDate, rawData, environment, firmId, reportType),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }
@@ -163,7 +163,7 @@ export function useGenerateSuccessReport() {
     mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
       generateAIReport(reportId, rawData, 'success', environment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }
@@ -176,7 +176,7 @@ export function useGenerateFailureReport() {
     mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
       generateAIReport(reportId, rawData, 'failure', environment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }
@@ -189,7 +189,7 @@ export function useGenerateFullReport() {
     mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
       generateAIReport(reportId, rawData, 'full', environment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }
@@ -221,7 +221,7 @@ export function useGenerateWeeklyReport() {
     mutationFn: ({ weekDate, firmId }: { weekDate: string; firmId?: number | null }) =>
       generateWeeklyReport(weekDate, environment, firmId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }
@@ -234,7 +234,7 @@ export function useGenerateWeeklyAIReport() {
     mutationFn: ({ reportId, rawData }: { reportId: string; rawData: WeeklyRawData }) =>
       generateAIReport(reportId, rawData, 'weekly', environment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
   });
 }

@@ -12,7 +12,7 @@ function formatDateForUrl(dateStr: string): string {
 
 /**
  * Build a shareable URL for a report
- * Format: /reports/eod/DDMMYYYY?e=production or /reports/weekly/DDMMYYYY?e=production
+ * Format: /reports?report=DDMMYYYY&type=eod&e=production
  */
 export function buildReportShareUrl(
   reportDate: string,
@@ -22,9 +22,11 @@ export function buildReportShareUrl(
 ): string {
   const dateForUrl = formatDateForUrl(reportDate);
   const params = new URLSearchParams();
+  params.set('report', dateForUrl);
+  params.set('type', reportType);
   params.set('e', environment);
 
-  return `${baseUrl}/reports/${reportType}/${dateForUrl}?${params.toString()}`;
+  return `${baseUrl}/reports?${params.toString()}`;
 }
 
 /**

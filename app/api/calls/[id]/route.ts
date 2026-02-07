@@ -5,9 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
-import { type Environment } from '@/lib/constants';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse, parseIntOrNull } from '@/lib/api/utils';
+import { errorResponse, parseIntOrNull, parseEnvironment } from '@/lib/api/utils';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { searchParams } = new URL(request.url);
-    const env = (searchParams.get('env') || 'production') as Environment;
+    const env = parseEnvironment(searchParams.get('env'));
     const { id } = await params;
 
     // Support both numeric ID and correlation ID (UUID format)

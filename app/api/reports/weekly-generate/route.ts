@@ -5,10 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse } from '@/lib/api/utils';
+import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
-import type { Environment } from '@/lib/constants';
 import type {
   EODRawData,
   WeeklyRawData,
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const environment = (searchParams.get('env') || 'production') as Environment;
+    const environment = parseEnvironment(searchParams.get('env'));
 
     const body = await request.json();
     const weekDate = body.weekDate as string;
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
     query = query.or('report_type.eq.eod,report_type.is.null');
 
     // Filter by firmId if provided
-    if (firmId) {
+    if (firmId != null) {
       query = query.eq('raw_data->firm_id', firmId);
     }
 

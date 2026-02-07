@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
-import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, type Environment } from '@/lib/constants';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/constants';
 import { authenticateRequest } from '@/lib/api/auth';
 import {
   errorResponse,
@@ -15,6 +15,7 @@ import {
   isValidInt4,
   decodeBase64Payload,
   escapeLikePattern,
+  parseEnvironment,
 } from '@/lib/api/utils';
 import type { DynamicFilter } from '@/types/api';
 import { hasMultipleTransfers, hasVoicemailTransfer, hasConversationTransfer, lastTransferMatchesCategory, type ToolCallResultCategory } from '@/lib/webhook-utils';
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const env = (searchParams.get('env') || 'production') as Environment;
+    const env = parseEnvironment(searchParams.get('env'));
 
     // Parse and validate parameters
     const firmId = parseIntOrNull(searchParams.get('firmId'));

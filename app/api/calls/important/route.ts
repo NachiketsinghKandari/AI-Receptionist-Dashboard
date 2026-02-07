@@ -6,8 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse } from '@/lib/api/utils';
-import type { Environment } from '@/lib/constants';
+import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const env = (searchParams.get('env') || 'production') as Environment;
+    const env = parseEnvironment(searchParams.get('env'));
 
     const client = getSupabaseClient(env);
 

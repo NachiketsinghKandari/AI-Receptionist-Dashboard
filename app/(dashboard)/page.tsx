@@ -95,10 +95,10 @@ const quickLinks = [
     bgColor: 'bg-blue-500/10',
   },
   {
-    href: '/eod-reports',
+    href: '/reports',
     icon: FileText,
-    title: 'EOD Reports',
-    description: 'End-of-day reports and call summaries',
+    title: 'Reports',
+    description: 'End-of-day and weekly reports',
     color: 'text-teal-500',
     bgColor: 'bg-teal-500/10',
   },
