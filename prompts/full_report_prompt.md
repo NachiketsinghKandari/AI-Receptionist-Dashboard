@@ -29,9 +29,9 @@ You will receive a JSON object with this structure:
     ...
   ],
   "transfers_report": {
-    "attempt_count": <number>,         // Total transfer attempts
+    "attempts_count": <number>,         // Total transfer attempts
     "failure_count": <number>,          // Transfers with result !== 'completed'
-    "transfer_map": {                  // Destination -> stats, sorted by attempts descending
+    "transfers_map": {                  // Destination -> stats, sorted by attempts descending
       "<destination_name>": {
         "attempts": <number>,
         "failed": <number>
@@ -135,10 +135,10 @@ Include all caller types present in the data. Use human-readable labels (e.g., "
 
 ## 3) Calls Transferred — Acceptance Rate by Team Member
 Use the `transfers_report` aggregate data to build this section:
-- Total transfer attempts: `transfers_report.attempt_count`
-- Overall transfer failure rate: `transfers_report.failure_count / attempt_count`
+- Total transfer attempts: `transfers_report.attempts_count`
+- Overall transfer failure rate: `transfers_report.failure_count / attempts_count`
 
-Present `transfers_report.transfer_map` as a table:
+Present `transfers_report.transfers_map` as a table:
 | Team Member | Attempts | Failed | Acceptance Rate |
 |-------------|----------|--------|-----------------|
 Compute acceptance rate as `(attempts - failed) / attempts * 100`. Sort by attempts descending.

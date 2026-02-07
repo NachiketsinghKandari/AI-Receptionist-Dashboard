@@ -26,11 +26,28 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     const supabase = getSupabaseClient(environment);
+    const firmIdParam = searchParams.get('firmId');
+    const firmId = firmIdParam ? parseInt(firmIdParam, 10) : null;
+
+    // Build base query with optional firmId filter
+    let countQuery = supabase.from('reports').select('*', { count: 'exact', head: true });
+    let dataQuery = supabase.from('reports').select('*');
+
+    // Filter by reportType if provided (defaults to showing all)
+    const reportType = searchParams.get('reportType');
+    if (reportType) {
+      countQuery = countQuery.eq('report_type', reportType);
+      dataQuery = dataQuery.eq('report_type', reportType);
+    }
+
+    // Filter by firmId if provided (stored in raw_data.firm_id)
+    if (firmId) {
+      countQuery = countQuery.eq('raw_data->firm_id', firmId);
+      dataQuery = dataQuery.eq('raw_data->firm_id', firmId);
+    }
 
     // Get total count
-    const { count: totalCount, error: countError } = await supabase
-      .from('eod_reports')
-      .select('*', { count: 'exact', head: true });
+    const { count: totalCount, error: countError } = await countQuery;
 
     if (countError) {
       console.error('Error fetching EOD reports count:', countError);
@@ -38,9 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch reports with pagination
-    const { data, error } = await supabase
-      .from('eod_reports')
-      .select('*')
+    const { data, error } = await dataQuery
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .range(offset, offset + limit - 1);
 
@@ -72,7 +87,7 @@ export async function POST(request: NextRequest) {
     const environment = (searchParams.get('env') || 'production') as Environment;
 
     const body = await request.json();
-    const { reportDate, rawData, triggerType = 'manual' } = body;
+    const { reportDate, rawData, triggerType = 'manual', reportType = 'eod' } = body;
 
     if (!reportDate || !rawData) {
       return errorResponse('reportDate and rawData are required', 400, 'MISSING_PARAMS');
@@ -80,27 +95,32 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseClient(environment);
 
-    // Check if report already exists for this date
-    const { data: existing } = await supabase
-      .from('eod_reports')
+    // Check if report already exists for this date and report_type
+    let existingQuery = supabase
+      .from('reports')
       .select('id')
-      .eq('report_date', reportDate)
-      .single();
+      .eq('report_date', reportDate);
+
+    // Include report_type in duplicate check so EOD and weekly don't collide
+    existingQuery = existingQuery.eq('report_type', reportType);
+
+    const { data: existing } = await existingQuery.single();
 
     if (existing) {
       // Update existing report - clear AI fields for regeneration
       const { data, error } = await supabase
-        .from('eod_reports')
+        .from('reports')
         .update({
           raw_data: rawData,
           generated_at: new Date().toISOString(),
           trigger_type: triggerType,
+          report_type: reportType,
           full_report: null, // Clear for regeneration
           errors: null, // Clear for regeneration
           success_report: null, // Clear for regeneration
           failure_report: null, // Clear for regeneration
         })
-        .eq('report_date', reportDate)
+        .eq('id', existing.id)
         .select()
         .single();
 
@@ -119,11 +139,12 @@ export async function POST(request: NextRequest) {
 
     // Insert new report
     const { data, error } = await supabase
-      .from('eod_reports')
+      .from('reports')
       .insert({
         report_date: reportDate,
         raw_data: rawData,
         trigger_type: triggerType,
+        report_type: reportType,
         full_report: null,
         errors: null,
         success_report: null,

@@ -763,7 +763,7 @@ export async function POST(request: NextRequest) {
     const totalCalls = cekuraResult.count;
     const disconnectionRate = totalCalls > 0 ? (disconnectedCount / totalCalls) * 100 : 0;
 
-    // Build transfer_map sorted by count descending
+    // Build transfers_map sorted by count descending
     const sortedTransferEntries = [...transferDestinationStats.entries()]
       .sort((a, b) => b[1].attempts - a[1].attempts);
     const transferMap: Record<string, { attempts: number; failed: number }> = {};
@@ -781,9 +781,9 @@ export async function POST(request: NextRequest) {
       cs_escalation_count: csEscalationCount,
       cs_escalation_map: csEscalationMap,
       transfers_report: {
-        attempt_count: transferAttemptCount,
+        attempts_count: transferAttemptCount,
         failure_count: transferFailureCount,
-        transfer_map: transferMap,
+        transfers_map: transferMap,
       },
       success: successCalls,
       failure: failureCalls,

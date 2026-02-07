@@ -29,9 +29,9 @@ You will receive a JSON object containing only failed calls along with day-level
     ...
   ],
   "transfers_report": {
-    "attempt_count": <number>,
+    "attempts_count": <number>,
     "failure_count": <number>,          // Transfers with result !== 'completed'
-    "transfer_map": {
+    "transfers_map": {
       "<destination_name>": {
         "attempts": <number>,
         "failed": <number>

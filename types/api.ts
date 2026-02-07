@@ -285,9 +285,9 @@ export interface EODTransferDestinationStats {
 }
 
 export interface EODTransferReport {
-  attempt_count: number;                                        // total transfer attempts across all calls
+  attempts_count: number;                                        // total transfer attempts across all calls
   failure_count: number;                                        // transfers with result !== 'completed'
-  transfer_map: Record<string, EODTransferDestinationStats>;    // destination -> stats, sorted by count descending
+  transfers_map: Record<string, EODTransferDestinationStats>;    // destination -> stats, sorted by count descending
 }
 
 export interface EODCSEscalation {
@@ -312,21 +312,30 @@ export interface EODRawData {
   environment: string;
   firm_id?: number | null;    // optional firm filter used during generation
   firm_name?: string | null;  // firm name for display purposes
+  week_start?: string;        // YYYY-MM-DD Monday of the week (weekly reports only)
+  week_end?: string;          // YYYY-MM-DD Sunday of the week (weekly reports only)
 }
+
+// Weekly reports omit individual call arrays — only aggregated metrics
+export type WeeklyRawData = Omit<EODRawData, 'success' | 'failure'> & {
+  week_start: string;   // YYYY-MM-DD Monday
+  week_end: string;     // YYYY-MM-DD Sunday
+};
 
 export interface EODReport {
   id: string;
   report_date: string;
-  raw_data: EODRawData;
+  raw_data: EODRawData | WeeklyRawData;
   full_report: string | null;     // AI-generated full report (all calls)
   errors: number | null;          // Error count computed by AI
   success_report: string | null;  // AI-generated report for successful calls
   failure_report: string | null;  // AI-generated report for failed calls
   generated_at: string;
   trigger_type: 'scheduled' | 'manual';
+  report_type?: EODReportCategory; // 'eod' or 'weekly' — optional for backward compat
 }
 
-export type EODReportType = 'success' | 'failure' | 'full';
+export type EODReportType = 'success' | 'failure' | 'full' | 'weekly';
 
 export type EODReportsResponse = PaginatedResponse<EODReport>;
 
@@ -336,6 +345,13 @@ export interface GenerateEODReportRequest {
 
 export interface GenerateEODReportResponse {
   raw_data: EODRawData;
+}
+
+export interface GenerateWeeklyReportResponse {
+  raw_data: WeeklyRawData;
+  week_start: string;
+  week_end: string;
+  eod_reports_used: number;
 }
 
 // Login API types

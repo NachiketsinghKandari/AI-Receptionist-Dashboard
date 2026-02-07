@@ -41,18 +41,29 @@ import {
 import {
   useEODReports,
   useGenerateEODReport,
-  useSaveEODReport,
+  useSaveReport,
   useGenerateSuccessReport,
   useGenerateFailureReport,
   useGenerateFullReport,
+  useGenerateWeeklyReport,
+  useGenerateWeeklyAIReport,
 } from '@/hooks/use-eod-reports';
+import { useFirms } from '@/hooks/use-firms';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useEnvironment } from '@/components/providers/environment-provider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { buildCekuraUrl } from '@/hooks/use-cekura';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/constants';
 import { JsonViewer } from '@/components/ui/json-viewer';
-import type { EODReport, EODRawData, SortOrder } from '@/types/api';
-import { format } from 'date-fns';
+import type { EODReport, EODRawData, WeeklyRawData, SortOrder, EODReportCategory } from '@/types/api';
+import type { Firm } from '@/types/database';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { formatUTCTimestamp } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 
@@ -143,7 +154,34 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
         const hasFullReport = row.original.full_report !== null;
         const isGenerating = generatingState?.reportId === row.original.id;
         const isGeneratingAny = isGenerating && (generatingState?.success || generatingState?.failure || generatingState?.full);
+        const isWeekly = !!(row.original.raw_data as EODRawData)?.week_start;
 
+        if (isWeekly) {
+          // Weekly reports only have full_report
+          if (hasFullReport) {
+            return (
+              <Badge variant="default" className="bg-green-600">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Ready
+              </Badge>
+            );
+          }
+          if (isGeneratingAny) {
+            return (
+              <Badge variant="secondary">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Generating
+              </Badge>
+            );
+          }
+          return (
+            <Badge variant="secondary">
+              Pending
+            </Badge>
+          );
+        }
+
+        // EOD reports: 3 AI reports (success, failure, full)
         const readyCount = [hasSuccessReport, hasFailureReport, hasFullReport].filter(Boolean).length;
 
         if (readyCount === 3) {
@@ -192,17 +230,39 @@ export default function EODReportsPage() {
   // Generate report state
   const [reportDate, setReportDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
+  // Firm and report category filters
+  const [firmId, setFirmId] = useState<number | null>(null);
+  const [reportCategory, setReportCategory] = useState<EODReportCategory>('eod');
+
+  // Fetch firms list
+  const { data: firmsData } = useFirms();
+  const firms = [...(firmsData?.firms ?? [])].sort((a, b) => a.id - b.id);
+
   const filters = useMemo(
-    () => ({ limit, offset, sortBy, sortOrder }),
-    [limit, offset, sortBy, sortOrder]
+    () => ({ limit, offset, sortBy, sortOrder, firmId, reportCategory }),
+    [limit, offset, sortBy, sortOrder, firmId, reportCategory]
   );
 
   const { data, isLoading, isFetching } = useEODReports(filters);
   const generateMutation = useGenerateEODReport();
-  const saveMutation = useSaveEODReport();
+  const saveMutation = useSaveReport();
   const successReportMutation = useGenerateSuccessReport();
   const failureReportMutation = useGenerateFailureReport();
   const fullReportMutation = useGenerateFullReport();
+  const weeklyGenerateMutation = useGenerateWeeklyReport();
+  const weeklyAIReportMutation = useGenerateWeeklyAIReport();
+
+  // Weekly generation progress tracking
+  const [weeklyProgress, setWeeklyProgress] = useState<string | null>(null);
+
+  // Compute the week range for weekly report display
+  const weekDateObj = useMemo(() => {
+    const d = new Date(reportDate + 'T12:00:00Z');
+    const mon = startOfWeek(d, { weekStartsOn: 1 });
+    const sun = endOfWeek(d, { weekStartsOn: 1 });
+    return { monday: mon, sunday: sun };
+  }, [reportDate]);
+  const weekRangeLabel = `${format(weekDateObj.monday, 'MMM d')} - ${format(weekDateObj.sunday, 'MMM d, yyyy')}`;
 
   const generatingState: GeneratingState = useMemo(() => ({
     reportId: successReportMutation.isPending ? successReportMutation.variables?.reportId
@@ -232,12 +292,12 @@ export default function EODReportsPage() {
 
   const handleGenerate = async () => {
     try {
-      // Step 1: Generate raw data from Cekura + Sentry
-      const result = await generateMutation.mutateAsync(reportDate);
+      // Step 1: Generate raw data from Cekura + Sentry (optionally filtered by firm)
+      const result = await generateMutation.mutateAsync({ reportDate, firmId });
       const rawData = result.raw_data;
 
       // Step 2: Save the report to database
-      const saveResult = await saveMutation.mutateAsync({ reportDate, rawData });
+      const saveResult = await saveMutation.mutateAsync({ reportDate, rawData, firmId });
 
       // Step 3: Generate all three AI reports in parallel
       const reportId = saveResult.report.id;
@@ -248,6 +308,61 @@ export default function EODReportsPage() {
       ]);
     } catch (error) {
       console.error('Failed to generate report:', error);
+    }
+  };
+
+  const handleGenerateWeekly = async () => {
+    try {
+      // Step 1: Generate all missing EOD reports for the week
+      setWeeklyProgress('Generating daily reports...');
+      const d = new Date(reportDate + 'T12:00:00Z');
+      const mon = startOfWeek(d, { weekStartsOn: 1 });
+      const sun = endOfWeek(d, { weekStartsOn: 1 });
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+
+      const days: string[] = [];
+      const cursor = new Date(mon);
+      while (cursor <= sun && cursor <= today) {
+        days.push(format(cursor, 'yyyy-MM-dd'));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      // Generate & save each day in parallel
+      await Promise.allSettled(
+        days.map(async (day) => {
+          try {
+            const genResult = await generateMutation.mutateAsync({ reportDate: day, firmId });
+            await saveMutation.mutateAsync({ reportDate: day, rawData: genResult.raw_data, firmId });
+          } catch {
+            // Individual day failures are acceptable — aggregation uses whatever exists
+          }
+        })
+      );
+
+      // Step 2: Aggregate EOD reports for the week
+      setWeeklyProgress('Aggregating weekly data...');
+      const result = await weeklyGenerateMutation.mutateAsync({ weekDate: reportDate, firmId });
+      const rawData = result.raw_data;
+
+      // Step 3: Save the weekly report
+      setWeeklyProgress('Saving weekly report...');
+      const saveResult = await saveMutation.mutateAsync({
+        reportDate: result.week_start,
+        rawData,
+        firmId,
+        reportType: 'weekly',
+      });
+
+      // Step 4: Generate AI weekly narrative
+      setWeeklyProgress('Generating AI report...');
+      const reportId = saveResult.report.id;
+      await weeklyAIReportMutation.mutateAsync({ reportId, rawData });
+
+      setWeeklyProgress(null);
+    } catch (error) {
+      console.error('Failed to generate weekly report:', error);
+      setWeeklyProgress(null);
     }
   };
 
@@ -298,74 +413,165 @@ export default function EODReportsPage() {
 
   const handleRetryFullReport = async () => {
     if (!selectedReport) return;
+    const isWeekly = !!(selectedReport.raw_data as EODRawData)?.week_start;
     try {
-      await fullReportMutation.mutateAsync({
-        reportId: selectedReport.id,
-        rawData: selectedReport.raw_data as EODRawData,
-      });
+      if (isWeekly) {
+        await weeklyAIReportMutation.mutateAsync({
+          reportId: selectedReport.id,
+          rawData: selectedReport.raw_data as WeeklyRawData,
+        });
+      } else {
+        await fullReportMutation.mutateAsync({
+          reportId: selectedReport.id,
+          rawData: selectedReport.raw_data as EODRawData,
+        });
+      }
     } catch (error) {
       console.error('Failed to retry full report:', error);
     }
   };
 
   const isAnyPending = generateMutation.isPending || saveMutation.isPending ||
-    successReportMutation.isPending || failureReportMutation.isPending || fullReportMutation.isPending;
+    successReportMutation.isPending || failureReportMutation.isPending || fullReportMutation.isPending ||
+    weeklyGenerateMutation.isPending || weeklyAIReportMutation.isPending || weeklyProgress !== null;
 
   const hasAnyError = generateMutation.isError || saveMutation.isError ||
-    successReportMutation.isError || failureReportMutation.isError || fullReportMutation.isError;
+    successReportMutation.isError || failureReportMutation.isError || fullReportMutation.isError ||
+    weeklyGenerateMutation.isError || weeklyAIReportMutation.isError;
 
-  const anySuccess = successReportMutation.isSuccess || failureReportMutation.isSuccess || fullReportMutation.isSuccess;
+  const anySuccess = successReportMutation.isSuccess || failureReportMutation.isSuccess || fullReportMutation.isSuccess ||
+    (weeklyAIReportMutation.isSuccess && saveMutation.isSuccess);
 
   // Sidebar content component to avoid duplication
   const sidebarContent = (
     <div className="space-y-4">
+      {/* Report Category Filter */}
       <div>
-        <Label htmlFor="reportDate" className="text-sm">
-          Report Date
-        </Label>
-        <Input
-          id="reportDate"
-          type="date"
-          value={reportDate}
-          onChange={(e) => setReportDate(e.target.value)}
-          className="mt-1"
-        />
+        <Label className="text-sm">Report Type</Label>
+        <Tabs value={reportCategory} onValueChange={(v) => { setReportCategory(v as EODReportCategory); setOffset(0); setSelectedReport(null); }} className="mt-1">
+          <TabsList className="w-full">
+            <TabsTrigger value="eod" className="flex-1 text-xs">EOD Reports</TabsTrigger>
+            <TabsTrigger value="weekly" className="flex-1 text-xs">Weekly Reports</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      <Button
-        onClick={handleGenerate}
-        disabled={isAnyPending || !reportDate}
-        className="w-full"
-      >
-        {generateMutation.isPending ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Fetching data...
-          </>
-        ) : saveMutation.isPending ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Saving report...
-          </>
-        ) : (successReportMutation.isPending || failureReportMutation.isPending || fullReportMutation.isPending) ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Generating AI reports...
-          </>
-        ) : (
-          <>
-            <Plus className="h-4 w-4 mr-2" />
-            Generate Report
-          </>
-        )}
-      </Button>
+      {/* Firm Filter */}
+      <div className="w-full">
+        <Label className="text-sm">Firm</Label>
+        <Select
+          value={firmId ? String(firmId) : 'all'}
+          onValueChange={(v) => {
+            setFirmId(v === 'all' ? null : parseInt(v, 10));
+            setOffset(0);
+          }}
+        >
+          <SelectTrigger className="mt-1.5 h-11 w-full">
+            <SelectValue placeholder="All Firms" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Firms</SelectItem>
+            {firms.map((firm: Firm) => (
+              <SelectItem key={firm.id} value={String(firm.id)}>
+                {firm.name} (ID: {firm.id})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {reportCategory === 'eod' ? (
+        <>
+          <div className="pt-2 border-t">
+            <Label htmlFor="reportDate" className="text-sm">
+              Report Date
+            </Label>
+            <Input
+              id="reportDate"
+              type="date"
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+
+          <Button
+            onClick={handleGenerate}
+            disabled={isAnyPending || !reportDate}
+            className="w-full h-11"
+          >
+            <span className="flex items-center justify-center gap-2">
+              {generateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Fetching data...</span>
+                </>
+              ) : saveMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Saving report...</span>
+                </>
+              ) : (successReportMutation.isPending || failureReportMutation.isPending || fullReportMutation.isPending) ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating AI...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Generate Report</span>
+                </>
+              )}
+            </span>
+          </Button>
+        </>
+      ) : (
+        <>
+          <div className="pt-2 border-t">
+            <Label htmlFor="reportDate" className="text-sm">
+              Select any date in the week
+            </Label>
+            <Input
+              id="reportDate"
+              type="date"
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Week: {weekRangeLabel}
+            </p>
+          </div>
+
+          <Button
+            onClick={handleGenerateWeekly}
+            disabled={isAnyPending || !reportDate}
+            className="w-full h-11"
+          >
+            <span className="flex items-center justify-center gap-2">
+              {weeklyProgress ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{weeklyProgress}</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Generate Weekly Report</span>
+                </>
+              )}
+            </span>
+          </Button>
+        </>
+      )}
 
       {hasAnyError && (
         <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
           <AlertCircle className="h-4 w-4" />
           {generateMutation.error?.message || saveMutation.error?.message ||
            successReportMutation.error?.message || failureReportMutation.error?.message ||
-           fullReportMutation.error?.message || 'Failed to generate'}
+           fullReportMutation.error?.message || weeklyGenerateMutation.error?.message ||
+           weeklyAIReportMutation.error?.message || 'Failed to generate'}
         </div>
       )}
 
@@ -435,7 +641,12 @@ export default function EODReportsPage() {
         <div className="shrink-0">
           <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 flex items-center gap-2">
             <FileText className="h-5 w-5 md:h-6 md:w-6" />
-            EOD Reports
+            Reports
+            {firmId && (
+              <Badge variant="secondary" className="text-xs font-normal">
+                {firms.find(f => f.id === firmId)?.name || `Firm ${firmId}`}
+              </Badge>
+            )}
           </h1>
 
           <div className="flex flex-wrap gap-2 md:gap-4 mb-2">
@@ -490,10 +701,10 @@ export default function EODReportsPage() {
           onRetryFullReport={handleRetryFullReport}
           isRetryingSuccess={successReportMutation.isPending}
           isRetryingFailure={failureReportMutation.isPending}
-          isRetryingFull={fullReportMutation.isPending}
+          isRetryingFull={fullReportMutation.isPending || weeklyAIReportMutation.isPending}
           successError={successReportMutation.error?.message}
           failureError={failureReportMutation.error?.message}
-          fullError={fullReportMutation.error?.message}
+          fullError={fullReportMutation.error?.message || weeklyAIReportMutation.error?.message}
         />
       )}
     </div>
@@ -597,6 +808,7 @@ function EODReportDetailPanel({
   }, []);
 
   const rawData = report.raw_data as EODRawData;
+  const isWeeklyReport = !!rawData?.week_start;
 
   return (
     <>
@@ -617,7 +829,12 @@ function EODReportDetailPanel({
             <div className="min-w-0">
               <h2 className="font-semibold flex items-center gap-2 text-sm md:text-base">
                 <FileText className="h-4 w-4 shrink-0" />
-                <span className="truncate">EOD Report - {report.report_date}</span>
+                <span className="truncate">
+                  {isWeeklyReport
+                    ? `Weekly Report - ${format(new Date(rawData.week_start + 'T12:00:00Z'), 'MMM d')} to ${format(new Date(rawData.week_end! + 'T12:00:00Z'), 'MMM d')}`
+                    : `EOD Report - ${report.report_date}`
+                  }
+                </span>
               </h2>
               <p className="text-xs text-muted-foreground truncate">
                 Generated: {formatUTCTimestamp(report.generated_at)} UTC
@@ -649,11 +866,11 @@ function EODReportDetailPanel({
           <Tabs defaultValue="info" className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <TabsList className="shrink-0 mx-2 mt-2 w-auto">
               <TabsTrigger value="info" className="text-xs px-3">Info</TabsTrigger>
-              <TabsTrigger value="reports" className="text-xs px-3">AI Reports</TabsTrigger>
+              <TabsTrigger value="reports" className="text-xs px-3">{isWeeklyReport ? 'Weekly Report' : 'AI Reports'}</TabsTrigger>
             </TabsList>
             <TabsContent value="info" className="flex-1 min-h-0 mt-0 overflow-hidden">
               <ScrollArea className="h-full">
-                <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} isMobile />
+                <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} isMobile hideErrors={isWeeklyReport} />
               </ScrollArea>
             </TabsContent>
             <TabsContent value="reports" className="flex-1 min-h-0 mt-0 overflow-hidden">
@@ -670,6 +887,7 @@ function EODReportDetailPanel({
                   failureError={failureError}
                   fullError={fullError}
                   isMobile
+                  hideSuccessFailure={isWeeklyReport}
                 />
               </ScrollArea>
             </TabsContent>
@@ -684,7 +902,7 @@ function EODReportDetailPanel({
               className="h-full overflow-hidden"
               style={{ width: `${leftPercent}%` }}
             >
-              <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} isMobile={false} />
+              <EODLeftPanel report={report} rawData={rawData} previousReport={previousReport} isMobile={false} hideErrors={isWeeklyReport} />
             </div>
 
             {/* Resize Handle */}
@@ -711,6 +929,7 @@ function EODReportDetailPanel({
                 failureError={failureError}
                 fullError={fullError}
                 isMobile={false}
+                hideSuccessFailure={isWeeklyReport}
               />
             </div>
           </div>
@@ -760,11 +979,13 @@ function EODLeftPanel({
   rawData,
   previousReport,
   isMobile = false,
+  hideErrors = false,
 }: {
   report: EODReport;
   rawData: EODRawData;
   previousReport: EODReport | null;
   isMobile?: boolean;
+  hideErrors?: boolean;
 }) {
   const { environment } = useEnvironment();
 
@@ -828,7 +1049,7 @@ function EODLeftPanel({
               <span className="text-base md:text-xl font-bold text-red-500">{errorCount}</span>
               <ChangeIndicator change={errorChange} inverted />
             </div>
-            <div className="text-[10px] md:text-xs text-muted-foreground">Failed</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">Failure</div>
           </CardContent>
         </Card>
         <Card>
@@ -871,12 +1092,14 @@ function EODLeftPanel({
       </Card>
 
       {/* Tabs for Raw Data and Errors - fills remaining space */}
-      <Tabs defaultValue="errors" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <Tabs defaultValue={hideErrors ? 'raw-data' : 'errors'} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <TabsList className="shrink-0 w-full">
-          <TabsTrigger value="errors" className="text-xs flex-1">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Errors ({failureCalls.length})
-          </TabsTrigger>
+          {!hideErrors && (
+            <TabsTrigger value="errors" className="text-xs flex-1">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              Errors ({failureCalls.length})
+            </TabsTrigger>
+          )}
           <TabsTrigger value="raw-data" className="text-xs flex-1">Raw</TabsTrigger>
         </TabsList>
 
@@ -993,6 +1216,7 @@ interface EODRightPanelProps {
   failureError?: string;
   fullError?: string;
   isMobile?: boolean;
+  hideSuccessFailure?: boolean;
 }
 
 function EODRightPanel({
@@ -1007,6 +1231,7 @@ function EODRightPanel({
   failureError,
   fullError,
   isMobile = false,
+  hideSuccessFailure = false,
 }: EODRightPanelProps) {
   const hasFailureReport = report.failure_report !== null;
   const hasSuccessReport = report.success_report !== null;
@@ -1018,7 +1243,7 @@ function EODRightPanel({
   const oldCalls = (rawData as unknown as { calls?: typeof rawData.failure })?.calls ?? [];
   const failureCount = rawData?.failure?.length ?? oldCalls.filter(c => c.cekura?.status !== 'success').length;
   const hasFailures = failureCount > 0;
-  const defaultTab = hasFailures ? 'failure' : 'full';
+  const defaultTab = hideSuccessFailure ? 'full' : (hasFailures ? 'failure' : 'full');
 
   return (
     <div className={cn(
@@ -1027,29 +1252,33 @@ function EODRightPanel({
     )}>
       <h3 className="font-semibold mb-2 md:mb-3 flex items-center gap-2 shrink-0 text-sm md:text-base">
         <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
-        AI Reports
+        {hideSuccessFailure ? 'Weekly Report' : 'AI Reports'}
       </h3>
 
       <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <TabsList className="w-full shrink-0">
-          <TabsTrigger value="failure" className="flex-1 text-xs md:text-sm px-2 md:px-3">
-            Fail
-            {!hasFailureReport && (
-              <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
-                {isRetryingFailure ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="success" className="flex-1 text-xs md:text-sm px-2 md:px-3">
-            OK
-            {!hasSuccessReport && (
-              <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
-                {isRetryingSuccess ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
-              </Badge>
-            )}
-          </TabsTrigger>
+          {!hideSuccessFailure && (
+            <>
+              <TabsTrigger value="failure" className="flex-1 text-xs md:text-sm px-2 md:px-3">
+                Failure
+                {!hasFailureReport && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
+                    {isRetryingFailure ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="success" className="flex-1 text-xs md:text-sm px-2 md:px-3">
+                Success
+                {!hasSuccessReport && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
+                    {isRetryingSuccess ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="full" className="flex-1 text-xs md:text-sm px-2 md:px-3">
-            Full
+            {hideSuccessFailure ? 'Weekly Report' : 'Full'}
             {!hasFullReport && (
               <Badge variant="secondary" className="ml-1 text-[10px] md:text-xs px-1 md:px-1.5">
                 {isRetryingFull ? <Loader2 className="h-2.5 w-2.5 md:h-3 md:w-3 animate-spin" /> : '!'}
@@ -1058,27 +1287,31 @@ function EODRightPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="failure" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-          <ReportContent
-            report={report}
-            content={report.failure_report}
-            reportType="failure"
-            onRetry={onRetryFailureReport}
-            isRetrying={isRetryingFailure}
-            error={failureError}
-          />
-        </TabsContent>
+        {!hideSuccessFailure && (
+          <>
+            <TabsContent value="failure" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+              <ReportContent
+                report={report}
+                content={report.failure_report}
+                reportType="failure"
+                onRetry={onRetryFailureReport}
+                isRetrying={isRetryingFailure}
+                error={failureError}
+              />
+            </TabsContent>
 
-        <TabsContent value="success" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-          <ReportContent
-            report={report}
-            content={report.success_report}
-            reportType="success"
-            onRetry={onRetrySuccessReport}
-            isRetrying={isRetryingSuccess}
-            error={successError}
-          />
-        </TabsContent>
+            <TabsContent value="success" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+              <ReportContent
+                report={report}
+                content={report.success_report}
+                reportType="success"
+                onRetry={onRetrySuccessReport}
+                isRetrying={isRetryingSuccess}
+                error={successError}
+              />
+            </TabsContent>
+          </>
+        )}
 
         <TabsContent value="full" className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           <ReportContent

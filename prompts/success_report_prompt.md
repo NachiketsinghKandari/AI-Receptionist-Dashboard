@@ -29,9 +29,9 @@ You will receive a JSON object containing only successful calls along with day-l
     ...
   ],
   "transfers_report": {
-    "attempt_count": <number>,
+    "attempts_count": <number>,
     "failure_count": <number>,          // Transfers with result !== 'completed'
-    "transfer_map": {
+    "transfers_map": {
       "<destination_name>": {
         "attempts": <number>,
         "failed": <number>
@@ -125,10 +125,10 @@ Use human-readable labels (e.g., "New Case" for "new_case").
 
 ## 3) Calls Transferred — Acceptance Rate by Team Member
 Use the `transfers_report` aggregate data:
-- Total transfer attempts: `transfers_report.attempt_count`
-- Overall transfer failure rate: `transfers_report.failure_count / attempt_count`
+- Total transfer attempts: `transfers_report.attempts_count`
+- Overall transfer failure rate: `transfers_report.failure_count / attempts_count`
 
-Present `transfers_report.transfer_map` as a table:
+Present `transfers_report.transfers_map` as a table:
 | Team Member | Attempts | Failed | Acceptance Rate |
 |-------------|----------|--------|-----------------|
 Compute acceptance rate as `(attempts - failed) / attempts * 100`.

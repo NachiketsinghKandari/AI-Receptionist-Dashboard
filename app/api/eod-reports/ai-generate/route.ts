@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       return errorResponse('rawData is required', 400, 'MISSING_PARAMS');
     }
 
-    if (!reportType || (reportType !== 'success' && reportType !== 'failure' && reportType !== 'full')) {
-      return errorResponse('reportType must be "success", "failure", or "full"', 400, 'INVALID_PARAMS');
+    if (!reportType || (reportType !== 'success' && reportType !== 'failure' && reportType !== 'full' && reportType !== 'weekly')) {
+      return errorResponse('reportType must be "success", "failure", "full", or "weekly"', 400, 'INVALID_PARAMS');
     }
 
     // Use shared AI generation function with reportType
