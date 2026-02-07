@@ -1109,22 +1109,23 @@ function EODLeftPanel({
 
   const totalCalls = rawData?.count ?? (successCalls.length + failureCalls.length);
   const errorCount = rawData?.failure_count ?? failureCalls.length;
-  const successCount = successCalls.length;
+  const successCount = totalCalls - errorCount;
 
   // Calculate previous report stats for comparison
   const prevRawData = previousReport?.raw_data as EODRawData | undefined;
   const prevHasNewStructure = prevRawData?.success !== undefined || prevRawData?.failure !== undefined;
   const prevOldCalls = (prevRawData as unknown as { calls?: typeof rawData.success })?.calls ?? [];
 
-  const prevSuccessCount = prevHasNewStructure
-    ? (prevRawData?.success?.length ?? 0)
-    : prevOldCalls.filter(c => c.cekura?.status === 'success').length;
-
   const prevErrorCount = prevRawData?.failure_count ?? (prevHasNewStructure
     ? (prevRawData?.failure?.length ?? 0)
     : prevOldCalls.filter(c => c.cekura?.status !== 'success').length);
 
-  const prevTotalCalls = prevRawData?.count ?? (prevSuccessCount + prevErrorCount);
+  const prevTotalCalls = prevRawData?.count ?? (
+    (prevHasNewStructure ? (prevRawData?.success?.length ?? 0) : prevOldCalls.filter(c => c.cekura?.status === 'success').length)
+    + prevErrorCount
+  );
+
+  const prevSuccessCount = prevTotalCalls - prevErrorCount;
 
   // Calculate percentage changes
   const totalChange = previousReport ? calcPercentChange(totalCalls, prevTotalCalls) : null;

@@ -408,6 +408,19 @@ function parseDurationToSeconds(duration: string | null): number {
 }
 
 /**
+ * Format seconds to "MM:SS" or "HH:MM:SS" duration string
+ */
+function formatSecondsToDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/**
  * Check if cekura evaluation indicates disconnection
  * Disconnection rate metric: score = 5 means NOT disconnected, anything else means disconnected
  */
@@ -430,12 +443,13 @@ interface EmailInfo {
 async function fetchCallsInfo(
   correlationIds: string[],
   environment: Environment
-): Promise<{ callerTypes: Map<string, string>; emailInfo: Map<string, EmailInfo> }> {
+): Promise<{ callerTypes: Map<string, string>; emailInfo: Map<string, EmailInfo>; callDurations: Map<string, number> }> {
   const callerTypes = new Map<string, string>();
   const emailInfo = new Map<string, EmailInfo>();
+  const callDurations = new Map<string, number>();
 
   if (correlationIds.length === 0) {
-    return { callerTypes, emailInfo };
+    return { callerTypes, emailInfo, callDurations };
   }
 
   const supabase = getSupabaseClient(environment);
@@ -453,7 +467,7 @@ async function fetchCallsInfo(
     const batch = correlationIds.slice(i, i + batchSize);
     const { data, error } = await supabase
       .from('calls')
-      .select('id, platform_call_id, call_type')
+      .select('id, platform_call_id, call_type, call_duration')
       .in('platform_call_id', batch);
 
     if (error) {
@@ -469,12 +483,15 @@ async function fetchCallsInfo(
         if (row.call_type) {
           callerTypes.set(row.platform_call_id, row.call_type);
         }
+        if (row.call_duration != null) {
+          callDurations.set(row.platform_call_id, row.call_duration);
+        }
       }
     }
   }
 
   if (callIdToCorrelationId.size === 0) {
-    return { callerTypes, emailInfo };
+    return { callerTypes, emailInfo, callDurations };
   }
 
   // Fetch email_logs for these call_ids
@@ -512,7 +529,7 @@ async function fetchCallsInfo(
     }
   }
 
-  return { callerTypes, emailInfo };
+  return { callerTypes, emailInfo, callDurations };
 }
 
 /**
@@ -670,7 +687,7 @@ export async function POST(request: NextRequest) {
       fetchTransfers(correlationIds, environment),
       fetchStructuredOutputs(correlationIds, environment),
     ]);
-    const { callerTypes: callerTypeMap, emailInfo: emailInfoMap } = callsInfo;
+    const { callerTypes: callerTypeMap, emailInfo: emailInfoMap, callDurations: callDurationsMap } = callsInfo;
 
     // Merge all data by correlation_id and separate by status
     const successCalls: EODCallRawData[] = [];
@@ -697,6 +714,13 @@ export async function POST(request: NextRequest) {
       const isDisconnected = checkIsDisconnected(cekuraData);
       const structuredOutputData = structuredOutputsMap.get(correlationId) || { outputs: [], hasFailure: false };
 
+      // Use DB call_duration (seconds) instead of Cekura's duration, and override cekura.duration for display
+      const dbDuration = callDurationsMap.get(correlationId);
+      const callDuration = dbDuration ?? parseDurationToSeconds(cekuraData.duration);
+      if (dbDuration != null) {
+        cekuraData.duration = formatSecondsToDuration(dbDuration);
+      }
+
       const callData: EODCallRawData = {
         correlation_id: correlationId,
         caller_type: callerType,
@@ -713,9 +737,8 @@ export async function POST(request: NextRequest) {
       };
 
       // Calculate aggregates
-      const callDuration = parseDurationToSeconds(cekuraData.duration);
       totalCallTimeSeconds += callDuration;
-      if (emailInfo.no_action_needed) {
+      if (emailInfo.no_action_needed && transfers.length === 0) {
         timeSavedSeconds += callDuration;
       }
       if (emailInfo.message_taken) {
