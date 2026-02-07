@@ -190,7 +190,12 @@ export default function HomePage() {
       break;
     }
     case 'week': {
-      const range = getDateRangeUTC(subtractDays(todayStr, 6), todayStr);
+      // Use current ISO week (Mon-Sun) to match weekly reports
+      const todayDate = new Date(todayStr + 'T12:00:00Z');
+      const dayOfWeek = todayDate.getUTCDay(); // 0=Sun, 1=Mon, ...
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const mondayStr = subtractDays(todayStr, daysFromMonday);
+      const range = getDateRangeUTC(mondayStr, todayStr);
       chartStartDate = range.startDate;
       chartEndDate = range.endDate;
       break;

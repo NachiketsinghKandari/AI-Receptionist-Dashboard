@@ -94,16 +94,13 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseClient(environment);
 
-    // Check if report already exists for this date and report_type
-    let existingQuery = supabase
+    // Check if report already exists for this date and type
+    const { data: existing } = await supabase
       .from('reports')
       .select('id')
-      .eq('report_date', reportDate);
-
-    // Include report_type in duplicate check so EOD and weekly don't collide
-    existingQuery = existingQuery.eq('report_type', reportType);
-
-    const { data: existing } = await existingQuery.single();
+      .eq('report_date', reportDate)
+      .eq('report_type', reportType)
+      .maybeSingle();
 
     if (existing) {
       // Update existing report - clear AI fields for regeneration

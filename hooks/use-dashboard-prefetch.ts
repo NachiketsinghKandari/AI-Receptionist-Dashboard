@@ -31,7 +31,12 @@ export function useDashboardPrefetch() {
     };
 
     const todayRange = getTodayRangeUTC();
-    const weekRange = getDateRangeUTC(subtractDays(todayStr, 6), todayStr);
+    // Use current ISO week (Mon-Sun) to match weekly reports
+    const todayDate = new Date(todayStr + 'T12:00:00Z');
+    const dayOfWeek = todayDate.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const mondayStr = subtractDays(todayStr, daysFromMonday);
+    const weekRange = getDateRangeUTC(mondayStr, todayStr);
     const monthRange = getDateRangeUTC(subtractDays(todayStr, 29), todayStr);
 
     // Define all chart date ranges to prefetch

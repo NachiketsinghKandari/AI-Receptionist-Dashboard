@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { decodeBase64Payload, errorResponse, parseEnvironment } from '@/lib/api/utils';
+import { getDateRangeUTC } from '@/lib/date-utils';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import type { Environment } from '@/lib/constants';
 import type {
@@ -407,6 +408,19 @@ function parseDurationToSeconds(duration: string | null): number {
 }
 
 /**
+ * Format seconds to "MM:SS" or "HH:MM:SS" duration string
+ */
+function formatSecondsToDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/**
  * Check if cekura evaluation indicates disconnection
  * Disconnection rate metric: score = 5 means NOT disconnected, anything else means disconnected
  */
@@ -414,7 +428,7 @@ function checkIsDisconnected(cekura: CekuraCallRawData): boolean {
   if (!cekura.evaluation?.metrics) return false;
   const metric = cekura.evaluation.metrics.find(m => m.name === 'Disconnection rate');
   if (!metric || metric.score === undefined || metric.score === null) return false;
-  return metric.score !== 5;
+  return metric.score < 5;
 }
 
 interface EmailInfo {
@@ -429,12 +443,13 @@ interface EmailInfo {
 async function fetchCallsInfo(
   correlationIds: string[],
   environment: Environment
-): Promise<{ callerTypes: Map<string, string>; emailInfo: Map<string, EmailInfo> }> {
+): Promise<{ callerTypes: Map<string, string>; emailInfo: Map<string, EmailInfo>; callDurations: Map<string, number> }> {
   const callerTypes = new Map<string, string>();
   const emailInfo = new Map<string, EmailInfo>();
+  const callDurations = new Map<string, number>();
 
   if (correlationIds.length === 0) {
-    return { callerTypes, emailInfo };
+    return { callerTypes, emailInfo, callDurations };
   }
 
   const supabase = getSupabaseClient(environment);
@@ -452,7 +467,7 @@ async function fetchCallsInfo(
     const batch = correlationIds.slice(i, i + batchSize);
     const { data, error } = await supabase
       .from('calls')
-      .select('id, platform_call_id, call_type')
+      .select('id, platform_call_id, call_type, call_duration')
       .in('platform_call_id', batch);
 
     if (error) {
@@ -468,12 +483,15 @@ async function fetchCallsInfo(
         if (row.call_type) {
           callerTypes.set(row.platform_call_id, row.call_type);
         }
+        if (row.call_duration != null) {
+          callDurations.set(row.platform_call_id, row.call_duration);
+        }
       }
     }
   }
 
   if (callIdToCorrelationId.size === 0) {
-    return { callerTypes, emailInfo };
+    return { callerTypes, emailInfo, callDurations };
   }
 
   // Fetch email_logs for these call_ids
@@ -511,7 +529,74 @@ async function fetchCallsInfo(
     }
   }
 
-  return { callerTypes, emailInfo };
+  return { callerTypes, emailInfo, callDurations };
+}
+
+/**
+ * Calculate time_saved directly from the DB:
+ *   calls JOIN email_logs (subject ILIKE '%no action needed%')
+ *   LEFT JOIN transfers_details WHERE td.id IS NULL
+ *   SUM(call_duration)
+ *
+ * This is authoritative because some calls may exist in the DB but not in Cekura.
+ */
+async function fetchTimeSavedFromDB(
+  startDate: string,
+  endDate: string,
+  environment: Environment,
+  firmId?: number | null
+): Promise<number> {
+  const supabase = getSupabaseClient(environment);
+  const batchSize = 500;
+
+  // Step 1: Get calls with "no action needed" emails
+  let callsQuery = supabase
+    .from('calls')
+    .select('id, call_duration, email_logs!inner(subject)')
+    .gte('started_at', startDate)
+    .lte('started_at', endDate)
+    .ilike('email_logs.subject', '%no action needed%');
+
+  if (firmId != null) {
+    callsQuery = callsQuery.eq('firm_id', firmId);
+  }
+
+  const { data: noActionCalls, error: callsError } = await callsQuery;
+  if (callsError) {
+    console.error('Error fetching no-action-needed calls:', callsError);
+    return 0;
+  }
+  if (!noActionCalls || noActionCalls.length === 0) return 0;
+
+  // Step 2: Check which of these calls have transfers
+  const callIds = noActionCalls.map(c => c.id);
+  const transferredCallIds = new Set<number>();
+
+  for (let i = 0; i < callIds.length; i += batchSize) {
+    const batch = callIds.slice(i, i + batchSize);
+    const { data: transfers, error: transferError } = await supabase
+      .from('transfers_details')
+      .select('call_id')
+      .in('call_id', batch);
+
+    if (transferError) {
+      console.error('Error fetching transfers for time_saved:', transferError);
+      continue;
+    }
+    for (const t of transfers || []) {
+      if (t.call_id != null) transferredCallIds.add(t.call_id);
+    }
+  }
+
+  // Step 3: Sum durations of calls that have no transfers
+  let timeSaved = 0;
+  for (const call of noActionCalls) {
+    if (!transferredCallIds.has(call.id) && call.call_duration != null) {
+      timeSaved += call.call_duration;
+    }
+  }
+
+  return timeSaved;
 }
 
 /**
@@ -581,13 +666,13 @@ async function fetchCorrelationIdsByFirm(
 
   const firmName = firmData?.name || null;
 
-  // Fetch calls for this firm within the date range
+  // Fetch calls for this firm within the date range (using started_at to match dashboard)
   const { data, error } = await supabase
     .from('calls')
     .select('platform_call_id')
     .eq('firm_id', firmId)
-    .gte('created_at', startDate)
-    .lt('created_at', endDate);
+    .gte('started_at', startDate)
+    .lte('started_at', endDate);
 
   if (error) {
     console.error('Error fetching calls by firm:', error);
@@ -622,19 +707,27 @@ export async function POST(request: NextRequest) {
       return errorResponse('Invalid reportDate format. Use YYYY-MM-DD', 400, 'INVALID_DATE');
     }
 
-    // Calculate date range for Cekura
-    // Start: reportDate at 00:00:00 UTC
-    // End: next day at 00:00:00 UTC (to capture full day)
-    const startDate = `${reportDate}T00:00:00Z`;
-    const nextDay = new Date(reportDate);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    const endDate = `${nextDay.toISOString().split('T')[0]}T00:00:00Z`;
+    // Calculate date range using UTC day boundaries (matches dashboard chart grouping)
+    const { startDate, endDate } = getDateRangeUTC(reportDate, reportDate);
 
-    // Fetch Cekura and Sentry data in parallel
-    const [cekuraResult, sentryErrors] = await Promise.all([
+    // Query Supabase for the authoritative call count (matches calls page / homepage)
+    const supabase = getSupabaseClient(environment);
+    let supabaseCountQuery = supabase
+      .from('calls')
+      .select('*', { count: 'exact', head: true })
+      .gte('started_at', startDate)
+      .lte('started_at', endDate);
+    if (firmId != null) {
+      supabaseCountQuery = supabaseCountQuery.eq('firm_id', firmId);
+    }
+
+    // Fetch Supabase count, Cekura, and Sentry data in parallel
+    const [supabaseCountResult, cekuraResult, sentryErrors] = await Promise.all([
+      supabaseCountQuery,
       fetchCekuraCalls(startDate, endDate, environment),
       fetchSentryErrors(startDate, endDate, environment),
     ]);
+    const supabaseCallCount = supabaseCountResult.count;
 
     // If firmId is provided, filter Cekura results to only include calls from that firm
     let firmName: string | null = null;
@@ -655,20 +748,20 @@ export async function POST(request: NextRequest) {
     // Get all correlation IDs for additional data fetches
     const correlationIds = [...cekuraResult.calls.keys()];
 
-    // Fetch calls info (caller_type + email info), transfers, and structured outputs in parallel
-    const [callsInfo, transfersMap, structuredOutputsMap] = await Promise.all([
+    // Fetch calls info, transfers, structured outputs, and DB-based time_saved in parallel
+    const [callsInfo, transfersMap, structuredOutputsMap, dbTimeSaved] = await Promise.all([
       fetchCallsInfo(correlationIds, environment),
       fetchTransfers(correlationIds, environment),
       fetchStructuredOutputs(correlationIds, environment),
+      fetchTimeSavedFromDB(startDate, endDate, environment, firmId),
     ]);
-    const { callerTypes: callerTypeMap, emailInfo: emailInfoMap } = callsInfo;
+    const { callerTypes: callerTypeMap, emailInfo: emailInfoMap, callDurations: callDurationsMap } = callsInfo;
 
     // Merge all data by correlation_id and separate by status
     const successCalls: EODCallRawData[] = [];
     const failureCalls: EODCallRawData[] = [];
 
     // Aggregate counters
-    let timeSavedSeconds = 0;
     let totalCallTimeSeconds = 0;
     let messagesTakenCount = 0;
     let disconnectedCount = 0;
@@ -688,6 +781,13 @@ export async function POST(request: NextRequest) {
       const isDisconnected = checkIsDisconnected(cekuraData);
       const structuredOutputData = structuredOutputsMap.get(correlationId) || { outputs: [], hasFailure: false };
 
+      // Use DB call_duration (seconds) instead of Cekura's duration, and override cekura.duration for display
+      const dbDuration = callDurationsMap.get(correlationId);
+      const callDuration = dbDuration ?? parseDurationToSeconds(cekuraData.duration);
+      if (dbDuration != null) {
+        cekuraData.duration = formatSecondsToDuration(dbDuration);
+      }
+
       const callData: EODCallRawData = {
         correlation_id: correlationId,
         caller_type: callerType,
@@ -704,11 +804,7 @@ export async function POST(request: NextRequest) {
       };
 
       // Calculate aggregates
-      const callDuration = parseDurationToSeconds(cekuraData.duration);
       totalCallTimeSeconds += callDuration;
-      if (emailInfo.no_action_needed) {
-        timeSavedSeconds += callDuration;
-      }
       if (emailInfo.message_taken) {
         messagesTakenCount++;
       }
@@ -772,9 +868,9 @@ export async function POST(request: NextRequest) {
     }
 
     const rawData: EODRawData = {
-      count: cekuraResult.count,
+      count: supabaseCallCount ?? cekuraResult.count,
       failure_count: failureCalls.length,
-      time_saved: timeSavedSeconds,
+      time_saved: dbTimeSaved,
       total_call_time: totalCallTimeSeconds,
       messages_taken: messagesTakenCount,
       disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places

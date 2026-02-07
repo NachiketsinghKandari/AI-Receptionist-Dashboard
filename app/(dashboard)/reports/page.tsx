@@ -285,6 +285,7 @@ export default function EODReportsPage() {
 
   // Weekly generation progress tracking
   const [weeklyProgress, setWeeklyProgress] = useState<string | null>(null);
+  const [forceRegenerate, setForceRegenerate] = useState(false);
 
   // Compute the week range for weekly report display
   const weekDateObj = useMemo(() => {
@@ -344,8 +345,8 @@ export default function EODReportsPage() {
 
   const handleGenerateWeekly = async () => {
     try {
-      // Step 1: Generate all missing EOD reports for the week
-      setWeeklyProgress('Generating daily reports...');
+      // Step 1: Compute the days in the week (Mon-Sun, up to today)
+      setWeeklyProgress('Checking existing reports...');
       const d = new Date(reportDate + 'T12:00:00Z');
       const mon = startOfWeek(d, { weekStartsOn: 1 });
       const sun = endOfWeek(d, { weekStartsOn: 1 });
@@ -359,35 +360,56 @@ export default function EODReportsPage() {
         cursor.setDate(cursor.getDate() + 1);
       }
 
-      // Generate & save each day in parallel using raw fetch (mutations share internal state)
-      await Promise.allSettled(
-        days.map(async (day) => {
-          try {
-            const genRes = await fetch(`/api/reports/payload-generate?env=${environment}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reportDate: day, firmId }),
-            });
-            if (!genRes.ok) return;
-            const genResult = await genRes.json();
-            await fetch(`/api/reports?env=${environment}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reportDate: day, rawData: genResult.raw_data, triggerType: 'manual', firmId, reportType: 'eod' }),
-            });
-          } catch {
-            // Individual day failures are acceptable — aggregation uses whatever exists
+      // Step 2: Check which days already have EOD reports (skip regenerating them unless forced)
+      let daysToGenerate = days;
+      if (!forceRegenerate) {
+        const existingRes = await fetch(
+          `/api/reports?env=${environment}&reportType=eod&limit=100&sortBy=report_date&sortOrder=desc`
+        );
+        const existingDates = new Set<string>();
+        if (existingRes.ok) {
+          const existingData = await existingRes.json();
+          for (const r of (existingData.data || []) as EODReport[]) {
+            if (days.includes(r.report_date)) {
+              existingDates.add(r.report_date);
+            }
           }
-        })
-      );
+        }
+        daysToGenerate = days.filter(day => !existingDates.has(day));
+      }
+
+      // Step 3: Generate & save EOD reports only for days that need it
+      if (daysToGenerate.length > 0) {
+        setWeeklyProgress(`Generating ${daysToGenerate.length} daily report${daysToGenerate.length > 1 ? 's' : ''}...`);
+        await Promise.allSettled(
+          daysToGenerate.map(async (day) => {
+            try {
+              const genRes = await fetch(`/api/reports/payload-generate?env=${environment}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reportDate: day, firmId }),
+              });
+              if (!genRes.ok) return;
+              const genResult = await genRes.json();
+              await fetch(`/api/reports?env=${environment}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reportDate: day, rawData: genResult.raw_data, triggerType: 'manual', firmId, reportType: 'eod' }),
+              });
+            } catch {
+              // Individual day failures are acceptable — aggregation uses whatever exists
+            }
+          })
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
 
-      // Step 2: Aggregate EOD reports for the week
+      // Step 4: Aggregate EOD reports for the week
       setWeeklyProgress('Aggregating weekly data...');
       const result = await weeklyGenerateMutation.mutateAsync({ weekDate: reportDate, firmId });
       const rawData = result.raw_data;
 
-      // Step 3: Save the weekly report
+      // Step 5: Save the weekly report
       setWeeklyProgress('Saving weekly report...');
       const saveResult = await saveMutation.mutateAsync({
         reportDate: result.week_start,
@@ -396,7 +418,7 @@ export default function EODReportsPage() {
         reportType: 'weekly',
       });
 
-      // Step 4: Generate AI weekly narrative
+      // Step 6: Generate AI weekly narrative
       setWeeklyProgress('Generating AI report...');
       const reportId = saveResult.report.id;
       await weeklyAIReportMutation.mutateAsync({ reportId, rawData });
@@ -584,6 +606,16 @@ export default function EODReportsPage() {
               Week: {weekRangeLabel}
             </p>
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={forceRegenerate}
+              onChange={(e) => setForceRegenerate(e.target.checked)}
+              className="rounded border-border"
+            />
+            <span className="text-xs text-muted-foreground">Force regenerate all daily reports</span>
+          </label>
 
           <Button
             onClick={handleGenerateWeekly}
@@ -1077,22 +1109,23 @@ function EODLeftPanel({
 
   const totalCalls = rawData?.count ?? (successCalls.length + failureCalls.length);
   const errorCount = rawData?.failure_count ?? failureCalls.length;
-  const successCount = successCalls.length;
+  const successCount = totalCalls - errorCount;
 
   // Calculate previous report stats for comparison
   const prevRawData = previousReport?.raw_data as EODRawData | undefined;
   const prevHasNewStructure = prevRawData?.success !== undefined || prevRawData?.failure !== undefined;
   const prevOldCalls = (prevRawData as unknown as { calls?: typeof rawData.success })?.calls ?? [];
 
-  const prevSuccessCount = prevHasNewStructure
-    ? (prevRawData?.success?.length ?? 0)
-    : prevOldCalls.filter(c => c.cekura?.status === 'success').length;
-
   const prevErrorCount = prevRawData?.failure_count ?? (prevHasNewStructure
     ? (prevRawData?.failure?.length ?? 0)
     : prevOldCalls.filter(c => c.cekura?.status !== 'success').length);
 
-  const prevTotalCalls = prevRawData?.count ?? (prevSuccessCount + prevErrorCount);
+  const prevTotalCalls = prevRawData?.count ?? (
+    (prevHasNewStructure ? (prevRawData?.success?.length ?? 0) : prevOldCalls.filter(c => c.cekura?.status === 'success').length)
+    + prevErrorCount
+  );
+
+  const prevSuccessCount = prevTotalCalls - prevErrorCount;
 
   // Calculate percentage changes
   const totalChange = previousReport ? calcPercentChange(totalCalls, prevTotalCalls) : null;
@@ -1421,10 +1454,11 @@ function ReportContent({
 }) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const hasReport = content !== null;
+  const isWeekly = !!(report.raw_data as EODRawData)?.week_start;
   const titleMap = {
     success: 'Success Report',
     failure: 'Failure Report',
-    full: 'Full Report',
+    full: isWeekly ? 'Weekly Report' : 'Full Report',
   };
   const title = titleMap[reportType];
 
@@ -1444,7 +1478,7 @@ function ReportContent({
           <div className="flex gap-0.5 shrink-0">
             <PDFExportButton
               contentRef={markdownRef}
-              filename={`eod-${reportType}-report-${report.report_date}`}
+              filename={`${isWeekly ? 'weekly' : 'eod'}-${reportType}-report-${report.report_date}`}
             />
             <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
               <Copy className="h-3 w-3 md:h-4 md:w-4" />
