@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ColumnDef } from '@tanstack/react-table';
 import {
   FileText,
@@ -18,6 +19,8 @@ import {
   ExternalLink,
   BarChart3,
   Copy,
+  Share2,
+  Check,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,6 +69,7 @@ import type { Firm } from '@/types/database';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { formatUTCTimestamp } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
+import { buildReportShareUrl, copyToClipboard } from '@/lib/report-share-url';
 
 // Panel resize constants
 const MIN_LEFT_PERCENT = 30;
@@ -221,6 +225,8 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
 }
 
 export default function EODReportsPage() {
+  const searchParams = useSearchParams();
+  const { environment, setEnvironment } = useEnvironment();
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<string | null>('report_date');
@@ -233,6 +239,14 @@ export default function EODReportsPage() {
   // Firm and report category filters
   const [firmId, setFirmId] = useState<number | null>(null);
   const [reportCategory, setReportCategory] = useState<EODReportCategory>('eod');
+
+  // Sync environment from URL (for shared links)
+  const urlEnv = searchParams.get('e');
+  useEffect(() => {
+    if (urlEnv && (urlEnv === 'production' || urlEnv === 'staging') && urlEnv !== environment) {
+      setEnvironment(urlEnv);
+    }
+  }, []); // Only run on mount to avoid loops
 
   // Fetch firms list
   const { data: firmsData } = useFirms();
@@ -753,15 +767,30 @@ function EODReportDetailPanel({
   fullError,
 }: EODReportDetailPanelProps) {
   const isMobile = useIsMobile();
+  const { environment } = useEnvironment();
   const containerRef = useRef<HTMLDivElement>(null);
   const [leftPercent, setLeftPercent] = useState(getStoredLayout());
   const [isHydrated, setIsHydrated] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
   const isDragging = useRef(false);
 
   useEffect(() => {
     setLeftPercent(getStoredLayout());
     setIsHydrated(true);
   }, []);
+
+  const rawData = report.raw_data as EODRawData;
+  const isWeeklyReport = !!rawData?.week_start;
+  const reportType = isWeeklyReport ? 'weekly' : 'eod';
+
+  const handleShare = async () => {
+    const url = buildReportShareUrl(report.report_date, reportType, environment);
+    const success = await copyToClipboard(url);
+    if (success) {
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 2000);
+    }
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -807,9 +836,6 @@ function EODReportDetailPanel({
     document.addEventListener('mouseup', onMouseUp);
   }, []);
 
-  const rawData = report.raw_data as EODRawData;
-  const isWeeklyReport = !!rawData?.week_start;
-
   return (
     <>
       {/* Backdrop */}
@@ -842,6 +868,24 @@ function EODReportDetailPanel({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShare}
+              className="gap-1.5 h-8 px-2.5"
+            >
+              {shareSuccess ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  <span className="hidden sm:inline text-xs">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Share</span>
+                </>
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="icon"

@@ -11,6 +11,7 @@ import type {
   GenerateWeeklyReportResponse,
   EODReportType,
   EODReportCategory,
+  EODReport,
 } from '@/types/api';
 import { CACHE_TTL_DATA } from '@/lib/constants';
 
@@ -28,8 +29,25 @@ async function fetchEODReports(
   if (filters.firmId) params.set('firmId', String(filters.firmId));
   if (filters.reportCategory) params.set('reportType', filters.reportCategory);
 
-  const response = await fetch(`/api/eod-reports?${params}`);
+  const response = await fetch(`/api/reports?${params}`);
   if (!response.ok) throw new Error('Failed to fetch EOD reports');
+  return response.json();
+}
+
+async function fetchReportByDate(
+  date: string,
+  reportType: 'eod' | 'weekly',
+  environment: string
+): Promise<{ report: EODReport }> {
+  const params = new URLSearchParams();
+  params.set('env', environment);
+  params.set('type', reportType);
+
+  const response = await fetch(`/api/reports/${date}?${params}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch report');
+  }
   return response.json();
 }
 
@@ -38,7 +56,7 @@ async function generateEODReport(
   environment: string,
   firmId?: number | null
 ): Promise<GenerateEODReportResponse> {
-  const response = await fetch(`/api/eod-reports/payload-generate?env=${environment}`, {
+  const response = await fetch(`/api/reports/payload-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reportDate, firmId }),
@@ -65,7 +83,7 @@ async function saveReport(
   firmId?: number | null,
   reportType?: EODReportCategory
 ): Promise<SaveReportResponse> {
-  const response = await fetch(`/api/eod-reports?env=${environment}`, {
+  const response = await fetch(`/api/reports?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reportDate, rawData, triggerType: 'manual', firmId, reportType: reportType || 'eod' }),
@@ -85,7 +103,7 @@ async function generateAIReport(
   reportType: EODReportType,
   environment: string
 ): Promise<{ success: boolean; reportType: EODReportType }> {
-  const response = await fetch(`/api/eod-reports/ai-generate?env=${environment}`, {
+  const response = await fetch(`/api/reports/ai-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reportId, rawData, reportType }),
@@ -181,7 +199,7 @@ async function generateWeeklyReport(
   environment: string,
   firmId?: number | null
 ): Promise<GenerateWeeklyReportResponse> {
-  const response = await fetch(`/api/eod-reports/weekly-generate?env=${environment}`, {
+  const response = await fetch(`/api/reports/weekly-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ weekDate, firmId }),
@@ -218,5 +236,21 @@ export function useGenerateWeeklyAIReport() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['eod-reports', 'list'] });
     },
+  });
+}
+
+export function useReportByDate(
+  date: string | null,
+  reportType: 'eod' | 'weekly',
+  environmentOverride?: string
+) {
+  const { environment: contextEnvironment } = useEnvironment();
+  const environment = environmentOverride || contextEnvironment;
+
+  return useQuery({
+    queryKey: ['report', reportType, date, environment],
+    queryFn: () => fetchReportByDate(date!, reportType, environment),
+    enabled: !!date,
+    staleTime: CACHE_TTL_DATA * 1000,
   });
 }
