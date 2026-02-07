@@ -533,6 +533,73 @@ async function fetchCallsInfo(
 }
 
 /**
+ * Calculate time_saved directly from the DB:
+ *   calls JOIN email_logs (subject ILIKE '%no action needed%')
+ *   LEFT JOIN transfers_details WHERE td.id IS NULL
+ *   SUM(call_duration)
+ *
+ * This is authoritative because some calls may exist in the DB but not in Cekura.
+ */
+async function fetchTimeSavedFromDB(
+  startDate: string,
+  endDate: string,
+  environment: Environment,
+  firmId?: number | null
+): Promise<number> {
+  const supabase = getSupabaseClient(environment);
+  const batchSize = 500;
+
+  // Step 1: Get calls with "no action needed" emails
+  let callsQuery = supabase
+    .from('calls')
+    .select('id, call_duration, email_logs!inner(subject)')
+    .gte('started_at', startDate)
+    .lte('started_at', endDate)
+    .ilike('email_logs.subject', '%no action needed%');
+
+  if (firmId != null) {
+    callsQuery = callsQuery.eq('firm_id', firmId);
+  }
+
+  const { data: noActionCalls, error: callsError } = await callsQuery;
+  if (callsError) {
+    console.error('Error fetching no-action-needed calls:', callsError);
+    return 0;
+  }
+  if (!noActionCalls || noActionCalls.length === 0) return 0;
+
+  // Step 2: Check which of these calls have transfers
+  const callIds = noActionCalls.map(c => c.id);
+  const transferredCallIds = new Set<number>();
+
+  for (let i = 0; i < callIds.length; i += batchSize) {
+    const batch = callIds.slice(i, i + batchSize);
+    const { data: transfers, error: transferError } = await supabase
+      .from('transfers_details')
+      .select('call_id')
+      .in('call_id', batch);
+
+    if (transferError) {
+      console.error('Error fetching transfers for time_saved:', transferError);
+      continue;
+    }
+    for (const t of transfers || []) {
+      if (t.call_id != null) transferredCallIds.add(t.call_id);
+    }
+  }
+
+  // Step 3: Sum durations of calls that have no transfers
+  let timeSaved = 0;
+  for (const call of noActionCalls) {
+    if (!transferredCallIds.has(call.id) && call.call_duration != null) {
+      timeSaved += call.call_duration;
+    }
+  }
+
+  return timeSaved;
+}
+
+/**
  * Fetch transfer data from the transfers_details table for given correlation IDs.
  * Uses transferred_to_name as the destination instead of parsing webhook payloads.
  */
@@ -681,11 +748,12 @@ export async function POST(request: NextRequest) {
     // Get all correlation IDs for additional data fetches
     const correlationIds = [...cekuraResult.calls.keys()];
 
-    // Fetch calls info (caller_type + email info), transfers, and structured outputs in parallel
-    const [callsInfo, transfersMap, structuredOutputsMap] = await Promise.all([
+    // Fetch calls info, transfers, structured outputs, and DB-based time_saved in parallel
+    const [callsInfo, transfersMap, structuredOutputsMap, dbTimeSaved] = await Promise.all([
       fetchCallsInfo(correlationIds, environment),
       fetchTransfers(correlationIds, environment),
       fetchStructuredOutputs(correlationIds, environment),
+      fetchTimeSavedFromDB(startDate, endDate, environment, firmId),
     ]);
     const { callerTypes: callerTypeMap, emailInfo: emailInfoMap, callDurations: callDurationsMap } = callsInfo;
 
@@ -694,7 +762,6 @@ export async function POST(request: NextRequest) {
     const failureCalls: EODCallRawData[] = [];
 
     // Aggregate counters
-    let timeSavedSeconds = 0;
     let totalCallTimeSeconds = 0;
     let messagesTakenCount = 0;
     let disconnectedCount = 0;
@@ -738,9 +805,6 @@ export async function POST(request: NextRequest) {
 
       // Calculate aggregates
       totalCallTimeSeconds += callDuration;
-      if (emailInfo.no_action_needed && transfers.length === 0) {
-        timeSavedSeconds += callDuration;
-      }
       if (emailInfo.message_taken) {
         messagesTakenCount++;
       }
@@ -806,7 +870,7 @@ export async function POST(request: NextRequest) {
     const rawData: EODRawData = {
       count: supabaseCallCount ?? cekuraResult.count,
       failure_count: failureCalls.length,
-      time_saved: timeSavedSeconds,
+      time_saved: dbTimeSaved,
       total_call_time: totalCallTimeSeconds,
       messages_taken: messagesTakenCount,
       disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places
