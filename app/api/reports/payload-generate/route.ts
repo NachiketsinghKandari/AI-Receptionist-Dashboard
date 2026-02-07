@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { decodeBase64Payload, errorResponse, parseEnvironment } from '@/lib/api/utils';
+import { getDateRangeUTC } from '@/lib/date-utils';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import type { Environment } from '@/lib/constants';
 import type {
@@ -414,7 +415,7 @@ function checkIsDisconnected(cekura: CekuraCallRawData): boolean {
   if (!cekura.evaluation?.metrics) return false;
   const metric = cekura.evaluation.metrics.find(m => m.name === 'Disconnection rate');
   if (!metric || metric.score === undefined || metric.score === null) return false;
-  return metric.score !== 5;
+  return metric.score < 5;
 }
 
 interface EmailInfo {
@@ -581,13 +582,13 @@ async function fetchCorrelationIdsByFirm(
 
   const firmName = firmData?.name || null;
 
-  // Fetch calls for this firm within the date range
+  // Fetch calls for this firm within the date range (using started_at to match dashboard)
   const { data, error } = await supabase
     .from('calls')
     .select('platform_call_id')
     .eq('firm_id', firmId)
-    .gte('created_at', startDate)
-    .lt('created_at', endDate);
+    .gte('started_at', startDate)
+    .lte('started_at', endDate);
 
   if (error) {
     console.error('Error fetching calls by firm:', error);
@@ -622,19 +623,27 @@ export async function POST(request: NextRequest) {
       return errorResponse('Invalid reportDate format. Use YYYY-MM-DD', 400, 'INVALID_DATE');
     }
 
-    // Calculate date range for Cekura
-    // Start: reportDate at 00:00:00 UTC
-    // End: next day at 00:00:00 UTC (to capture full day)
-    const startDate = `${reportDate}T00:00:00Z`;
-    const nextDay = new Date(reportDate);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    const endDate = `${nextDay.toISOString().split('T')[0]}T00:00:00Z`;
+    // Calculate date range using UTC day boundaries (matches dashboard chart grouping)
+    const { startDate, endDate } = getDateRangeUTC(reportDate, reportDate);
 
-    // Fetch Cekura and Sentry data in parallel
-    const [cekuraResult, sentryErrors] = await Promise.all([
+    // Query Supabase for the authoritative call count (matches calls page / homepage)
+    const supabase = getSupabaseClient(environment);
+    let supabaseCountQuery = supabase
+      .from('calls')
+      .select('*', { count: 'exact', head: true })
+      .gte('started_at', startDate)
+      .lte('started_at', endDate);
+    if (firmId != null) {
+      supabaseCountQuery = supabaseCountQuery.eq('firm_id', firmId);
+    }
+
+    // Fetch Supabase count, Cekura, and Sentry data in parallel
+    const [supabaseCountResult, cekuraResult, sentryErrors] = await Promise.all([
+      supabaseCountQuery,
       fetchCekuraCalls(startDate, endDate, environment),
       fetchSentryErrors(startDate, endDate, environment),
     ]);
+    const supabaseCallCount = supabaseCountResult.count;
 
     // If firmId is provided, filter Cekura results to only include calls from that firm
     let firmName: string | null = null;
@@ -772,7 +781,7 @@ export async function POST(request: NextRequest) {
     }
 
     const rawData: EODRawData = {
-      count: cekuraResult.count,
+      count: supabaseCallCount ?? cekuraResult.count,
       failure_count: failureCalls.length,
       time_saved: timeSavedSeconds,
       total_call_time: totalCallTimeSeconds,
