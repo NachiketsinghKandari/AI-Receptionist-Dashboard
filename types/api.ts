@@ -296,22 +296,26 @@ export interface EODCSEscalation {
 }
 
 export interface EODRawData {
+  // Metrics
   count: number;              // total calls
   failure_count: number;      // count of calls where status !== 'success'
-  time_saved: number;         // sum of durations (in seconds) where no_action_needed is true
   total_call_time: number;    // sum of all call durations (in seconds)
+  time_saved: number;         // sum of durations (in seconds) where no_action_needed is true
   messages_taken: number;     // count of calls where message_taken is true
   disconnection_rate: number; // percentage of calls where is_disconnected is true
   cs_escalation_count: number; // calls transferred to "Customer Success" with structured_output_failure
   cs_escalation_map: EODCSEscalation[];  // details of each CS escalation
   transfers_report: EODTransferReport;  // aggregate transfer statistics
-  success: EODCallRawData[];  // calls where cekura.status === 'success'
-  failure: EODCallRawData[];  // calls where cekura.status !== 'success'
+  // Context
+  firm_id?: number | null;    // optional firm filter used during generation
+  firm_name?: string | null;  // firm name for display purposes
   report_date: string;        // YYYY-MM-DD date for this report
   generated_at: string;
   environment: string;
-  firm_id?: number | null;    // optional firm filter used during generation
-  firm_name?: string | null;  // firm name for display purposes
+  // Call data
+  success: EODCallRawData[];  // calls where cekura.status === 'success'
+  failure: EODCallRawData[];  // calls where cekura.status !== 'success'
+  // Weekly report fields
   week_start?: string;        // YYYY-MM-DD Monday of the week (weekly reports only)
   week_end?: string;          // YYYY-MM-DD Sunday of the week (weekly reports only)
 }

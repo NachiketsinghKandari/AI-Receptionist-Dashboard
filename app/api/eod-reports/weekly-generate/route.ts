@@ -163,10 +163,11 @@ function aggregateEODReports(
   const firmName = firstWithFirm ? (firstWithFirm.raw_data as EODRawData).firm_name : null;
 
   return {
+    // Metrics
     count,
     failure_count: failureCount,
-    time_saved: timeSaved,
     total_call_time: totalCallTime,
+    time_saved: timeSaved,
     messages_taken: messagesTaken,
     disconnection_rate: disconnectionRate,
     cs_escalation_count: csEscalationCount,
@@ -176,11 +177,13 @@ function aggregateEODReports(
       failure_count: transferFailureCount,
       transfers_map: transfersMap,
     },
+    // Context
+    firm_id: firmId || null,
+    firm_name: firmName || null,
     report_date: weekStart,
     generated_at: new Date().toISOString(),
     environment,
-    firm_id: firmId || null,
-    firm_name: firmName || null,
+    // Weekly report fields
     week_start: weekStart,
     week_end: weekEnd,
   };

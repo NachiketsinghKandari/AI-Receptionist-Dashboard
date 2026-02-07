@@ -772,12 +772,13 @@ export async function POST(request: NextRequest) {
     }
 
     const rawData: EODRawData = {
+      // Metrics
       count: cekuraResult.count,
       failure_count: failureCalls.length,
-      time_saved: timeSavedSeconds,
       total_call_time: totalCallTimeSeconds,
+      time_saved: timeSavedSeconds,
       messages_taken: messagesTakenCount,
-      disconnection_rate: Math.round(disconnectionRate * 100) / 100, // Round to 2 decimal places
+      disconnection_rate: Math.round(disconnectionRate * 100) / 100,
       cs_escalation_count: csEscalationCount,
       cs_escalation_map: csEscalationMap,
       transfers_report: {
@@ -785,13 +786,15 @@ export async function POST(request: NextRequest) {
         failure_count: transferFailureCount,
         transfers_map: transferMap,
       },
-      success: successCalls,
-      failure: failureCalls,
+      // Context
+      firm_id: firmId || null,
+      firm_name: firmName,
       report_date: reportDate,
       generated_at: new Date().toISOString(),
       environment,
-      firm_id: firmId || null,
-      firm_name: firmName,
+      // Call data
+      success: successCalls,
+      failure: failureCalls,
     };
 
     return NextResponse.json({ raw_data: rawData });
