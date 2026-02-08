@@ -163,6 +163,10 @@ function aggregateEODReports(
   const firstWithFirm = reports.find(r => (r.raw_data as EODRawData)?.firm_id);
   const firmName = firstWithFirm ? (firstWithFirm.raw_data as EODRawData).firm_name : null;
 
+  // Get firms list from first report that has it
+  const firstWithFirms = reports.find(r => (r.raw_data as EODRawData)?.firms?.length);
+  const firms = firstWithFirms ? (firstWithFirms.raw_data as EODRawData).firms : undefined;
+
   return {
     count,
     failure_count: failureCount,
@@ -182,6 +186,7 @@ function aggregateEODReports(
     environment,
     firm_id: firmId || null,
     firm_name: firmName || null,
+    firms,
     week_start: weekStart,
     week_end: weekEnd,
   };

@@ -522,13 +522,42 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"reportType\": \"full\"\n}"
+							"raw": "{\n  \"reportId\": \"uuid-here\",\n  \"rawData\": {},\n  \"reportType\": \"full\",\n  \"dataFormat\": \"json\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/reports/ai-generate",
+							"raw": "{{base_url}}/api/reports/ai-generate?env=production",
 							"host": ["{{base_url}}"],
-							"path": ["api", "reports", "ai-generate"]
-						}
+							"path": ["api", "reports", "ai-generate"],
+							"query": [
+								{ "key": "env", "value": "production", "disabled": true }
+							]
+						},
+						"description": "Generate AI insights for a saved EOD report. dataFormat can be 'json' (default) or 'toon'."
+					}
+				},
+				{
+					"name": "Compare JSON vs TOON Format",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reportId\": \"uuid-here\",\n  \"reportType\": \"full\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/reports/format-compare?env=production",
+							"host": ["{{base_url}}"],
+							"path": ["api", "reports", "format-compare"],
+							"query": [
+								{ "key": "env", "value": "production", "disabled": true }
+							]
+						},
+						"description": "Compare JSON vs TOON encoding of report input data. Pass reportId to fetch raw_data from DB, or pass rawData directly. Returns both formatted strings with character/line counts and savings percentage."
 					}
 				}
 			]

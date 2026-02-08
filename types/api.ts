@@ -295,6 +295,11 @@ export interface EODCSEscalation {
   failed_tool_calls: string[];  // names of tool calls that failed
 }
 
+export interface EODFirm {
+  id: number;
+  name: string;
+}
+
 export interface EODRawData {
   // Metrics
   count: number;              // total calls
@@ -309,6 +314,7 @@ export interface EODRawData {
   // Context
   firm_id?: number | null;    // optional firm filter used during generation
   firm_name?: string | null;  // firm name for display purposes
+  firms?: EODFirm[];          // list of firms covered by this report
   report_date: string;        // YYYY-MM-DD date for this report
   generated_at: string;
   environment: string;
