@@ -35,7 +35,25 @@
       "Bash(git rm:*)",
       "Bash(git push:*)",
       "Bash(git pull:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(git reset:*)",
+      "Bash(git stash:*)",
+      "Bash(git status:*)",
+      "Bash(npm ls:*)",
+      "Bash(node -e:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git -C /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard status --short)",
+      "Bash(gh repo view:*)",
+      "WebFetch(domain:toonformat.dev)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:developers.openai.com)",
+      "WebFetch(domain:dev.to)",
+      "Bash(wc:*)",
+      "Bash(git branch:*)",
+      "Bash(npx skills find:*)",
+      "WebFetch(domain:skills.sh)",
+      "Bash(npx skills:*)"
     ]
   }
 }

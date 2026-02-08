@@ -7,6 +7,10 @@ import type { CallListItem, Call, Email, Transfer, Webhook, Firm, SentryEvent } 
 // Sort order type
 export type SortOrder = 'asc' | 'desc';
 
+// Cekura status filter categories
+export type CekuraStatusCategory = 'success' | 'failure' | 'reviewed_success' | 'reviewed_failure' | 'other';
+export type CekuraStatusFilter = 'all' | CekuraStatusCategory;
+
 // Common filter types
 export interface BaseFilters {
   showAll?: boolean;
@@ -75,6 +79,7 @@ export interface CallFilters extends BaseFilters {
   excludeStatus?: string | null; // exclude calls matching this status
   excludeStatusValues?: string[] | null; // multiple exclude status values for OR combinator
   excludeStatusUseUnion?: boolean; // true = OR (exclude ANY), false = AND (exclude only if matches ALL)
+  searchFeedbackCorrelationIds?: string[] | null; // Correlation IDs matching feedback text for search OR condition
   hasImpossibleCondition?: boolean; // true = contradictory filter (e.g., is_empty AND is_not_empty), should return 0 results
   _filtersHash?: string; // Hash of raw filters for cache invalidation when combinators change
 }
@@ -295,6 +300,11 @@ export interface EODCSEscalation {
   failed_tool_calls: string[];  // names of tool calls that failed
 }
 
+export interface EODFirm {
+  id: number;
+  name: string;
+}
+
 export interface EODRawData {
   // Metrics
   count: number;              // total calls
@@ -309,6 +319,7 @@ export interface EODRawData {
   // Context
   firm_id?: number | null;    // optional firm filter used during generation
   firm_name?: string | null;  // firm name for display purposes
+  firms?: EODFirm[];          // list of firms covered by this report
   report_date: string;        // YYYY-MM-DD date for this report
   generated_at: string;
   environment: string;
@@ -337,9 +348,12 @@ export interface EODReport {
   generated_at: string;
   trigger_type: 'scheduled' | 'manual';
   report_type?: EODReportCategory; // 'eod' or 'weekly' — optional for backward compat
+  firm_id?: number | null;        // null = all firms, number = firm-specific report
 }
 
 export type EODReportType = 'success' | 'failure' | 'full' | 'weekly';
+
+export type DataFormat = 'json' | 'toon';
 
 export type EODReportsResponse = PaginatedResponse<EODReport>;
 

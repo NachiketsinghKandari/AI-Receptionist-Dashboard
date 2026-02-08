@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
     const environment = parseEnvironment(searchParams.get('env'));
 
     const body = await request.json();
-    const { reportId, rawData, reportType } = body;
+    const { reportId, rawData, reportType, dataFormat } = body;
+    const validFormat = dataFormat === 'toon' ? 'toon' as const : 'json' as const;
 
     if (!reportId) {
       return errorResponse('reportId is required', 400, 'MISSING_PARAMS');
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use shared AI generation function with reportType
-    const result = await generateAIReportForEOD(reportId, rawData, environment, reportType as EODReportType);
+    const result = await generateAIReportForEOD(reportId, rawData, environment, reportType as EODReportType, validFormat);
 
     if (!result.success) {
       return errorResponse(result.error || 'AI generation failed', 500, 'AI_ERROR');

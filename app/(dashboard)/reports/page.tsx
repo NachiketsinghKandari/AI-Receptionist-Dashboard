@@ -14,6 +14,7 @@ import {
   Sparkles,
   CalendarPlus,
   X,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   GripVertical,
@@ -67,7 +68,15 @@ import {
 import { buildCekuraUrl } from '@/hooks/use-cekura';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/constants';
 import { JsonViewer } from '@/components/ui/json-viewer';
-import type { EODReport, EODRawData, WeeklyRawData, SortOrder, EODReportCategory } from '@/types/api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import type { EODReport, EODRawData, WeeklyRawData, SortOrder, EODReportCategory, DataFormat } from '@/types/api';
 import type { Firm } from '@/types/database';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { formatUTCTimestamp } from '@/lib/formatting';
@@ -108,6 +117,18 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
       cell: ({ row }) => {
         const value = row.getValue('report_date') as string;
         return <span className="font-medium">{value}</span>;
+      },
+    },
+    {
+      id: 'firm',
+      header: 'Firm',
+      cell: ({ row }) => {
+        const firmId = row.original.firm_id;
+        if (firmId == null) {
+          return <span className="text-muted-foreground">All</span>;
+        }
+        const firmName = (row.original.raw_data as EODRawData)?.firm_name;
+        return <span>{firmName ?? `Firm ${firmId}`}</span>;
       },
     },
     {
@@ -283,6 +304,9 @@ export default function EODReportsPage() {
   const weeklyGenerateMutation = useGenerateWeeklyReport();
   const weeklyAIReportMutation = useGenerateWeeklyAIReport();
 
+  // Data format for AI report generation (JSON or TOON)
+  const [dataFormat, setDataFormat] = useState<DataFormat>('json');
+
   // Weekly generation progress tracking
   const [weeklyProgress, setWeeklyProgress] = useState<string | null>(null);
   const [forceRegenerate, setForceRegenerate] = useState(false);
@@ -334,9 +358,9 @@ export default function EODReportsPage() {
       // Step 3: Generate all three AI reports in parallel
       const reportId = saveResult.report.id;
       await Promise.allSettled([
-        successReportMutation.mutateAsync({ reportId, rawData }),
-        failureReportMutation.mutateAsync({ reportId, rawData }),
-        fullReportMutation.mutateAsync({ reportId, rawData }),
+        successReportMutation.mutateAsync({ reportId, rawData, dataFormat }),
+        failureReportMutation.mutateAsync({ reportId, rawData, dataFormat }),
+        fullReportMutation.mutateAsync({ reportId, rawData, dataFormat }),
       ]);
     } catch (error) {
       console.error('Failed to generate report:', error);
@@ -421,7 +445,7 @@ export default function EODReportsPage() {
       // Step 6: Generate AI weekly narrative
       setWeeklyProgress('Generating AI report...');
       const reportId = saveResult.report.id;
-      await weeklyAIReportMutation.mutateAsync({ reportId, rawData });
+      await weeklyAIReportMutation.mutateAsync({ reportId, rawData, dataFormat });
 
       setWeeklyProgress(null);
     } catch (error) {
@@ -451,31 +475,33 @@ export default function EODReportsPage() {
     : null;
 
   // Retry handlers for individual reports
-  const handleRetrySuccessReport = async () => {
+  const handleRetrySuccessReport = async (fmt?: DataFormat) => {
     if (!selectedReport) return;
     try {
       await successReportMutation.mutateAsync({
         reportId: selectedReport.id,
         rawData: selectedReport.raw_data as EODRawData,
+        dataFormat: fmt,
       });
     } catch (error) {
       console.error('Failed to retry success report:', error);
     }
   };
 
-  const handleRetryFailureReport = async () => {
+  const handleRetryFailureReport = async (fmt?: DataFormat) => {
     if (!selectedReport) return;
     try {
       await failureReportMutation.mutateAsync({
         reportId: selectedReport.id,
         rawData: selectedReport.raw_data as EODRawData,
+        dataFormat: fmt,
       });
     } catch (error) {
       console.error('Failed to retry failure report:', error);
     }
   };
 
-  const handleRetryFullReport = async () => {
+  const handleRetryFullReport = async (fmt?: DataFormat) => {
     if (!selectedReport) return;
     const isWeekly = !!(selectedReport.raw_data as EODRawData)?.week_start;
     try {
@@ -483,11 +509,13 @@ export default function EODReportsPage() {
         await weeklyAIReportMutation.mutateAsync({
           reportId: selectedReport.id,
           rawData: selectedReport.raw_data as WeeklyRawData,
+          dataFormat: fmt,
         });
       } else {
         await fullReportMutation.mutateAsync({
           reportId: selectedReport.id,
           rawData: selectedReport.raw_data as EODRawData,
+          dataFormat: fmt,
         });
       }
     } catch (error) {
@@ -559,35 +587,54 @@ export default function EODReportsPage() {
             />
           </div>
 
-          <Button
-            onClick={handleGenerate}
-            disabled={isAnyPending || !reportDate}
-            className="w-full h-11"
-          >
-            <span className="flex items-center justify-center gap-2">
-              {generateMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Fetching data...</span>
-                </>
-              ) : saveMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Saving report...</span>
-                </>
-              ) : (successReportMutation.isPending || failureReportMutation.isPending || fullReportMutation.isPending) ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Generating AI...</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  <span>Generate Report</span>
-                </>
-              )}
-            </span>
-          </Button>
+          <div className="flex gap-0">
+            <Button
+              onClick={handleGenerate}
+              disabled={isAnyPending || !reportDate}
+              className="flex-1 h-11 rounded-r-none"
+            >
+              <span className="flex items-center justify-center gap-2">
+                {generateMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Fetching data...</span>
+                  </>
+                ) : saveMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Saving report...</span>
+                  </>
+                ) : (successReportMutation.isPending || failureReportMutation.isPending || fullReportMutation.isPending) ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Generating AI...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span>Generate Report</span>
+                  </>
+                )}
+              </span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={isAnyPending || !reportDate}
+                  className="h-11 px-2 rounded-l-none border-l border-primary-foreground/20"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup value={dataFormat} onValueChange={(v) => setDataFormat(v as DataFormat)}>
+                  <DropdownMenuRadioItem value="json">JSON</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="toon">TOON (experimental)</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-right">Format: {dataFormat.toUpperCase()}</p>
         </>
       ) : (
         <>
@@ -617,25 +664,44 @@ export default function EODReportsPage() {
             <span className="text-xs text-muted-foreground">Force regenerate all daily reports</span>
           </label>
 
-          <Button
-            onClick={handleGenerateWeekly}
-            disabled={isAnyPending || !reportDate}
-            className="w-full h-11"
-          >
-            <span className="flex items-center justify-center gap-2">
-              {weeklyProgress ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{weeklyProgress}</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  <span>Generate Weekly Report</span>
-                </>
-              )}
-            </span>
-          </Button>
+          <div className="flex gap-0 min-w-0">
+            <Button
+              onClick={handleGenerateWeekly}
+              disabled={isAnyPending || !reportDate}
+              className="flex-1 h-11 rounded-r-none min-w-0"
+            >
+              <span className="flex items-center justify-center gap-2 min-w-0">
+                {weeklyProgress ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                    <span className="truncate">{weeklyProgress}</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Generate Weekly</span>
+                  </>
+                )}
+              </span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={isAnyPending || !reportDate}
+                  className="h-11 px-2 rounded-l-none border-l border-primary-foreground/20"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup value={dataFormat} onValueChange={(v) => setDataFormat(v as DataFormat)}>
+                  <DropdownMenuRadioItem value="json">JSON</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="toon">TOON (experimental)</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-right">Format: {dataFormat.toUpperCase()}</p>
         </>
       )}
 
@@ -682,7 +748,7 @@ export default function EODReportsPage() {
     <div className="flex h-full">
       {/* Desktop Sidebar for generating reports */}
       <div className="hidden md:flex w-64 shrink-0 flex-col bg-card border-r border-border">
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-4">
           <h2 className="font-semibold text-lg">Generate Report</h2>
           {sidebarContent}
         </div>
@@ -797,9 +863,9 @@ interface EODReportDetailPanelProps {
   onNext: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
-  onRetrySuccessReport: () => void;
-  onRetryFailureReport: () => void;
-  onRetryFullReport: () => void;
+  onRetrySuccessReport: (dataFormat?: DataFormat) => void;
+  onRetryFailureReport: (dataFormat?: DataFormat) => void;
+  onRetryFullReport: (dataFormat?: DataFormat) => void;
   isRetryingSuccess: boolean;
   isRetryingFailure: boolean;
   isRetryingFull: boolean;
@@ -1311,9 +1377,9 @@ function EODLeftPanel({
 
 interface EODRightPanelProps {
   report: EODReport;
-  onRetrySuccessReport: () => void;
-  onRetryFailureReport: () => void;
-  onRetryFullReport: () => void;
+  onRetrySuccessReport: (dataFormat?: DataFormat) => void;
+  onRetryFailureReport: (dataFormat?: DataFormat) => void;
+  onRetryFullReport: (dataFormat?: DataFormat) => void;
   isRetryingSuccess: boolean;
   isRetryingFailure: boolean;
   isRetryingFull: boolean;
@@ -1448,7 +1514,7 @@ function ReportContent({
   report: EODReport;
   content: string | null;
   reportType: 'success' | 'failure' | 'full';
-  onRetry: () => void;
+  onRetry: (dataFormat?: DataFormat) => void;
   isRetrying: boolean;
   error?: string;
 }) {
@@ -1479,21 +1545,37 @@ function ReportContent({
             <PDFExportButton
               contentRef={markdownRef}
               filename={`${isWeekly ? 'weekly' : 'eod'}-${reportType}-report-${report.report_date}`}
+              reportTitle={title}
+              reportDate={report.report_date}
+              firmId={(report.raw_data as EODRawData)?.firm_id}
+              firmName={(report.raw_data as EODRawData)?.firm_name}
             />
             <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
               <Copy className="h-3 w-3 md:h-4 md:w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={onRetry} disabled={isRetrying} title="Regenerate">
-              {isRetrying ? (
-                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
-              )}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" disabled={isRetrying} title="Regenerate">
+                  {isRetrying ? (
+                    <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onRetry('json')}>
+                  Regenerate (JSON)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onRetry('toon')}>
+                  Regenerate (TOON)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent className="px-2 md:px-4 pb-2 md:pb-4 overflow-hidden">
-          <div ref={markdownRef} className="bg-background overflow-x-auto text-xs md:text-sm">
+          <div ref={markdownRef} className="overflow-x-auto text-xs md:text-sm">
             <MarkdownReport content={content || ''} />
           </div>
         </CardContent>
@@ -1525,19 +1607,38 @@ function ReportContent({
             {error}
           </div>
         )}
-        <Button variant="outline" size="sm" onClick={onRetry} disabled={isRetrying}>
-          {isRetrying ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Generate {title}
-            </>
+        <div className="inline-flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => onRetry()} disabled={isRetrying}>
+            {isRetrying ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Generate {title}
+              </>
+            )}
+          </Button>
+          {!isRetrying && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8">
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onRetry('json')}>
+                  Generate (JSON)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onRetry('toon')}>
+                  Generate (TOON)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-        </Button>
+        </div>
       </CardContent>
     </Card>
   );

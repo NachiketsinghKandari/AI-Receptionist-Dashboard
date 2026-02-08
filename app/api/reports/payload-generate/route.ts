@@ -731,9 +731,11 @@ export async function POST(request: NextRequest) {
 
     // If firmId is provided, filter Cekura results to only include calls from that firm
     let firmName: string | null = null;
+    let firms: { id: number; name: string }[] = [];
     if (firmId != null) {
       const firmFilter = await fetchCorrelationIdsByFirm(firmId, startDate, endDate, environment);
       firmName = firmFilter.firmName;
+      firms = firmName ? [{ id: firmId, name: firmName }] : [];
 
       // Remove calls that don't belong to this firm
       for (const correlationId of cekuraResult.calls.keys()) {
@@ -743,6 +745,13 @@ export async function POST(request: NextRequest) {
       }
       // Update the count to reflect filtered results
       cekuraResult.count = cekuraResult.calls.size;
+    } else {
+      // All Firms: fetch the full firms list
+      const { data: allFirms } = await supabase
+        .from('firms')
+        .select('id, name')
+        .order('name');
+      firms = allFirms ?? [];
     }
 
     // Get all correlation IDs for additional data fetches
@@ -888,6 +897,7 @@ export async function POST(request: NextRequest) {
       environment,
       firm_id: firmId || null,
       firm_name: firmName,
+      firms,
     };
 
     return NextResponse.json({ raw_data: rawData });

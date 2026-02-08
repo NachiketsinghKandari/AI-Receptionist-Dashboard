@@ -12,6 +12,7 @@ import type {
   EODReportType,
   EODReportCategory,
   EODReport,
+  DataFormat,
 } from '@/types/api';
 import { CACHE_TTL_DATA } from '@/lib/constants';
 
@@ -101,12 +102,13 @@ async function generateAIReport(
   reportId: string,
   rawData: EODRawData | WeeklyRawData,
   reportType: EODReportType,
-  environment: string
+  environment: string,
+  dataFormat: DataFormat = 'json'
 ): Promise<{ success: boolean; reportType: EODReportType }> {
   const response = await fetch(`/api/reports/ai-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reportId, rawData, reportType }),
+    body: JSON.stringify({ reportId, rawData, reportType, dataFormat }),
   });
 
   if (!response.ok) {
@@ -160,8 +162,8 @@ export function useGenerateSuccessReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
-      generateAIReport(reportId, rawData, 'success', environment),
+    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat }) =>
+      generateAIReport(reportId, rawData, 'success', environment, dataFormat),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -173,8 +175,8 @@ export function useGenerateFailureReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
-      generateAIReport(reportId, rawData, 'failure', environment),
+    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat }) =>
+      generateAIReport(reportId, rawData, 'failure', environment, dataFormat),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -186,8 +188,8 @@ export function useGenerateFullReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData }: { reportId: string; rawData: EODRawData }) =>
-      generateAIReport(reportId, rawData, 'full', environment),
+    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat }) =>
+      generateAIReport(reportId, rawData, 'full', environment, dataFormat),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -231,8 +233,8 @@ export function useGenerateWeeklyAIReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData }: { reportId: string; rawData: WeeklyRawData }) =>
-      generateAIReport(reportId, rawData, 'weekly', environment),
+    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: WeeklyRawData; dataFormat?: DataFormat }) =>
+      generateAIReport(reportId, rawData, 'weekly', environment, dataFormat),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },

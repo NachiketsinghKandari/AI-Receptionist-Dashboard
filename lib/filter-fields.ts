@@ -41,9 +41,12 @@ export const CALL_FILTER_FIELDS: FilterFieldDefinition[] = [
     options: [
       { value: 'success', label: 'Success' },
       { value: 'failure', label: 'Failure' },
+      { value: 'reviewed_success', label: 'Reviewed Success' },
+      { value: 'reviewed_failure', label: 'Reviewed Failure' },
       { value: 'other', label: 'Other' },
     ],
   },
+  { key: 'feedback', label: 'Feedback', type: 'text' },
   { key: 'call_duration', label: 'Duration (seconds)', type: 'number' },
   { key: 'started_at', label: 'Started At', type: 'date' },
   { key: 'firm_id', label: 'Firm ID', type: 'number' },

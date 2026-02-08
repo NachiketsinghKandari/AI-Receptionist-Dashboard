@@ -103,6 +103,10 @@ async function fetchCalls(filters: CallFilters, environment: string): Promise<Ca
   if (filters.excludeStatusUseUnion) {
     params.set('excludeStatusUseUnion', 'true');
   }
+  // Feedback search: correlation IDs where feedback matches search term (added to search OR condition)
+  if (filters.searchFeedbackCorrelationIds && filters.searchFeedbackCorrelationIds.length > 0) {
+    params.set('searchFeedbackCorrelationIds', filters.searchFeedbackCorrelationIds.join(','));
+  }
 
   const response = await fetch(`/api/calls?${params}`);
   if (!response.ok) throw new Error('Failed to fetch calls');
@@ -232,4 +236,28 @@ export function usePrefetchCallDetails() {
   );
 
   return prefetch;
+}
+
+/**
+ * Hook to fetch the earliest and latest started_at dates from the calls table.
+ * Used to determine the Cekura fetch window when no date filter is active ("all" mode).
+ */
+interface CallDateRangeResponse {
+  earliest: string | null;
+  latest: string | null;
+}
+
+async function fetchCallDateRange(environment: string): Promise<CallDateRangeResponse> {
+  const response = await fetch(`/api/calls/date-range?env=${environment}`);
+  if (!response.ok) throw new Error('Failed to fetch call date range');
+  return response.json();
+}
+
+export function useCallDateRange() {
+  const { environment } = useEnvironment();
+  return useQuery({
+    queryKey: ['calls', 'date-range', environment],
+    queryFn: () => fetchCallDateRange(environment),
+    staleTime: 5 * 60 * 1000, // 5 minutes — date bounds change infrequently
+  });
 }

@@ -1,4 +1,5 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
+import type { CekuraStatusFilter } from '@/types/api';
 
 export interface ShareableCallsState {
   // Flags
@@ -15,7 +16,7 @@ export interface ShareableCallsState {
   callType?: string;
   transferType?: string;
   multipleTransfers?: boolean;
-  cekuraStatus?: 'all' | 'success' | 'failure' | 'other';
+  cekuraStatus?: CekuraStatusFilter;
   // Sorting
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
