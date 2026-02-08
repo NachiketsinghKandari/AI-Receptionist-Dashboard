@@ -337,9 +337,12 @@ export interface EODReport {
   generated_at: string;
   trigger_type: 'scheduled' | 'manual';
   report_type?: EODReportCategory; // 'eod' or 'weekly' — optional for backward compat
+  firm_id?: number | null;        // null = all firms, number = firm-specific report
 }
 
 export type EODReportType = 'success' | 'failure' | 'full' | 'weekly';
+
+export type DataFormat = 'json' | 'toon';
 
 export type EODReportsResponse = PaginatedResponse<EODReport>;
 

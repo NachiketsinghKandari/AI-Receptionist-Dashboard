@@ -6,7 +6,8 @@
 import { generateContent, type GeminiConfig, type LLMModel, type LLMProvider } from '@/lib/llm';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import type { Environment } from '@/lib/constants';
-import type { EODRawData, WeeklyRawData, EODReportType, EODCallRawData } from '@/types/api';
+import type { EODRawData, WeeklyRawData, EODReportType, EODCallRawData, DataFormat } from '@/types/api';
+import { encode as toonEncode } from '@toon-format/toon';
 
 interface AIResponse {
   ai_response: string;
@@ -40,8 +41,154 @@ const COLUMN_MAP: Record<EODReportType, string> = {
   weekly: 'full_report',
 };
 
+/**
+ * Fetch a prompt row for the given type and firm.
+ * Tries the firm-specific prompt first (firm_id = N); if none exists,
+ * falls back to the default prompt (firm_id IS NULL).
+ */
+async function fetchPrompt(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  promptType: string,
+  firmId: number | null | undefined
+): Promise<{ data: PromptRow | null; error: string | null }> {
+  // If a firm is selected, try the firm-specific prompt first
+  if (firmId != null) {
+    const { data, error } = await supabase
+      .from('prompts')
+      .select('prompt, llm_provider, llm_model')
+      .eq('type', promptType)
+      .eq('firm_id', firmId)
+      .maybeSingle<PromptRow>();
+
+    if (!error && data) {
+      return { data, error: null };
+    }
+    // Fall through to default prompt
+  }
+
+  // Default: firm_id IS NULL
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('prompt, llm_provider, llm_model')
+    .eq('type', promptType)
+    .is('firm_id', null)
+    .single<PromptRow>();
+
+  if (error || !data) {
+    return { data: null, error: `Prompt not found for type "${promptType}"` };
+  }
+
+  return { data, error: null };
+}
+
 // Dashboard base URL for correlation ID links
 const DASHBOARD_URL = 'https://hellocounsel-dashboard.vercel.app/calls';
+
+// Brief explanation of TOON syntax prepended when dataFormat is 'toon'
+const TOON_PREAMBLE = `=== DATA FORMAT ===
+The input data below is in TOON (Token-Oriented Object Notation), a compact encoding of JSON:
+- Key-value pairs: \`key: value\` (YAML-like)
+- Nested objects: indented 2 spaces per level
+- Dotted paths: \`cekura.evaluation.metrics\` folds single-key chains
+- Tabular arrays: \`calls[50]{correlation_id,caller_type,...}:\` declares field names once, followed by one comma-separated row per object
+- Inline arrays: \`critical_categories[2]: tool_error,timeout\`
+- Array count in brackets is the item count
+- Values are the same types as JSON (strings, numbers, booleans, null)
+Parse this data using the JSON schema described above as your structural reference.
+
+`;
+
+/**
+ * Format input data as JSON or TOON for the LLM prompt.
+ * TOON encoding is ~40% fewer tokens with comparable retrieval accuracy.
+ */
+export function formatInputData(data: Record<string, unknown>, format: DataFormat): string {
+  if (format === 'toon') {
+    return TOON_PREAMBLE + toonEncode(data, {
+      keyFolding: 'safe',
+      flattenDepth: 5,
+      delimiter: ',',
+      indent: 2,
+    });
+  }
+  return JSON.stringify(data, null, 2);
+}
+
+/**
+ * Build the inputData object that gets injected into the LLM prompt.
+ * Extracted so format-compare can reuse without duplicating logic.
+ */
+export function buildReportInputData(
+  rawData: EODRawData | WeeklyRawData,
+  reportType: EODReportType
+): { inputData: Record<string, unknown>; callCount: number } {
+  if (reportType === 'weekly') {
+    const weeklyData = rawData as WeeklyRawData;
+    const inputData: Record<string, unknown> = {
+      count: weeklyData.count,
+      success_count: weeklyData.count - weeklyData.failure_count,
+      failure_count: weeklyData.failure_count,
+      time_saved: weeklyData.time_saved,
+      total_call_time: weeklyData.total_call_time,
+      messages_taken: weeklyData.messages_taken,
+      disconnection_rate: weeklyData.disconnection_rate,
+      cs_escalation_count: weeklyData.cs_escalation_count,
+      cs_escalation_map: weeklyData.cs_escalation_map,
+      transfers_report: weeklyData.transfers_report,
+      week_start: weeklyData.week_start,
+      week_end: weeklyData.week_end,
+      report_date: weeklyData.report_date,
+      generated_at: weeklyData.generated_at,
+      environment: weeklyData.environment,
+      firm_id: weeklyData.firm_id,
+      firm_name: weeklyData.firm_name,
+      ...(('eod_reports_used' in rawData)
+        ? { eod_reports_used: (rawData as WeeklyRawData & { eod_reports_used?: number }).eod_reports_used }
+        : {}),
+    };
+    return { inputData, callCount: 0 };
+  }
+
+  // EOD report types
+  const eodRawData = rawData as EODRawData;
+  const hasNewStructure = eodRawData.success !== undefined || eodRawData.failure !== undefined;
+  const oldCalls = (eodRawData as unknown as { calls?: EODCallRawData[] }).calls ?? [];
+
+  let calls: EODCallRawData[];
+  if (reportType === 'full') {
+    calls = hasNewStructure
+      ? [...(eodRawData.success || []), ...(eodRawData.failure || [])]
+      : oldCalls;
+  } else if (reportType === 'success') {
+    calls = hasNewStructure
+      ? (eodRawData.success || [])
+      : oldCalls.filter(call => call.cekura?.status?.toLowerCase().includes('success'));
+  } else {
+    calls = hasNewStructure
+      ? (eodRawData.failure || [])
+      : oldCalls.filter(call => !call.cekura?.status?.toLowerCase().includes('success'));
+  }
+
+  const inputData: Record<string, unknown> = {
+    count: calls.length,
+    total: eodRawData.count,
+    report_type: reportType,
+    time_saved: eodRawData.time_saved,
+    total_call_time: eodRawData.total_call_time,
+    messages_taken: eodRawData.messages_taken,
+    disconnection_rate: eodRawData.disconnection_rate,
+    failure_count: eodRawData.failure_count,
+    cs_escalation_count: eodRawData.cs_escalation_count,
+    cs_escalation_map: eodRawData.cs_escalation_map,
+    transfers_report: eodRawData.transfers_report,
+    calls,
+    report_date: eodRawData.report_date,
+    generated_at: eodRawData.generated_at,
+    environment: eodRawData.environment,
+  };
+
+  return { inputData, callCount: calls.length };
+}
 
 /**
  * Post-process the AI-generated markdown to convert correlation IDs into clickable dashboard links.
@@ -97,20 +244,20 @@ export async function generateAIReportForEOD(
   reportId: string,
   rawData: EODRawData | WeeklyRawData,
   environment: Environment,
-  reportType: EODReportType
+  reportType: EODReportType,
+  dataFormat: DataFormat = 'json'
 ): Promise<GenerateAIReportResult> {
   try {
     const supabase = getSupabaseClient(environment);
 
+    // Extract firmId from raw data for firm-aware prompt lookup
+    const firmId = rawData.firm_id;
+
     // Weekly reports have no individual call arrays — skip calls logic entirely
     if (reportType === 'weekly') {
-      // Fetch prompt and LLM configuration from prompts table
+      // Fetch prompt with firm-specific fallback
       const promptType = PROMPT_TYPE_MAP[reportType];
-      const { data: promptData, error: promptError } = await supabase
-        .from('prompts')
-        .select('prompt, llm_provider, llm_model')
-        .eq('type', promptType)
-        .single<PromptRow>();
+      const { data: promptData, error: promptError } = await fetchPrompt(supabase, promptType, firmId);
 
       if (promptError || !promptData) {
         console.error(`Error fetching prompt for ${promptType}:`, promptError);
@@ -122,30 +269,11 @@ export async function generateAIReportForEOD(
 
       // Build input data from aggregated metrics only (no call arrays)
       const weeklyData = rawData as WeeklyRawData;
-      const inputData = {
-        count: weeklyData.count,
-        success_count: weeklyData.count - weeklyData.failure_count,
-        failure_count: weeklyData.failure_count,
-        time_saved: weeklyData.time_saved,
-        total_call_time: weeklyData.total_call_time,
-        messages_taken: weeklyData.messages_taken,
-        disconnection_rate: weeklyData.disconnection_rate,
-        cs_escalation_count: weeklyData.cs_escalation_count,
-        cs_escalation_map: weeklyData.cs_escalation_map,
-        transfers_report: weeklyData.transfers_report,
-        week_start: weeklyData.week_start,
-        week_end: weeklyData.week_end,
-        report_date: weeklyData.report_date,
-        generated_at: weeklyData.generated_at,
-        environment: weeklyData.environment,
-        firm_id: weeklyData.firm_id,
-        firm_name: weeklyData.firm_name,
-        ...(('eod_reports_used' in rawData) ? { eod_reports_used: (rawData as WeeklyRawData & { eod_reports_used?: number }).eod_reports_used } : {}),
-      };
+      const { inputData } = buildReportInputData(rawData, reportType);
 
       const fullPrompt = promptData.prompt.replace(
         '{input_json}',
-        JSON.stringify(inputData, null, 2)
+        formatInputData(inputData, dataFormat)
       );
 
       const providerConfig: GeminiConfig | undefined =
@@ -208,39 +336,11 @@ export async function generateAIReportForEOD(
 
     // EOD report types: success, failure, full
     const eodRawData = rawData as EODRawData;
-
-    // Get the relevant calls array based on report type
-    // Handle backward compatibility: old reports have 'calls' array, new reports have 'success'/'failure'
-    const hasNewStructure = eodRawData.success !== undefined || eodRawData.failure !== undefined;
-    const oldCalls = (eodRawData as unknown as { calls?: EODCallRawData[] }).calls ?? [];
-
-    let calls: EODCallRawData[];
-    if (reportType === 'full') {
-      if (hasNewStructure) {
-        // New structure: combine both success and failure calls
-        calls = [...(eodRawData.success || []), ...(eodRawData.failure || [])];
-      } else {
-        // Old structure: use the calls array directly
-        calls = oldCalls;
-      }
-    } else if (reportType === 'success') {
-      if (hasNewStructure) {
-        calls = eodRawData.success || [];
-      } else {
-        // Old structure: filter calls where status contains 'success'
-        calls = oldCalls.filter(call => call.cekura?.status?.toLowerCase().includes('success'));
-      }
-    } else {
-      if (hasNewStructure) {
-        calls = eodRawData.failure || [];
-      } else {
-        // Old structure: filter calls where status does not contain 'success'
-        calls = oldCalls.filter(call => !call.cekura?.status?.toLowerCase().includes('success'));
-      }
-    }
+    const { inputData, callCount } = buildReportInputData(rawData, reportType);
+    const calls = (inputData.calls as EODCallRawData[]) ?? [];
 
     // Check if there are calls to analyze
-    if (!calls || calls.length === 0) {
+    if (callCount === 0) {
       // No calls to analyze - update with empty message
       const emptyMessage = reportType === 'success'
         ? 'No successful calls to analyze for this period.'
@@ -262,13 +362,9 @@ export async function generateAIReportForEOD(
       return { success: true, reportType };
     }
 
-    // Fetch prompt and LLM configuration from prompts table
+    // Fetch prompt with firm-specific fallback
     const promptType = PROMPT_TYPE_MAP[reportType];
-    const { data: promptData, error: promptError } = await supabase
-      .from('prompts')
-      .select('prompt, llm_provider, llm_model')
-      .eq('type', promptType)
-      .single<PromptRow>();
+    const { data: promptData, error: promptError } = await fetchPrompt(supabase, promptType, firmId);
 
     if (promptError || !promptData) {
       console.error(`Error fetching prompt for ${promptType}:`, promptError);
@@ -279,29 +375,10 @@ export async function generateAIReportForEOD(
     const provider = promptData.llm_provider as LLMProvider;
     const model = promptData.llm_model as LLMModel;
 
-    // Build input data with relevant calls and pre-computed aggregates
-    const inputData = {
-      count: calls.length,
-      total: eodRawData.count,
-      report_type: reportType,
-      time_saved: eodRawData.time_saved,
-      total_call_time: eodRawData.total_call_time,
-      messages_taken: eodRawData.messages_taken,
-      disconnection_rate: eodRawData.disconnection_rate,
-      failure_count: eodRawData.failure_count,
-      cs_escalation_count: eodRawData.cs_escalation_count,
-      cs_escalation_map: eodRawData.cs_escalation_map,
-      transfers_report: eodRawData.transfers_report,
-      calls,
-      report_date: eodRawData.report_date,
-      generated_at: eodRawData.generated_at,
-      environment: eodRawData.environment,
-    };
-
-    // Replace placeholder with actual JSON data
+    // Replace placeholder with formatted data
     const fullPrompt = promptData.prompt.replace(
       '{input_json}',
-      JSON.stringify(inputData, null, 2)
+      formatInputData(inputData, dataFormat)
     );
 
     // Build provider config (Gemini-specific: use high thinking level)
@@ -351,15 +428,9 @@ export async function generateAIReportForEOD(
     aiResult.ai_response = processedMarkdown;
 
     // Calculate error count from raw data (for updating errors column)
-    // Use rawData.failure_count if available, otherwise count from failure array or filter old calls
-    let errorCount: number;
-    if (typeof eodRawData.failure_count === 'number') {
-      errorCount = eodRawData.failure_count;
-    } else if (hasNewStructure) {
-      errorCount = (eodRawData.failure || []).length;
-    } else {
-      errorCount = oldCalls.filter(call => !call.cekura?.status?.toLowerCase().includes('success')).length;
-    }
+    const errorCount = typeof eodRawData.failure_count === 'number'
+      ? eodRawData.failure_count
+      : (eodRawData.failure || []).length;
 
     // Update the appropriate column based on report type, and also update errors count
     const { error: updateError } = await supabase

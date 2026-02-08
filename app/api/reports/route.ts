@@ -39,10 +39,12 @@ export async function GET(request: NextRequest) {
       dataQuery = dataQuery.eq('report_type', reportType);
     }
 
-    // Filter by firmId if provided (stored in raw_data.firm_id)
+    // Filter by firmId using the dedicated column
+    // When a specific firm is selected, show only that firm's reports.
+    // When "All" is selected (firmId is null), show every report — no filter.
     if (firmId != null) {
-      countQuery = countQuery.eq('raw_data->firm_id', firmId);
-      dataQuery = dataQuery.eq('raw_data->firm_id', firmId);
+      countQuery = countQuery.eq('firm_id', firmId);
+      dataQuery = dataQuery.eq('firm_id', firmId);
     }
 
     // Get total count
@@ -87,6 +89,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { reportDate, rawData, triggerType = 'manual', reportType = 'eod' } = body;
+    const firmId = body.firmId as number | null | undefined;
+    const firmIdValue = firmId ?? null;
 
     if (!reportDate || !rawData) {
       return errorResponse('reportDate and rawData are required', 400, 'MISSING_PARAMS');
@@ -94,16 +98,24 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseClient(environment);
 
-    // Check if report already exists for this date and type
-    const { data: existing } = await supabase
+    // Check if report already exists for this date, type, and firm
+    let existingQuery = supabase
       .from('reports')
       .select('id')
       .eq('report_date', reportDate)
-      .eq('report_type', reportType)
-      .maybeSingle();
+      .eq('report_type', reportType);
+
+    if (firmIdValue != null) {
+      existingQuery = existingQuery.eq('firm_id', firmIdValue);
+    } else {
+      existingQuery = existingQuery.is('firm_id', null);
+    }
+
+    const { data: existing } = await existingQuery.maybeSingle();
 
     if (existing) {
       // Update existing report - clear AI fields for regeneration
+      // firm_id is NOT updated here — the row was already matched by firm_id in the existence check
       const { data, error } = await supabase
         .from('reports')
         .update({
@@ -133,19 +145,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Insert new report
+    // Insert new report — only set firm_id when a specific firm was chosen
+    const insertPayload: Record<string, unknown> = {
+      report_date: reportDate,
+      raw_data: rawData,
+      trigger_type: triggerType,
+      report_type: reportType,
+      full_report: null,
+      errors: null,
+      success_report: null,
+      failure_report: null,
+    };
+    if (firmIdValue != null) {
+      insertPayload.firm_id = firmIdValue;
+    }
+
     const { data, error } = await supabase
       .from('reports')
-      .insert({
-        report_date: reportDate,
-        raw_data: rawData,
-        trigger_type: triggerType,
-        report_type: reportType,
-        full_report: null,
-        errors: null,
-        success_report: null,
-        failure_report: null,
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

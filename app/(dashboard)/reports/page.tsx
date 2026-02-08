@@ -120,6 +120,18 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
       },
     },
     {
+      id: 'firm',
+      header: 'Firm',
+      cell: ({ row }) => {
+        const firmId = row.original.firm_id;
+        if (firmId == null) {
+          return <span className="text-muted-foreground">All</span>;
+        }
+        const firmName = (row.original.raw_data as EODRawData)?.firm_name;
+        return <span>{firmName ?? `Firm ${firmId}`}</span>;
+      },
+    },
+    {
       id: 'call_count',
       header: 'Calls',
       cell: ({ row }) => {
@@ -1535,7 +1547,6 @@ function ReportContent({
               filename={`${isWeekly ? 'weekly' : 'eod'}-${reportType}-report-${report.report_date}`}
               reportTitle={title}
               reportDate={report.report_date}
-              environment={(report.raw_data as EODRawData)?.environment ?? 'production'}
               firmId={(report.raw_data as EODRawData)?.firm_id}
             />
             <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">

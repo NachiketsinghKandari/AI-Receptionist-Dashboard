@@ -53,9 +53,11 @@ export async function POST(request: NextRequest) {
     // Filter to only EOD reports (report_type is 'eod' or null for backward compat)
     query = query.or('report_type.eq.eod,report_type.is.null');
 
-    // Filter by firmId if provided
+    // Filter by firmId using the dedicated column
     if (firmId != null) {
-      query = query.eq('raw_data->firm_id', firmId);
+      query = query.eq('firm_id', firmId);
+    } else {
+      query = query.is('firm_id', null);
     }
 
     const { data: eodReports, error } = await query.order('report_date', { ascending: true });
