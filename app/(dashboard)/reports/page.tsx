@@ -1548,6 +1548,7 @@ function ReportContent({
               reportTitle={title}
               reportDate={report.report_date}
               firmId={(report.raw_data as EODRawData)?.firm_id}
+              firmName={(report.raw_data as EODRawData)?.firm_name}
             />
             <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
               <Copy className="h-3 w-3 md:h-4 md:w-4" />
