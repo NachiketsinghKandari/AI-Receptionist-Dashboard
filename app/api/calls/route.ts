@@ -110,6 +110,13 @@ export async function GET(request: NextRequest) {
     // true = OR (exclude ANY), false = AND (exclude only if matches ALL - impossible for single-value)
     const excludeStatusUseUnion = searchParams.get('excludeStatusUseUnion') === 'true';
 
+    // Feedback search: correlation IDs where Cekura feedback matches search term
+    // These get added to the search OR condition so feedback matches appear alongside DB column matches
+    const searchFeedbackCorrelationIdsParam = searchParams.get('searchFeedbackCorrelationIds')?.trim() || null;
+    const searchFeedbackCorrelationIds = searchFeedbackCorrelationIdsParam
+      ? searchFeedbackCorrelationIdsParam.split(',').filter(id => id.length > 0)
+      : null;
+
     // Parse dynamic filters (JSON array) - each filter has its own combinator for mixed AND/OR
     let dynamicFilters: DynamicFilter[] = [];
     const dynamicFiltersParam = searchParams.get('dynamicFilters');
@@ -783,6 +790,11 @@ export async function GET(request: NextRequest) {
       // If the search term is a valid integer, also search by ID
       if (isValidInt4(search)) {
         orCondition += `,id.eq.${search}`;
+      }
+
+      // Include calls where Cekura feedback matches the search term (computed client-side)
+      if (searchFeedbackCorrelationIds && searchFeedbackCorrelationIds.length > 0) {
+        orCondition += `,platform_call_id.in.(${searchFeedbackCorrelationIds.join(',')})`;
       }
 
       query = query.or(orCondition);

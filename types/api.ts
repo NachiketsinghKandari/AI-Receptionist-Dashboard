@@ -7,6 +7,10 @@ import type { CallListItem, Call, Email, Transfer, Webhook, Firm, SentryEvent } 
 // Sort order type
 export type SortOrder = 'asc' | 'desc';
 
+// Cekura status filter categories
+export type CekuraStatusCategory = 'success' | 'failure' | 'reviewed_success' | 'reviewed_failure' | 'other';
+export type CekuraStatusFilter = 'all' | CekuraStatusCategory;
+
 // Common filter types
 export interface BaseFilters {
   showAll?: boolean;
@@ -75,6 +79,7 @@ export interface CallFilters extends BaseFilters {
   excludeStatus?: string | null; // exclude calls matching this status
   excludeStatusValues?: string[] | null; // multiple exclude status values for OR combinator
   excludeStatusUseUnion?: boolean; // true = OR (exclude ANY), false = AND (exclude only if matches ALL)
+  searchFeedbackCorrelationIds?: string[] | null; // Correlation IDs matching feedback text for search OR condition
   hasImpossibleCondition?: boolean; // true = contradictory filter (e.g., is_empty AND is_not_empty), should return 0 results
   _filtersHash?: string; // Hash of raw filters for cache invalidation when combinators change
 }

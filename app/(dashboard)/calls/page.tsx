@@ -17,7 +17,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { CallDetailSheet } from '@/components/details/call-detail-sheet';
 import { CekuraStatus } from '@/components/cekura/cekura-status';
 import { CekuraFeedback } from '@/components/cekura/cekura-feedback';
-import { useCalls, useImportantCallIds, useTransferEmailMismatchIds } from '@/hooks/use-calls';
+import { useCalls, useImportantCallIds, useTransferEmailMismatchIds, useCallDateRange } from '@/hooks/use-calls';
 import { useFlaggedCalls } from '@/hooks/use-flagged-calls';
 import { useSentryErrorCorrelationIds } from '@/hooks/use-sentry-events';
 import { useCekuraCallMapping, type CekuraCallData } from '@/hooks/use-cekura';
@@ -27,7 +27,7 @@ import { DEFAULT_PAGE_LIMIT, CALL_TYPES, TRANSFER_TYPES } from '@/lib/constants'
 import { useDateFilter } from '@/components/providers/date-filter-provider';
 import { formatDuration, formatUTCTimestamp } from '@/lib/formatting';
 import type { CallListItem, Firm } from '@/types/database';
-import type { SortOrder, FlaggedCallListItem } from '@/types/api';
+import type { SortOrder, FlaggedCallListItem, CekuraStatusFilter, CekuraStatusCategory } from '@/types/api';
 import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
@@ -196,7 +196,7 @@ export default function CallsPage() {
               callType: state.ct || 'All',
               transferType: state.tt || 'Off',
               multipleTransfers: !!state.mt,
-              cekuraStatus: (state.ck || 'all') as 'all' | 'success' | 'failure' | 'other',
+              cekuraStatus: (state.ck || 'all') as CekuraStatusFilter,
               sortBy: state.sb || 'started_at',
               sortOrder: (state.so || 'desc') as SortOrder,
               offset: state.o || 0,
@@ -242,7 +242,7 @@ export default function CallsPage() {
       callType: searchParams.get('callType') || 'All',
       transferType: searchParams.get('transferType') || 'Off',
       multipleTransfers: searchParams.get('multipleTransfers') === 'true',
-      cekuraStatus: (searchParams.get('cekura') || 'all') as 'all' | 'success' | 'failure' | 'other',
+      cekuraStatus: (searchParams.get('cekura') || 'all') as CekuraStatusFilter,
       sortBy: searchParams.get('sortBy') || 'started_at',
       sortOrder: (searchParams.get('sortOrder') || 'desc') as SortOrder,
       offset: parseInt(searchParams.get('offset') || '0', 10),
@@ -287,7 +287,7 @@ export default function CallsPage() {
   const [callType, setCallType] = useState(urlFilters.callType);
   const [transferType, setTransferType] = useState(urlFilters.transferType);
   const [multipleTransfers, setMultipleTransfers] = useState(urlFilters.multipleTransfers);
-  const [cekuraStatusFilter, setCekuraStatusFilter] = useState<'all' | 'success' | 'failure' | 'other'>(urlFilters.cekuraStatus);
+  const [cekuraStatusFilter, setCekuraStatusFilter] = useState<CekuraStatusFilter>(urlFilters.cekuraStatus);
   const [limit, setLimit] = useState(urlFilters.limit);
   const [offset, setOffset] = useState(urlFilters.offset);
   const [sortBy, setSortBy] = useState<string | null>(urlFilters.sortBy);
@@ -399,6 +399,22 @@ export default function CallsPage() {
     return getDateRangeUTC(startDate, endDate);
   }, [dateFilterMode, startDate, endDate]);
 
+  // When date filter is "all", fetch the min/max dates from the calls table
+  // so Cekura data can be loaded for the full range
+  const { data: callDateRange } = useCallDateRange();
+
+  // Compute date range for Cekura: use effective date range if set, otherwise fall back to calls table bounds
+  const cekuraDateRange = useMemo(() => {
+    if (effectiveDateRange.startDate && effectiveDateRange.endDate) {
+      return effectiveDateRange;
+    }
+    // "all" mode — use min/max dates from calls table
+    if (callDateRange?.earliest && callDateRange?.latest) {
+      return { startDate: callDateRange.earliest, endDate: callDateRange.latest };
+    }
+    return { startDate: null, endDate: null };
+  }, [effectiveDateRange, callDateRange]);
+
   // Fetch Cekura call data (progressive loading - recent day first, then full range)
   // This needs to be before callFilters so we can use it for Cekura status filtering
   const {
@@ -407,8 +423,8 @@ export default function CallsPage() {
     isFullyLoaded: cekuraIsFullyLoaded,
     hasError: cekuraHasError,
   } = useCekuraCallMapping(
-    effectiveDateRange.startDate,
-    effectiveDateRange.endDate
+    cekuraDateRange.startDate,
+    cekuraDateRange.endDate
   );
 
   // Extract special filters from dynamic filters and separate standard filters
@@ -477,6 +493,8 @@ export default function CallsPage() {
     const excludeCallTypeConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
     const statusConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
     const excludeStatusConditions: Array<{ value: string; combinator: 'and' | 'or' }> = [];
+    // Feedback filter conditions (text-based, processed client-side against Cekura data)
+    const feedbackFilters: Array<{ condition: string; value: string; combinator: 'and' | 'or' }> = [];
 
     // Boolean trackers for select field emptiness (is_empty / is_not_empty)
     const cekuraStatusEmptyConditions: Array<{ value: boolean; combinator: 'and' | 'or' }> = [];
@@ -590,6 +608,12 @@ export default function CallsPage() {
         continue;
       }
 
+      // Handle feedback (text field from Cekura data, processed client-side)
+      if (filter.field === 'feedback') {
+        feedbackFilters.push({ condition: filter.condition, value: filter.value, combinator });
+        continue;
+      }
+
       // Handle firm_id - equals goes to dedicated filter, others go to standard
       if (filter.field === 'firm_id' && filter.condition === 'equals') {
         extractedFirmId = parseInt(filter.value) || null;
@@ -667,7 +691,7 @@ export default function CallsPage() {
       multipleTransfers: multipleTransfersResult.value,
       // Cekura status
       cekuraStatus: cekuraStatusResult.values.length > 0
-        ? cekuraStatusResult.values[0] as 'success' | 'failure' | 'other'
+        ? cekuraStatusResult.values[0] as CekuraStatusCategory
         : 'all' as const,
       cekuraStatusValues: cekuraStatusResult.values.length > 0 ? cekuraStatusResult.values : null,
       cekuraStatusUseUnion: cekuraStatusResult.useUnion,
@@ -710,6 +734,8 @@ export default function CallsPage() {
       excludeToolCallResultUseUnion: excludeToolCallResultResult.useUnion,
       // Tool call result emptiness (is_empty / is_not_empty)
       toolCallResultEmpty: toolCallResultEmptyResult.value,
+      // Feedback filters (processed client-side against Cekura data)
+      feedbackFilters,
       // Standard filters for API
       standardFilters: standardFilters.length > 0 ? standardFilters : null,
       // Flag for impossible conditions (should return 0 results)
@@ -722,11 +748,13 @@ export default function CallsPage() {
   const effectiveExcludeCekuraStatus = extractedFilters.excludeCekuraStatus;
 
   // Helper to check if a Cekura status matches a category
-  const matchesCekuraCategory = (status: string, category: 'success' | 'failure' | 'other') => {
+  const matchesCekuraCategory = (status: string, category: CekuraStatusCategory) => {
     const s = status.toLowerCase();
     if (category === 'success') return s === 'success' || s === 'completed';
     if (category === 'failure') return s === 'failure' || s === 'failed' || s === 'error';
-    if (category === 'other') return s !== 'success' && s !== 'completed' && s !== 'failure' && s !== 'failed' && s !== 'error';
+    if (category === 'reviewed_success') return s === 'reviewed_success';
+    if (category === 'reviewed_failure') return s === 'reviewed_failure';
+    if (category === 'other') return s !== 'success' && s !== 'completed' && s !== 'failure' && s !== 'failed' && s !== 'error' && s !== 'reviewed_success' && s !== 'reviewed_failure';
     return false;
   };
 
@@ -776,7 +804,7 @@ export default function CallsPage() {
       cekuraCallsData.calls.forEach((callData, correlationId) => {
         const status = callData.status || '';
         const matches = statusValues.some(cat =>
-          matchesCekuraCategory(status, cat as 'success' | 'failure' | 'other')
+          matchesCekuraCategory(status, cat as CekuraStatusCategory)
         );
         if (matches) matchingIds.push(correlationId);
       });
@@ -791,7 +819,7 @@ export default function CallsPage() {
         if (excludeUseUnion) {
           // OR exclude: exclude if matches ANY of the excluded categories
           const shouldExclude = excludeValues.some(cat =>
-            matchesCekuraCategory(status, cat as 'success' | 'failure' | 'other')
+            matchesCekuraCategory(status, cat as CekuraStatusCategory)
           );
           if (!shouldExclude) matchingIds.push(correlationId);
         } else {
@@ -816,7 +844,7 @@ export default function CallsPage() {
       }
       // If we have an exclude filter, include everything EXCEPT that category
       else if (effectiveExcludeCekuraStatus) {
-        const excludeCategory = effectiveExcludeCekuraStatus as 'success' | 'failure' | 'other';
+        const excludeCategory = effectiveExcludeCekuraStatus as CekuraStatusCategory;
         if (!matchesCekuraCategory(status, excludeCategory)) {
           matchingIds.push(correlationId);
         }
@@ -826,9 +854,157 @@ export default function CallsPage() {
     return { include: matchingIds, exclude: null };
   }, [effectiveCekuraStatus, effectiveExcludeCekuraStatus, cekuraCallsData, extractedFilters.cekuraStatusValues, extractedFilters.cekuraStatusUseUnion, extractedFilters.excludeCekuraStatusValues, extractedFilters.excludeCekuraStatusUseUnion, extractedFilters.cekuraStatusEmpty]);
 
-  // Extract include/exclude correlation IDs from the filter result
-  const cekuraFilteredCorrelationIds = cekuraFilterResult?.include ?? null;
-  const cekuraExcludeCorrelationIds = cekuraFilterResult?.exclude ?? null;
+  // Process feedback dynamic filters against Cekura data to produce correlation ID include/exclude lists
+  const feedbackFilterResult = useMemo(() => {
+    const filters = extractedFilters.feedbackFilters;
+    if (filters.length === 0 || !cekuraCallsData?.calls) {
+      return { include: null, exclude: null };
+    }
+
+    // Helper: check if a feedback string matches a condition
+    const matchesFeedbackCondition = (
+      feedback: string | null,
+      condition: string,
+      value: string,
+    ): boolean => {
+      const fb = (feedback ?? '').toLowerCase();
+      const v = value.toLowerCase();
+      switch (condition) {
+        case 'contains':
+          return fb.includes(v);
+        case 'not_contains':
+          return !fb.includes(v);
+        case 'equals':
+          return fb === v;
+        case 'not_equals':
+          return fb !== v;
+        case 'starts_with':
+          return fb.startsWith(v);
+        case 'ends_with':
+          return fb.endsWith(v);
+        case 'is_empty':
+          return !feedback || feedback.trim().length === 0;
+        case 'is_not_empty':
+          return !!feedback && feedback.trim().length > 0;
+        default:
+          return true;
+      }
+    };
+
+    // Evaluate each filter sequentially with AND/OR combinators
+    // Start with the full set of correlation IDs, then narrow/expand based on conditions
+    // Strategy: evaluate filters left-to-right, grouping consecutive ANDs, separating ORs
+    // Same pattern as `cekuraFilterResult` but for text conditions
+
+    // For each correlation ID, evaluate all conditions with AND/OR logic
+    // Build groups: consecutive ANDs form a group, ORs separate groups
+    // Result = union of groups (a match in ANY group passes)
+    type FilterGroup = typeof filters;
+    const groups: FilterGroup[] = [];
+    let currentGroup: FilterGroup = [];
+
+    for (const filter of filters) {
+      if (filter.combinator === 'or' && currentGroup.length > 0) {
+        groups.push(currentGroup);
+        currentGroup = [filter];
+      } else {
+        currentGroup.push(filter);
+      }
+    }
+    if (currentGroup.length > 0) groups.push(currentGroup);
+
+    // Determine if we need an include or exclude list
+    // For positive conditions (contains, equals, starts_with, ends_with, is_not_empty):
+    //   → include list (only matching calls pass)
+    // For negative conditions (not_contains, not_equals, is_empty):
+    //   → depends on logic; we evaluate per-call and decide
+
+    // Evaluate every Cekura call against all filter groups
+    const matchingIds: string[] = [];
+    const nonMatchingCekuraIds: string[] = [];
+
+    cekuraCallsData.calls.forEach((callData, correlationId) => {
+      // A call passes if it matches ANY group (OR between groups)
+      const passes = groups.some(group =>
+        // A call matches a group if it passes ALL filters in the group (AND within group)
+        group.every(f => matchesFeedbackCondition(callData.feedback, f.condition, f.value))
+      );
+
+      if (passes) {
+        matchingIds.push(correlationId);
+      } else {
+        nonMatchingCekuraIds.push(correlationId);
+      }
+    });
+
+    // Determine if the filter set is primarily inclusive or exclusive
+    // If any positive condition exists (contains, equals, starts_with, ends_with, is_not_empty),
+    // use include list. Otherwise (all negative: not_contains, not_equals, is_empty),
+    // use exclude list so calls without Cekura data also pass.
+    const hasPositiveCondition = filters.some(f =>
+      ['contains', 'equals', 'starts_with', 'ends_with', 'is_not_empty'].includes(f.condition)
+    );
+
+    if (hasPositiveCondition) {
+      return { include: matchingIds, exclude: null };
+    } else {
+      // Negative-only filters: exclude non-matching Cekura calls
+      // Calls without Cekura data naturally pass (they're not in the exclude list)
+      return { include: null, exclude: nonMatchingCekuraIds };
+    }
+  }, [extractedFilters.feedbackFilters, cekuraCallsData]);
+
+  // Merge Cekura status and feedback filter results into final correlation ID lists
+  const mergedCorrelationIds = useMemo(() => {
+    const cekuraInclude = cekuraFilterResult?.include ?? null;
+    const cekuraExclude = cekuraFilterResult?.exclude ?? null;
+    const feedbackInclude = feedbackFilterResult?.include ?? null;
+    const feedbackExclude = feedbackFilterResult?.exclude ?? null;
+
+    // Merge include lists: if both exist, intersect them (call must pass both)
+    let mergedInclude: string[] | null = null;
+    if (cekuraInclude !== null && feedbackInclude !== null) {
+      const feedbackSet = new Set(feedbackInclude);
+      mergedInclude = cekuraInclude.filter(id => feedbackSet.has(id));
+    } else if (cekuraInclude !== null) {
+      // Only cekura has include — but if feedback has exclude, remove those from include
+      if (feedbackExclude !== null) {
+        const excludeSet = new Set(feedbackExclude);
+        mergedInclude = cekuraInclude.filter(id => !excludeSet.has(id));
+      } else {
+        mergedInclude = cekuraInclude;
+      }
+    } else if (feedbackInclude !== null) {
+      // Only feedback has include — but if cekura has exclude, remove those from include
+      if (cekuraExclude !== null) {
+        const excludeSet = new Set(cekuraExclude);
+        mergedInclude = feedbackInclude.filter(id => !excludeSet.has(id));
+      } else {
+        mergedInclude = feedbackInclude;
+      }
+    }
+
+    // Merge exclude lists: union them (exclude calls failing either filter)
+    let mergedExclude: string[] | null = null;
+    // Only use exclude if neither filter produced an include list
+    // (when include is used, excludes are already factored in above)
+    if (mergedInclude === null) {
+      if (cekuraExclude !== null && feedbackExclude !== null) {
+        const combined = new Set([...cekuraExclude, ...feedbackExclude]);
+        mergedExclude = Array.from(combined);
+      } else if (cekuraExclude !== null) {
+        mergedExclude = cekuraExclude;
+      } else if (feedbackExclude !== null) {
+        mergedExclude = feedbackExclude;
+      }
+    }
+
+    return { include: mergedInclude, exclude: mergedExclude };
+  }, [cekuraFilterResult, feedbackFilterResult]);
+
+  // Extract include/exclude correlation IDs from the merged filter result
+  const cekuraFilteredCorrelationIds = mergedCorrelationIds.include;
+  const cekuraExcludeCorrelationIds = mergedCorrelationIds.exclude;
 
   // Date-only filters for total count (no other filters applied)
   const dateOnlyFilters = useMemo(
@@ -864,6 +1040,20 @@ export default function CallsPage() {
 
   // Compute effective call type values (sidebar overrides, then dynamic filter)
   const effectiveCallTypeValues = callType !== 'All' ? null : extractedFilters.callTypeValues;
+
+  // Compute correlation IDs where Cekura feedback matches the search term
+  // These get added to the search OR condition so feedback matches appear alongside DB column matches
+  const searchFeedbackCorrelationIds = useMemo(() => {
+    if (!debouncedSearch || !cekuraCallsData?.calls) return null;
+    const term = debouncedSearch.toLowerCase();
+    const matchingIds: string[] = [];
+    cekuraCallsData.calls.forEach((callData, correlationId) => {
+      if (callData.feedback && callData.feedback.toLowerCase().includes(term)) {
+        matchingIds.push(correlationId);
+      }
+    });
+    return matchingIds.length > 0 ? matchingIds : null;
+  }, [debouncedSearch, cekuraCallsData]);
 
   // Build filters for regular calls
   // Each filter now has its own combinator for mixed AND/OR logic
@@ -920,12 +1110,16 @@ export default function CallsPage() {
       correlationIds: cekuraFilteredCorrelationIds,
       excludeCorrelationIds: cekuraExcludeCorrelationIds,
       dynamicFilters: extractedFilters.standardFilters,
+      // Feedback search: correlation IDs where feedback matches search term (for search OR condition)
+      searchFeedbackCorrelationIds,
       // Flag for impossible filter conditions (e.g., is_empty AND is_not_empty)
-      hasImpossibleCondition: extractedFilters.hasImpossibleCondition,
+      // Also triggered when correlation ID include list is empty (no calls match the Cekura/feedback filter)
+      hasImpossibleCondition: extractedFilters.hasImpossibleCondition ||
+        (cekuraFilteredCorrelationIds !== null && cekuraFilteredCorrelationIds.length === 0),
       // Include hash of raw filters to ensure cache invalidation when combinators change
       _filtersHash: dynamicFiltersHash,
     }),
-    [effectiveFirmId, effectiveCallType, effectiveCallTypeValues, extractedFilters.callTypeUseUnion, effectiveTransferType, effectiveTransferTypeValues, effectiveMultipleTransfers, extractedFilters.transferTypeUseUnion, extractedFilters.excludeTransferType, extractedFilters.excludeTransferTypeValues, extractedFilters.excludeTransferTypeUseUnion, extractedFilters.excludeCallType, extractedFilters.excludeCallTypeValues, extractedFilters.excludeCallTypeUseUnion, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, extractedFilters.toolCallResultValues, extractedFilters.toolCallResultUseUnion, extractedFilters.excludeToolCallResult, extractedFilters.excludeToolCallResultValues, extractedFilters.excludeToolCallResultUseUnion, extractedFilters.status, extractedFilters.statusValues, extractedFilters.statusUseUnion, extractedFilters.excludeStatus, extractedFilters.excludeStatusValues, extractedFilters.excludeStatusUseUnion, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, cekuraExcludeCorrelationIds, extractedFilters.standardFilters, extractedFilters.hasImpossibleCondition, dynamicFiltersHash]
+    [effectiveFirmId, effectiveCallType, effectiveCallTypeValues, extractedFilters.callTypeUseUnion, effectiveTransferType, effectiveTransferTypeValues, effectiveMultipleTransfers, extractedFilters.transferTypeUseUnion, extractedFilters.excludeTransferType, extractedFilters.excludeTransferTypeValues, extractedFilters.excludeTransferTypeUseUnion, extractedFilters.excludeCallType, extractedFilters.excludeCallTypeValues, extractedFilters.excludeCallTypeUseUnion, extractedFilters.requireHasTransfer, extractedFilters.toolCallResult, extractedFilters.toolCallResultValues, extractedFilters.toolCallResultUseUnion, extractedFilters.excludeToolCallResult, extractedFilters.excludeToolCallResultValues, extractedFilters.excludeToolCallResultUseUnion, extractedFilters.status, extractedFilters.statusValues, extractedFilters.statusUseUnion, extractedFilters.excludeStatus, extractedFilters.excludeStatusValues, extractedFilters.excludeStatusUseUnion, effectiveDateRange, debouncedSearch, limit, offset, sortBy, sortOrder, cekuraFilteredCorrelationIds, cekuraExcludeCorrelationIds, extractedFilters.standardFilters, searchFeedbackCorrelationIds, extractedFilters.hasImpossibleCondition, dynamicFiltersHash]
   );
 
   // Build filters for flagged calls
@@ -1105,7 +1299,7 @@ export default function CallsPage() {
         onEndDateChange={setEndDate}
         search={search}
         onSearchChange={setSearch}
-        searchHelpText="ID, caller name, phone, correlation ID, summary"
+        searchHelpText="ID, caller name, phone, correlation ID, summary, feedback"
         firmId={firmId}
         onFirmIdChange={setFirmId}
         hideFirmFilter={!flaggedOnly}
@@ -1186,6 +1380,8 @@ export default function CallsPage() {
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="success">Success</SelectItem>
                     <SelectItem value="failure">Failure</SelectItem>
+                    <SelectItem value="reviewed_success">R. Success</SelectItem>
+                    <SelectItem value="reviewed_failure">R. Failure</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
