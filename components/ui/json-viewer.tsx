@@ -17,7 +17,7 @@ export function JsonViewer({ data, className, collapsed = false }: JsonViewerPro
   const isDark = resolvedTheme === 'dark';
 
   return (
-    <div className={cn('text-xs overflow-auto', className)}>
+    <div className={cn('text-xs overflow-auto break-all', className)}>
       <JsonView
         value={data as object}
         style={isDark ? darkTheme : lightTheme}
