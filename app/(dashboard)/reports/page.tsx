@@ -1575,7 +1575,7 @@ function ReportContent({
           </div>
         </CardHeader>
         <CardContent className="px-2 md:px-4 pb-2 md:pb-4 overflow-hidden">
-          <div ref={markdownRef} className="bg-background overflow-x-auto text-xs md:text-sm">
+          <div ref={markdownRef} className="overflow-x-auto text-xs md:text-sm">
             <MarkdownReport content={content || ''} />
           </div>
         </CardContent>

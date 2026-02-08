@@ -266,16 +266,16 @@ export function PDFExportButton({
     printWindow.document.write(html);
     printWindow.document.close();
 
-    printWindow.onload = () => {
+    let printed = false;
+    const triggerPrint = () => {
+      if (printed || printWindow.closed) return;
+      printed = true;
       printWindow.print();
-      printWindow.onafterprint = () => printWindow.close();
     };
 
-    setTimeout(() => {
-      if (!printWindow.closed) {
-        printWindow.print();
-      }
-    }, 500);
+    printWindow.onload = triggerPrint;
+    // Fallback for browsers where onload doesn't fire reliably
+    setTimeout(triggerPrint, 500);
   };
 
   const getLogoHtml = async (branding: LogoBranding): Promise<string> => {
