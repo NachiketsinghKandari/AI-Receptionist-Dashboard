@@ -17,7 +17,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "http://localhost:3000"
+			"value": "https://hellocounsel-dashboard.vercel.app"
 		},
 		{
 			"key": "email",
@@ -390,16 +390,13 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/cekura/call-mapping?startDate=2025-01-01T00:00:00Z&endDate=2025-01-02T00:00:00Z&environment=staging&page=1&pageSize=25&fetchAll=false",
+							"raw": "{{base_url}}/api/cekura/call-mapping?env=staging&limit=20&offset=0",
 							"host": ["{{base_url}}"],
 							"path": ["api", "cekura", "call-mapping"],
 							"query": [
-								{ "key": "startDate", "value": "2025-01-01T00:00:00Z" },
-								{ "key": "endDate", "value": "2025-01-02T00:00:00Z" },
-								{ "key": "environment", "value": "staging", "disabled": true },
-								{ "key": "page", "value": "1", "disabled": true },
-								{ "key": "pageSize", "value": "25", "disabled": true },
-								{ "key": "fetchAll", "value": "false", "disabled": true }
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "limit", "value": "20", "disabled": true },
+								{ "key": "offset", "value": "0", "disabled": true }
 							]
 						}
 					}
@@ -456,9 +453,9 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/reports?env=staging&limit=20&offset=0&reportDate=2025-01-15",
+							"raw": "{{base_url}}/api/eod-reports?env=staging&limit=20&offset=0&reportDate=2025-01-15",
 							"host": ["{{base_url}}"],
-							"path": ["api", "reports"],
+							"path": ["api", "eod-reports"],
 							"query": [
 								{ "key": "env", "value": "staging", "disabled": true },
 								{ "key": "limit", "value": "20", "disabled": true },
@@ -480,12 +477,12 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"firmId\": null\n}"
+							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/reports",
+							"raw": "{{base_url}}/api/eod-reports",
 							"host": ["{{base_url}}"],
-							"path": ["api", "reports"]
+							"path": ["api", "eod-reports"]
 						}
 					}
 				},
@@ -501,38 +498,13 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"firmId\": null\n}"
+							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/reports/payload-generate",
+							"raw": "{{base_url}}/api/eod-reports/payload-generate",
 							"host": ["{{base_url}}"],
-							"path": ["api", "reports", "payload-generate"]
+							"path": ["api", "eod-reports", "payload-generate"]
 						}
-					}
-				},
-				{
-					"name": "Generate Weekly Report",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"weekDate\": \"2025-01-15\",\n  \"firmId\": null\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/reports/weekly-generate?env=production",
-							"host": ["{{base_url}}"],
-							"path": ["api", "reports", "weekly-generate"],
-							"query": [
-								{ "key": "env", "value": "production", "disabled": true }
-							]
-						},
-						"description": "Aggregate EOD reports for the week containing the given date into a weekly report. firmId filters to a specific firm (null for all firms)."
 					}
 				},
 				{
@@ -547,42 +519,13 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"reportId\": \"uuid-here\",\n  \"rawData\": {},\n  \"reportType\": \"full\",\n  \"dataFormat\": \"json\"\n}"
+							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"reportType\": \"full\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/reports/ai-generate?env=production",
+							"raw": "{{base_url}}/api/eod-reports/ai-generate",
 							"host": ["{{base_url}}"],
-							"path": ["api", "reports", "ai-generate"],
-							"query": [
-								{ "key": "env", "value": "production", "disabled": true }
-							]
-						},
-						"description": "Generate AI insights for a saved EOD report. dataFormat can be 'json' (default) or 'toon'."
-					}
-				},
-				{
-					"name": "Compare JSON vs TOON Format",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"reportId\": \"uuid-here\",\n  \"reportType\": \"full\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/reports/format-compare?env=production",
-							"host": ["{{base_url}}"],
-							"path": ["api", "reports", "format-compare"],
-							"query": [
-								{ "key": "env", "value": "production", "disabled": true }
-							]
-						},
-						"description": "Compare JSON vs TOON encoding of report input data. Pass reportId to fetch raw_data from DB, or pass rawData directly. Returns both formatted strings with character/line counts and savings percentage."
+							"path": ["api", "eod-reports", "ai-generate"]
+						}
 					}
 				}
 			]
