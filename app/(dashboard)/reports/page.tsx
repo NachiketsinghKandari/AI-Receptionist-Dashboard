@@ -34,6 +34,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { CopyButton } from '@/components/ui/copy-button';
 import { MarkdownReport } from '@/components/eod/markdown-report';
 import { PDFExportButton } from '@/components/eod/pdf-export-button';
+import { DocxExportButton } from '@/components/eod/docx-export-button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
@@ -1549,6 +1550,10 @@ function ReportContent({
               reportDate={report.report_date}
               firmId={(report.raw_data as EODRawData)?.firm_id}
               firmName={(report.raw_data as EODRawData)?.firm_name}
+            />
+            <DocxExportButton
+              markdown={content || ''}
+              filename={`${isWeekly ? 'weekly' : 'eod'}-${reportType}-report-${report.report_date}`}
             />
             <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
               <Copy className="h-3 w-3 md:h-4 md:w-4" />
