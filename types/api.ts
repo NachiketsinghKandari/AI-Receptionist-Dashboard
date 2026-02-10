@@ -372,6 +372,49 @@ export interface GenerateWeeklyReportResponse {
   eod_reports_used: number;
 }
 
+// Accurate Transcript types (Gemini-powered transcription accuracy evaluation)
+export interface TranscriptionCorrection {
+  original: string;
+  corrected: string;
+  source: 'audio' | 'tool_call' | 'context_inference';
+  evidence: string;
+}
+
+export interface AccurateUtterance {
+  role: 'assistant' | 'user';
+  content: string;
+  original_transcription: string;
+  corrections: TranscriptionCorrection[];
+}
+
+export interface MajorCorrection {
+  original: string;
+  corrected: string;
+  category: 'name' | 'data' | 'number' | 'missing_speech' | 'meaning_change';
+  source: 'audio' | 'tool_call' | 'context_inference';
+  evidence: string;
+}
+
+export interface TranscriptionAccuracyResult {
+  accurate_transcript: AccurateUtterance[];
+  accuracy_score: number;
+  total_utterances: number;
+  corrected_utterances: number;
+  correction_categories: {
+    name_corrections: number;
+    data_corrections: number;
+    number_corrections: number;
+    missing_speech: number;
+    word_corrections: number;
+    filler_omissions: number;
+  };
+  major_corrections: MajorCorrection[];
+}
+
+export interface AccurateTranscriptResponse {
+  result: TranscriptionAccuracyResult;
+}
+
 // Login API types
 export interface LoginRequest {
   email: string;

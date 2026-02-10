@@ -1,0 +1,461 @@
+/**
+ * Accurate Transcript API route
+ * Generates a corrected transcript by combining audio analysis (Gemini 3 Flash)
+ * with ground-truth data from tool calls and the original STT transcription.
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { getSupabaseClient } from '@/lib/supabase/client';
+import { authenticateRequest } from '@/lib/api/auth';
+import { errorResponse, parseEnvironment, decodeBase64Payload } from '@/lib/api/utils';
+import type { TranscriptionAccuracyResult } from '@/types/api';
+
+// DB lookup tools whose results are considered absolute ground truth
+const GROUND_TRUTH_TOOLS = new Set([
+  'search_case_details',
+  'staff_directory_lookup',
+]);
+
+// Maximum audio file size for inline data (20 MB)
+const MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024;
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Context extraction helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract numbered original transcript from webhook messages.
+ * Maps bot -> "Assistant:" and user -> "User:".
+ */
+function buildOriginalTranscript(messages: Record<string, unknown>[]): string {
+  const lines: string[] = [];
+  let index = 1;
+
+  for (const msg of messages) {
+    const role = msg.role as string | undefined;
+    const content = msg.content as string | undefined;
+
+    if (!content) continue;
+
+    if (role === 'bot' || role === 'assistant') {
+      lines.push(`${index}. Assistant: ${content}`);
+      index++;
+    } else if (role === 'user') {
+      lines.push(`${index}. User: ${content}`);
+      index++;
+    }
+  }
+
+  return lines.length > 0 ? lines.join('\n') : 'No transcript available.';
+}
+
+/**
+ * Extract tool call ground-truth context from the messages array.
+ * Only includes results from DB-lookup tools defined in GROUND_TRUTH_TOOLS.
+ */
+function buildToolCallContext(messages: Record<string, unknown>[]): string {
+  const entries: string[] = [];
+
+  for (const msg of messages) {
+    const role = msg.role as string | undefined;
+
+    // tool_call_result entries contain the actual data returned
+    if (role === 'tool_call_result') {
+      const name = msg.name as string | undefined;
+      if (!name || !GROUND_TRUTH_TOOLS.has(name)) continue;
+
+      const result = msg.result as string | undefined;
+      if (result) {
+        entries.push(`[${name}] Result:\n${result}`);
+      }
+      continue;
+    }
+
+    // Also capture tool_calls entries for request context
+    if (role === 'tool_calls') {
+      const toolCalls = msg.tool_calls as Record<string, unknown>[] | undefined;
+      if (!toolCalls) continue;
+
+      for (const tc of toolCalls) {
+        const fn = tc.function as Record<string, unknown> | undefined;
+        if (!fn) continue;
+        const name = fn.name as string | undefined;
+        if (!name || !GROUND_TRUTH_TOOLS.has(name)) continue;
+
+        const args = fn.arguments as Record<string, unknown> | string | undefined;
+        if (args) {
+          const argsStr = typeof args === 'string' ? args : JSON.stringify(args);
+          entries.push(`[${name}] Called with: ${argsStr}`);
+        }
+      }
+    }
+  }
+
+  return entries.length > 0
+    ? entries.join('\n\n')
+    : 'No database lookups were performed during this call.';
+}
+
+/**
+ * Extract transfer transcripts from the webhook artifact.transfers array.
+ */
+function buildTransferTranscripts(artifact: Record<string, unknown>): string {
+  const transfers = artifact.transfers as Record<string, unknown>[] | undefined;
+  if (!transfers || transfers.length === 0) {
+    return 'No transfer conversations occurred.';
+  }
+
+  const transcripts: string[] = [];
+
+  for (let i = 0; i < transfers.length; i++) {
+    const transfer = transfers[i];
+    const transcript = transfer.transcript as string | undefined;
+    if (transcript) {
+      transcripts.push(`--- Transfer ${i + 1} ---\n${transcript}`);
+    }
+  }
+
+  return transcripts.length > 0
+    ? transcripts.join('\n\n')
+    : 'No transfer transcripts available.';
+}
+
+/**
+ * Normalize audio MIME types to standard values accepted by Gemini.
+ */
+function normalizeAudioMime(contentType: string): string {
+  const mime = contentType.split(';')[0].trim().toLowerCase();
+  if (mime === 'audio/x-wav') return 'audio/wav';
+  return mime;
+}
+
+// ---------------------------------------------------------------------------
+// Gemini prompt
+// ---------------------------------------------------------------------------
+
+function buildPrompt(
+  toolCallContext: string,
+  transferTranscripts: string,
+  originalTranscript: string,
+): string {
+  return `You are a transcription accuracy evaluator for a law firm call routing system. Your job is to produce the most accurate transcript possible by combining multiple sources of information.
+
+## Your Inputs
+
+1. **Audio Recording** (attached): The actual audio of the phone call. Listen carefully.
+2. **Original Transcription**: The real-time STT transcription produced during the call.
+3. **Tool Call Results**: Database lookups and system actions that occurred during the call. These are ABSOLUTE TRUTH for names, case numbers, dates, phone numbers, and all factual data.
+4. **Transfer Transcripts**: Conversations during warm call transfers.
+
+## Instructions
+
+Listen to the entire audio recording and compare it against the original transcription. Produce what each speaker ACTUALLY said by:
+
+1. **Preserving ALL speech artifacts**: Include every "um", "uh", "hmm", stutter, false start, self-correction, and verbal filler exactly as spoken. Do NOT clean up or normalize speech.
+2. **Capturing pauses**: Mark significant pauses with "..." in the transcript.
+3. **Including incomplete words**: If a speaker starts a word and stops, include the partial word.
+4. **Using tool call results as ground truth**: When a name, case number, or other data was looked up via a tool call and the audio is unclear or the original transcription differs from the tool call result, use the tool call result as the correct value.
+5. **Inferring from context**: When the audio is genuinely ambiguous, use the full conversation context to determine what was most likely said.
+6. **Noting background speech**: If there is audible background speech, include it in brackets like [background: "..."].
+
+## Database Lookup Results (ABSOLUTE TRUTH)
+The following data was fetched from the database during the call. These are the DEFINITIVE correct values.
+
+${toolCallContext}
+
+## Transfer Transcripts
+
+${transferTranscripts}
+
+## Original Real-Time Transcription
+
+${originalTranscript}
+
+## Output Requirements
+
+Return a JSON object with this exact structure:
+- accurate_transcript: Array of utterance objects, each with:
+  - role: "assistant" or "user"
+  - content: What was ACTUALLY spoken (from audio + context), including all umms, pauses, fillers
+  - original_transcription: What was originally transcribed by STT for this utterance
+  - corrections: Array of correction objects (empty if no corrections needed), each with:
+    - original: The original incorrect text
+    - corrected: The corrected text
+    - source: One of "audio", "tool_call", "context_inference"
+    - evidence: Brief explanation of why this correction was made
+- accuracy_score: Float 0.0-1.0 representing overall accuracy of the original transcription
+- total_utterances: Total number of utterances in the transcript
+- corrected_utterances: Number of utterances that required any correction
+- correction_categories: Object counting corrections by type:
+  - name_corrections: Person names, firm names, staff names misspelled or wrong
+  - data_corrections: Factual data errors
+  - number_corrections: Phone numbers, case numbers, or any numeric data
+  - missing_speech: Speech present in audio but entirely missing from transcript
+  - word_corrections: General words misheard
+  - filler_omissions: Filler words or pauses omitted
+- major_corrections: Array of ONLY the corrections that materially affect accuracy. Each with:
+  - original: The original incorrect text
+  - corrected: The corrected text
+  - category: One of "name", "data", "number", "missing_speech", "meaning_change"
+  - source: One of "audio", "tool_call", "context_inference"
+  - evidence: Clear explanation`;
+}
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+function isValidAccuracyResult(data: unknown): data is TranscriptionAccuracyResult {
+  if (typeof data !== 'object' || data === null) return false;
+  const obj = data as Record<string, unknown>;
+
+  if (!Array.isArray(obj.accurate_transcript)) return false;
+  if (typeof obj.accuracy_score !== 'number') return false;
+  if (typeof obj.total_utterances !== 'number') return false;
+  if (typeof obj.corrected_utterances !== 'number') return false;
+  if (typeof obj.correction_categories !== 'object' || obj.correction_categories === null) return false;
+  if (!Array.isArray(obj.major_corrections)) return false;
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Route handler
+// ---------------------------------------------------------------------------
+
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    // 1. Authenticate
+    const auth = await authenticateRequest(request);
+    if (!auth.authenticated) {
+      return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
+    // 2. Parse parameters
+    const { searchParams } = new URL(request.url);
+    const env = parseEnvironment(searchParams.get('env'));
+    const { id } = await params;
+
+    // Support both numeric ID and correlation ID (UUID format)
+    const isCorrelationId = id.includes('-') && id.length > 20;
+    const callId = isCorrelationId ? null : parseInt(id, 10);
+
+    if (!isCorrelationId && (callId === null || Number.isNaN(callId))) {
+      return errorResponse('Invalid call ID', 400, 'INVALID_CALL_ID');
+    }
+
+    const client = getSupabaseClient(env);
+
+    // 3. Fetch the call record
+    const callQuery = isCorrelationId
+      ? client.from('calls').select('*').eq('platform_call_id', id).single()
+      : client.from('calls').select('*').eq('id', callId).single();
+
+    const callResponse = await callQuery;
+
+    if (callResponse.error) {
+      console.error('Error fetching call:', callResponse.error);
+      return errorResponse('Call not found', 404, 'CALL_NOT_FOUND');
+    }
+
+    const call = callResponse.data;
+    const recordingUrl = call.recording_url as string | null;
+    const platformCallId = call.platform_call_id as string | null;
+
+    if (!recordingUrl) {
+      return errorResponse(
+        'No recording URL available for this call',
+        400,
+        'NO_RECORDING_URL',
+      );
+    }
+
+    if (!platformCallId) {
+      return errorResponse(
+        'No platform call ID available for this call',
+        400,
+        'NO_PLATFORM_CALL_ID',
+      );
+    }
+
+    // 4. Fetch end-of-call-report webhook
+    const webhookResponse = await client
+      .from('webhook_dumps')
+      .select('payload')
+      .eq('platform_call_id', platformCallId)
+      .eq('webhook_type', 'end-of-call-report')
+      .order('received_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (webhookResponse.error || !webhookResponse.data) {
+      console.error('Error fetching webhook:', webhookResponse.error);
+      return errorResponse(
+        'No webhook data available for transcript context',
+        400,
+        'NO_WEBHOOK_DATA',
+      );
+    }
+
+    // Decode payload (may be compressed base64 or raw JSON)
+    const payload = typeof webhookResponse.data.payload === 'string'
+      ? decodeBase64Payload(webhookResponse.data.payload)
+      : (webhookResponse.data.payload as Record<string, unknown>) || {};
+
+    const message = payload.message as Record<string, unknown> | undefined;
+    const artifact = (message?.artifact ?? payload.artifact) as Record<string, unknown> | undefined;
+
+    const messages = (
+      (message?.messages as Record<string, unknown>[]) ??
+      (artifact?.messages as Record<string, unknown>[]) ??
+      []
+    );
+
+    if (messages.length === 0) {
+      return errorResponse(
+        'No webhook data available for transcript context',
+        400,
+        'NO_WEBHOOK_DATA',
+      );
+    }
+
+    // 5. Build context strings
+    const originalTranscript = buildOriginalTranscript(messages);
+    const toolCallContext = buildToolCallContext(messages);
+    const transferTranscripts = artifact
+      ? buildTransferTranscripts(artifact)
+      : 'No transfer conversations occurred.';
+
+    // 6. Download the audio file
+    let audioBuffer: ArrayBuffer;
+    let audioMimeType: string;
+
+    try {
+      const audioResponse = await fetch(recordingUrl, {
+        signal: AbortSignal.timeout(60_000), // 60s timeout for audio download
+      });
+
+      if (!audioResponse.ok) {
+        console.error('Audio download failed:', audioResponse.status, audioResponse.statusText);
+        return errorResponse(
+          `Failed to download audio file: ${audioResponse.status} ${audioResponse.statusText}`,
+          502,
+          'AUDIO_DOWNLOAD_FAILED',
+        );
+      }
+
+      audioBuffer = await audioResponse.arrayBuffer();
+      audioMimeType = normalizeAudioMime(
+        audioResponse.headers.get('content-type') || 'audio/wav',
+      );
+    } catch (downloadError) {
+      console.error('Audio download error:', downloadError);
+      return errorResponse(
+        `Failed to download audio file: ${downloadError instanceof Error ? downloadError.message : 'Unknown error'}`,
+        502,
+        'AUDIO_DOWNLOAD_FAILED',
+      );
+    }
+
+    // 7. Validate audio size
+    if (audioBuffer.byteLength > MAX_AUDIO_SIZE_BYTES) {
+      return errorResponse(
+        `Audio file too large (${(audioBuffer.byteLength / 1024 / 1024).toFixed(1)} MB). Maximum is 20 MB.`,
+        413,
+        'AUDIO_TOO_LARGE',
+      );
+    }
+
+    // 8. Encode audio as base64
+    const base64AudioData = Buffer.from(audioBuffer).toString('base64');
+
+    // 9. Check for Gemini API key
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      return errorResponse(
+        'GEMINI_API_KEY is not configured',
+        500,
+        'GEMINI_NOT_CONFIGURED',
+      );
+    }
+
+    // 10. Call Gemini 3 Flash Preview with audio + text prompt
+    const geminiClient = new GoogleGenAI({ apiKey: geminiApiKey });
+    const promptText = buildPrompt(toolCallContext, transferTranscripts, originalTranscript);
+
+    let geminiResponse;
+    try {
+      geminiResponse = await geminiClient.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: audioMimeType, data: base64AudioData } },
+              { text: promptText },
+            ],
+          },
+        ],
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+          responseMimeType: 'application/json',
+          httpOptions: { timeout: 600_000 }, // 10-minute timeout
+        },
+      });
+    } catch (geminiError) {
+      console.error('Gemini API error:', geminiError);
+      return errorResponse(
+        `Gemini API error: ${geminiError instanceof Error ? geminiError.message : 'Unknown error'}`,
+        500,
+        'GEMINI_API_ERROR',
+      );
+    }
+
+    // 11. Parse and validate the response
+    const responseText = geminiResponse.text;
+    if (!responseText) {
+      return errorResponse(
+        'Gemini returned an empty response',
+        500,
+        'GEMINI_EMPTY_RESPONSE',
+      );
+    }
+
+    let parsedResult: unknown;
+    try {
+      parsedResult = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse Gemini response as JSON:', parseError);
+      console.error('Raw response (first 1000 chars):', responseText.substring(0, 1000));
+      return errorResponse(
+        'Gemini returned invalid JSON',
+        500,
+        'GEMINI_INVALID_JSON',
+      );
+    }
+
+    if (!isValidAccuracyResult(parsedResult)) {
+      console.error('Gemini response failed validation. Keys:', Object.keys(parsedResult as object));
+      return errorResponse(
+        'Gemini returned a response that does not match the expected schema',
+        500,
+        'GEMINI_INVALID_SCHEMA',
+      );
+    }
+
+    // 12. Return the result
+    return NextResponse.json({ result: parsedResult });
+  } catch (error) {
+    console.error('Accurate transcript API error:', error);
+    return errorResponse(
+      `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      'INTERNAL_ERROR',
+    );
+  }
+}

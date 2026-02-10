@@ -14,10 +14,12 @@ import { useCallDetail } from '@/hooks/use-calls';
 import { useWebhooksForCall } from '@/hooks/use-webhooks';
 import { useSentryEventsForCall } from '@/hooks/use-sentry-events';
 import { useCekuraCallMapping, buildCekuraUrl, useCekuraFeedbackMutation } from '@/hooks/use-cekura';
+import { useAccurateTranscript } from '@/hooks/use-accurate-transcript';
 import { CekuraStatusSelector } from '@/components/cekura/cekura-status-selector';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { formatDuration } from '@/lib/formatting';
 import type { Transfer, Email, Webhook, SentryEvent } from '@/types/database';
+import type { AccurateUtterance, TranscriptionAccuracyResult } from '@/types/api';
 import {
   ChevronDown,
   Phone,
@@ -55,6 +57,7 @@ import {
   Voicemail,
   PhoneOff,
   Maximize2,
+  Sparkles,
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
@@ -1903,6 +1906,7 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
       {/* Transcript - fills remaining space */}
       <div className="flex-1 min-h-0">
         <TranscriptSection
+          callId={callId}
           transcription={call.transcription}
           webhooks={webhooksList}
           webhooksLoading={webhooksLoading}
@@ -1915,22 +1919,215 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
 }
 
 /**
+ * Single bubble in the accurate transcript view.
+ * Shows corrections inline with strikethrough for originals.
+ */
+function AccurateTranscriptBubble({ utterance }: { utterance: AccurateUtterance }) {
+  const isAssistant = utterance.role === 'assistant';
+  const hasCorrections = utterance.corrections.length > 0;
+
+  return (
+    <div className={cn('flex', isAssistant ? 'justify-start' : 'justify-end')}>
+      <div className={cn(
+        'max-w-[80%] px-3 py-2 rounded-lg text-sm',
+        isAssistant
+          ? 'bg-muted text-foreground rounded-bl-none'
+          : 'bg-primary text-primary-foreground rounded-br-none',
+        hasCorrections && 'ring-1 ring-emerald-500/30'
+      )}>
+        <span className="text-xs font-medium opacity-70 block mb-0.5">
+          {isAssistant ? 'Agent' : 'Caller'}
+          {hasCorrections && (
+            <span className="ml-1 text-emerald-500">
+              ({utterance.corrections.length} {utterance.corrections.length === 1 ? 'fix' : 'fixes'})
+            </span>
+          )}
+        </span>
+        <p>{utterance.content}</p>
+        {hasCorrections && (
+          <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
+            {utterance.corrections.map((c, i) => (
+              <div key={i} className="text-xs opacity-80">
+                <span className="line-through opacity-60">{c.original}</span>
+                {' \u2192 '}
+                <span className="font-medium">{c.corrected}</span>
+                <span className="opacity-50 ml-1">({c.source})</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Accurate transcript view with on-demand generation via Gemini AI.
+ * Shows a generate button initially, loading state, error state, or the corrected transcript.
+ */
+function AccurateTranscriptView({ callId, mutate, data, isPending, error, reset }: {
+  callId: number | string;
+  mutate: (callId: number | string) => void;
+  data: TranscriptionAccuracyResult | undefined;
+  isPending: boolean;
+  error: Error | null;
+  reset: () => void;
+}) {
+
+  if (!data && !isPending && !error) {
+    // Initial state - show generate button
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <div className="p-4 bg-emerald-500/10 rounded-full">
+          <Sparkles className="h-8 w-8 text-emerald-500" />
+        </div>
+        <div className="text-center space-y-2">
+          <h3 className="text-sm font-medium">Accurate Transcript</h3>
+          <p className="text-xs text-muted-foreground max-w-[300px]">
+            Generate a corrected transcript by analyzing the call audio with AI.
+            This compares the recording against the STT transcript to fix errors.
+          </p>
+        </div>
+        <Button
+          onClick={() => mutate(callId)}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Generate Accurate Transcript
+        </Button>
+      </div>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+        <div className="text-center space-y-1">
+          <p className="text-sm font-medium">Generating accurate transcript...</p>
+          <p className="text-xs text-muted-foreground">
+            Analyzing audio recording with AI. This may take a few minutes.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <div className="p-3 bg-red-500/10 rounded-full">
+          <XCircle className="h-6 w-6 text-red-500" />
+        </div>
+        <div className="text-center space-y-1">
+          <p className="text-sm font-medium text-red-500">Failed to generate transcript</p>
+          <p className="text-xs text-muted-foreground">{error.message}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => reset()}>
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // Display the accurate transcript
+  return (
+    <div className="space-y-4">
+      {/* Accuracy Score Header */}
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Accuracy</span>
+          <span className={cn(
+            "text-lg font-bold",
+            data.accuracy_score >= 0.9 ? "text-emerald-600" :
+            data.accuracy_score >= 0.7 ? "text-yellow-600" :
+            "text-red-600"
+          )}>
+            {Math.round(data.accuracy_score * 100)}%
+          </span>
+        </div>
+        <Separator orientation="vertical" className="h-6" />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{data.corrected_utterances}/{data.total_utterances} corrected</span>
+        </div>
+        {data.major_corrections.length > 0 && (
+          <>
+            <Separator orientation="vertical" className="h-6" />
+            <span className="text-xs text-red-500 font-medium">
+              {data.major_corrections.length} major {data.major_corrections.length === 1 ? 'correction' : 'corrections'}
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Correction Categories */}
+      {data.corrected_utterances > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {data.correction_categories.name_corrections > 0 && (
+            <Badge variant="outline" className="text-xs bg-red-500/5 text-red-600 border-red-200">
+              Names: {data.correction_categories.name_corrections}
+            </Badge>
+          )}
+          {data.correction_categories.data_corrections > 0 && (
+            <Badge variant="outline" className="text-xs bg-orange-500/5 text-orange-600 border-orange-200">
+              Data: {data.correction_categories.data_corrections}
+            </Badge>
+          )}
+          {data.correction_categories.number_corrections > 0 && (
+            <Badge variant="outline" className="text-xs bg-purple-500/5 text-purple-600 border-purple-200">
+              Numbers: {data.correction_categories.number_corrections}
+            </Badge>
+          )}
+          {data.correction_categories.missing_speech > 0 && (
+            <Badge variant="outline" className="text-xs bg-blue-500/5 text-blue-600 border-blue-200">
+              Missing: {data.correction_categories.missing_speech}
+            </Badge>
+          )}
+          {data.correction_categories.word_corrections > 0 && (
+            <Badge variant="outline" className="text-xs bg-yellow-500/5 text-yellow-600 border-yellow-200">
+              Words: {data.correction_categories.word_corrections}
+            </Badge>
+          )}
+          {data.correction_categories.filler_omissions > 0 && (
+            <Badge variant="outline" className="text-xs bg-gray-500/5 text-gray-600 border-gray-200">
+              Fillers: {data.correction_categories.filler_omissions}
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Transcript Messages */}
+      <div className="space-y-3">
+        {data.accurate_transcript.map((utterance, idx) => (
+          <AccurateTranscriptBubble key={idx} utterance={utterance} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Full-height transcript section for the right panel
  */
 function TranscriptSection({
+  callId,
   transcription,
   webhooks,
   webhooksLoading,
   errorMetrics,
   errorMetricsLoading,
 }: {
+  callId: number | string;
   transcription: string | null;
   webhooks: Webhook[];
   webhooksLoading: boolean;
   errorMetrics?: Array<{ name: string; score: number; explanation: string }>;
   errorMetricsLoading?: boolean;
 }) {
-  const [mode, setMode] = useState<'basic' | 'advanced' | 'errors'>('advanced');
+  const [mode, setMode] = useState<'basic' | 'advanced' | 'errors' | 'accurate'>('advanced');
+  const accurateTranscript = useAccurateTranscript();
 
   const extractedData = useMemo(() => {
     if (webhooksLoading) return null;
@@ -1961,48 +2158,58 @@ function TranscriptSection({
             <FileText className="h-4 w-4" />
             Transcript
           </CardTitle>
-          {(hasAdvancedData || hasErrorMetrics) && (
-            <div className="inline-flex items-center rounded-lg border bg-muted p-0.5">
+          <div className="inline-flex items-center rounded-lg border bg-muted p-0.5">
+            <button
+              onClick={() => setMode('basic')}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                mode === 'basic'
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Basic
+            </button>
+            {hasAdvancedData && (
               <button
-                onClick={() => setMode('basic')}
+                onClick={() => setMode('advanced')}
                 className={cn(
                   "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                  mode === 'basic'
+                  mode === 'advanced'
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                Basic
+                Advanced
               </button>
-              {hasAdvancedData && (
-                <button
-                  onClick={() => setMode('advanced')}
-                  className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                    mode === 'advanced'
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Advanced
-                </button>
+            )}
+            {(hasErrorMetrics || errorMetricsLoading) && (
+              <button
+                onClick={() => setMode('errors')}
+                className={cn(
+                  "px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                  mode === 'errors'
+                    ? "bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
+                    : "text-red-500/70 hover:text-red-500"
+                )}
+              >
+                <AlertTriangle className="h-3 w-3" />
+                Errors
+              </button>
+            )}
+            <button
+              onClick={() => setMode('accurate')}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                mode === 'accurate'
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                  : "text-emerald-500/70 hover:text-emerald-500"
               )}
-              {(hasErrorMetrics || errorMetricsLoading) && (
-                <button
-                  onClick={() => setMode('errors')}
-                  className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
-                    mode === 'errors'
-                      ? "bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
-                      : "text-red-500/70 hover:text-red-500"
-                  )}
-                >
-                  <AlertTriangle className="h-3 w-3" />
-                  Errors
-                </button>
-              )}
-            </div>
-          )}
+            >
+              <Sparkles className="h-3 w-3" />
+              Accurate
+            </button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-y-auto pt-0">
@@ -2011,6 +2218,15 @@ function TranscriptSection({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
             <span className="text-sm text-muted-foreground">Loading advanced transcript...</span>
           </div>
+        ) : mode === 'accurate' ? (
+          <AccurateTranscriptView
+            callId={callId}
+            mutate={accurateTranscript.mutate}
+            data={accurateTranscript.data}
+            isPending={accurateTranscript.isPending}
+            error={accurateTranscript.error}
+            reset={accurateTranscript.reset}
+          />
         ) : showErrors ? (
           <TranscriptErrorsView
             errorMetrics={errorMetrics || []}
