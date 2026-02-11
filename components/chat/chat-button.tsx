@@ -15,7 +15,7 @@ export function ChatButton({ onClick }: ChatButtonProps) {
         <Button
           onClick={onClick}
           size="icon-lg"
-          className="fixed bottom-20 md:bottom-6 right-6 z-40 rounded-full shadow-lg"
+          className="fixed bottom-20 right-6 z-40 rounded-full shadow-lg"
         >
           <MessageSquare className="h-5 w-5" />
         </Button>
