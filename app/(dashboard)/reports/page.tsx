@@ -83,6 +83,7 @@ import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { formatUTCTimestamp } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 import { buildReportShareUrl, copyToClipboard } from '@/lib/report-share-url';
+import { useClientConfig } from '@/hooks/use-client-config';
 
 // Panel resize constants
 const MIN_LEFT_PERCENT = 30;
@@ -252,6 +253,7 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
 export default function EODReportsPage() {
   const searchParams = useSearchParams();
   const { environment } = useEnvironment();
+  const { config, isAdmin } = useClientConfig();
   const queryClient = useQueryClient();
   const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
   const [offset, setOffset] = useState(0);
@@ -744,6 +746,9 @@ export default function EODReportsPage() {
       </div>
     </div>
   );
+
+  // Route guard: hide page if disabled for this client
+  if (!isAdmin && config && !config.pages.reports) return null;
 
   return (
     <div className="flex h-full">

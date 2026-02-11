@@ -32,6 +32,7 @@ import { ChatInput } from './chat-input';
 import { ChatMessage } from './chat-message';
 import { ChatHistory } from './chat-history';
 import { cn } from '@/lib/utils';
+import { useClientConfig } from '@/hooks/use-client-config';
 import type { ChatMessage as ChatMessageType } from '@/types/chat';
 
 function IconAction({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
@@ -52,6 +53,7 @@ export function ChatPanel() {
   const [expanded, setExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const isMobile = useIsMobile();
+  const { config, isAdmin } = useClientConfig();
 
   const {
     conversations,
@@ -141,6 +143,12 @@ export function ChatPanel() {
     },
     [conversations],
   );
+
+  // Hide chat if feature is disabled for this client
+  const chatDisabled = !isAdmin && config && config.features.chat === false;
+  if (chatDisabled) {
+    return null;
+  }
 
   const chatContent = (
     <div className="flex flex-1 min-h-0 min-w-0 flex-col">

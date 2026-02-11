@@ -20,6 +20,8 @@ import { formatUTCTimestamp } from '@/lib/formatting';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { TRANSFER_FILTER_FIELDS } from '@/lib/filter-fields';
+import { useClientConfig } from '@/hooks/use-client-config';
+import { filterColumns } from '@/lib/column-filter';
 
 const columns: ColumnDef<Transfer>[] = [
   {
@@ -68,6 +70,14 @@ const columns: ColumnDef<Transfer>[] = [
 ];
 
 export default function TransfersPage() {
+  const { config, isAdmin } = useClientConfig();
+
+  // Apply column visibility filtering from client config
+  const visibleColumns = useMemo(
+    () => isAdmin ? columns : filterColumns(columns, config?.columns.transfers),
+    [isAdmin, config]
+  );
+
   // Shared date filter state from context
   const {
     dateFilterMode,
@@ -223,6 +233,9 @@ export default function TransfersPage() {
     if (hasNext) setSelectedTransfer(dataArray[currentIndex + 1]);
   };
 
+  // Route guard: hide page if disabled for this client
+  if (!isAdmin && config && !config.pages.transfers) return null;
+
   return (
     <div className="flex h-full">
       <ResponsiveFilterSidebar
@@ -240,12 +253,14 @@ export default function TransfersPage() {
         limit={limit}
         onLimitChange={setLimit}
         headerAction={
-          <DynamicFilterBuilder
-            fields={TRANSFER_FILTER_FIELDS}
-            filters={dynamicFilters}
-            onFiltersChange={setDynamicFilters}
-            onApply={() => setOffset(0)}
-          />
+          (isAdmin || !config || config.features.dynamicFilters !== false) ? (
+            <DynamicFilterBuilder
+              fields={TRANSFER_FILTER_FIELDS}
+              filters={dynamicFilters}
+              onFiltersChange={setDynamicFilters}
+              onApply={() => setOffset(0)}
+            />
+          ) : undefined
         }
       >
         <div>
@@ -313,7 +328,7 @@ export default function TransfersPage() {
         {/* Table - scrollable */}
         <div className="flex-1 min-h-0">
           <DataTable
-            columns={columns}
+            columns={visibleColumns}
             data={data?.data ?? []}
             total={data?.total ?? 0}
             offset={offset}

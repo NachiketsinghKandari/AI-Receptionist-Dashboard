@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Home,
   Phone,
@@ -18,8 +18,9 @@ import {
   Moon,
   Monitor,
   X,
+  Settings,
 } from 'lucide-react';
-import { HelloCounselLogo } from '@/components/logo';
+import { BrandedLogo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -40,16 +41,18 @@ import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { EnvironmentSwitcher } from '@/components/layout/environment-switcher';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+import { useClientConfig } from '@/hooks/use-client-config';
 import type { User } from '@/types/api';
+import type { PageToggles } from '@/types/client-config';
 
-const navItems = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/calls', label: 'Calls', icon: Phone },
-  { href: '/reports', label: 'Reports', icon: FileText },
-  { href: '/emails', label: 'Emails', icon: Mail },
-  { href: '/transfers', label: 'Transfers', icon: ArrowLeftRight },
-  { href: '/sentry', label: 'Sentry', icon: Bug },
-  { href: '/webhooks', label: 'Webhooks', icon: Webhook },
+const allNavItems = [
+  { href: '/', label: 'Home', icon: Home, pageKey: null },
+  { href: '/calls', label: 'Calls', icon: Phone, pageKey: 'calls' as keyof PageToggles },
+  { href: '/reports', label: 'Reports', icon: FileText, pageKey: 'reports' as keyof PageToggles },
+  { href: '/emails', label: 'Emails', icon: Mail, pageKey: 'emails' as keyof PageToggles },
+  { href: '/transfers', label: 'Transfers', icon: ArrowLeftRight, pageKey: 'transfers' as keyof PageToggles },
+  { href: '/sentry', label: 'Sentry', icon: Bug, pageKey: 'sentry' as keyof PageToggles },
+  { href: '/webhooks', label: 'Webhooks', icon: Webhook, pageKey: 'webhooks' as keyof PageToggles },
 ];
 
 function NavLink({
@@ -87,6 +90,7 @@ export function Navbar() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { config, isAdmin } = useClientConfig();
 
   useEffect(() => {
     fetch('/api/auth/session')
@@ -116,6 +120,24 @@ export function Navbar() {
     return pathname.startsWith(href);
   };
 
+  // Filter nav items based on client config
+  const navItems = useMemo(() => {
+    if (isAdmin || !config) return allNavItems;
+    return allNavItems.filter((item) => {
+      if (!item.pageKey) return true; // Home is always visible
+      return config.pages[item.pageKey] !== false;
+    });
+  }, [isAdmin, config]);
+
+  // Should we show the environment switcher?
+  const showEnvSwitcher = isAdmin || !config || config.features.environmentSwitcher !== false;
+
+  // Branding overrides
+  const brandingLogoUrl = !isAdmin && config?.branding?.logoUrl ? config.branding.logoUrl : null;
+  const brandingName = !isAdmin && config?.branding?.displayName
+    ? config.branding.displayName
+    : null;
+
   return (
     <header className="sticky top-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-full items-center px-4 md:px-6">
@@ -133,7 +155,7 @@ export function Navbar() {
                 <SheetTitle>Navigation Menu</SheetTitle>
               </VisuallyHidden.Root>
               <div className="flex items-center justify-between px-3 pt-4 mb-6">
-                <HelloCounselLogo className="h-6 w-auto text-foreground" />
+                <BrandedLogo logoUrl={brandingLogoUrl} displayName={brandingName} className="h-6 w-auto text-foreground" />
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileOpen(false)}>
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close</span>
@@ -153,13 +175,13 @@ export function Navbar() {
               </nav>
             </SheetContent>
           </Sheet>
-          <EnvironmentSwitcher />
+          {showEnvSwitcher && <EnvironmentSwitcher />}
         </div>
 
         {/* Desktop: Branding section - matches filter sidebar width */}
         <div className="hidden md:flex md:w-64 shrink-0 items-center">
           <Link href="/" className="flex items-center gap-2">
-            <HelloCounselLogo className="h-6 w-auto text-foreground" />
+            <BrandedLogo logoUrl={brandingLogoUrl} displayName={brandingName} className="h-6 w-auto text-foreground" />
             <span className="text-muted-foreground text-sm font-medium">Dashboard</span>
           </Link>
         </div>
@@ -180,9 +202,11 @@ export function Navbar() {
         {/* Right side */}
         <div className="ml-auto flex items-center gap-2">
           {/* Environment Switcher - Desktop only */}
-          <div className="hidden md:block">
-            <EnvironmentSwitcher />
-          </div>
+          {showEnvSwitcher && (
+            <div className="hidden md:block">
+              <EnvironmentSwitcher />
+            </div>
+          )}
 
           {/* User Menu */}
           <DropdownMenu>
@@ -203,29 +227,42 @@ export function Navbar() {
                     {user?.username || 'User'}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {user?.apps?.join(', ') || 'No apps'}
+                    {user?.email || user?.apps?.join(', ') || 'No apps'}
                   </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                Theme
-              </DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setTheme('light')} className="cursor-pointer">
-                <Sun className="mr-2 h-4 w-4" />
-                Light
-                {theme === 'light' && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('dark')} className="cursor-pointer">
-                <Moon className="mr-2 h-4 w-4" />
-                Dark
-                {theme === 'dark' && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('system')} className="cursor-pointer">
-                <Monitor className="mr-2 h-4 w-4" />
-                System
-                {theme === 'system' && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
-              </DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    Theme
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setTheme('light')} className="cursor-pointer">
+                    <Sun className="mr-2 h-4 w-4" />
+                    Light
+                    {theme === 'light' && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme('dark')} className="cursor-pointer">
+                    <Moon className="mr-2 h-4 w-4" />
+                    Dark
+                    {theme === 'dark' && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme('system')} className="cursor-pointer">
+                    <Monitor className="mr-2 h-4 w-4" />
+                    System
+                    {theme === 'system' && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
+                  </DropdownMenuItem>
+                </>
+              )}
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push('/admin')} className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Admin Panel
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />

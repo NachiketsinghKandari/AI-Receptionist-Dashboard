@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Phone,
@@ -27,6 +27,7 @@ import { useChartData } from '@/hooks/use-chart-data';
 import { useDashboardPrefetch } from '@/hooks/use-dashboard-prefetch';
 import { formatDuration } from '@/lib/formatting';
 import { useUser } from '@/hooks/use-user';
+import { useClientConfig } from '@/hooks/use-client-config';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC, BUSINESS_TIMEZONE } from '@/lib/date-utils';
 
@@ -85,7 +86,9 @@ function useTypingEffect(text: string | null, speed: number = 100) {
   return displayedText;
 }
 
-const quickLinks = [
+import type { PageToggles } from '@/types/client-config';
+
+const allQuickLinks = [
   {
     href: '/calls',
     icon: Phone,
@@ -93,6 +96,7 @@ const quickLinks = [
     description: 'View call records, summaries, and transcripts',
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
+    pageKey: 'calls' as keyof PageToggles,
   },
   {
     href: '/reports',
@@ -101,6 +105,7 @@ const quickLinks = [
     description: 'End-of-day and weekly reports',
     color: 'text-teal-500',
     bgColor: 'bg-teal-500/10',
+    pageKey: 'reports' as keyof PageToggles,
   },
   {
     href: '/emails',
@@ -109,6 +114,7 @@ const quickLinks = [
     description: 'Monitor email logs for new case leads',
     color: 'text-green-500',
     bgColor: 'bg-green-500/10',
+    pageKey: 'emails' as keyof PageToggles,
   },
   {
     href: '/transfers',
@@ -117,6 +123,7 @@ const quickLinks = [
     description: 'Track transfers to case managers',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
+    pageKey: 'transfers' as keyof PageToggles,
   },
   {
     href: '/sentry',
@@ -125,6 +132,7 @@ const quickLinks = [
     description: 'View Sentry events and logs',
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
+    pageKey: 'sentry' as keyof PageToggles,
   },
   {
     href: '/webhooks',
@@ -133,6 +141,7 @@ const quickLinks = [
     description: 'Inspect incoming webhook payloads',
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10',
+    pageKey: 'webhooks' as keyof PageToggles,
   },
 ];
 
@@ -140,6 +149,13 @@ export default function HomePage() {
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('Yesterday');
   const [timeRange, setTimeRange] = useState<TimeRange>('yesterday');
   const { user } = useUser();
+  const { config, isAdmin } = useClientConfig();
+
+  // Filter quick links based on client config
+  const quickLinks = useMemo(() => {
+    if (isAdmin || !config) return allQuickLinks;
+    return allQuickLinks.filter((link) => config.pages[link.pageKey] !== false);
+  }, [isAdmin, config]);
 
   // Capitalize first letter of username
   const displayName = user?.username
@@ -273,7 +289,7 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex flex-col gap-1">
         <p className="text-xs md:text-sm text-muted-foreground">
-          HelloCounsel {environment.charAt(0).toUpperCase() + environment.slice(1)}
+          {(!isAdmin && config?.branding?.displayName) || 'HelloCounsel'} {environment.charAt(0).toUpperCase() + environment.slice(1)}
         </p>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           Welcome{typedName ? ` ${typedName}` : ''}
@@ -284,7 +300,7 @@ export default function HomePage() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+      <div className={`grid grid-cols-2 sm:grid-cols-3 ${quickLinks.length <= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-6'} gap-3 md:gap-4`}>
         {quickLinks.map((link) => (
           <Link key={link.href} href={link.href}>
             <Card className="h-full hover:shadow-md transition-shadow cursor-pointer group">

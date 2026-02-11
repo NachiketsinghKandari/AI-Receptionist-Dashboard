@@ -38,6 +38,8 @@ import { DataTable } from '@/components/tables/data-table';
 import { DetailDialog } from '@/components/details/detail-dialog';
 import { useSentryBrowse, type SentryGroupedSummary, type SentryParsedEvent } from '@/hooks/use-sentry-events';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useClientConfig } from '@/hooks/use-client-config';
+import { filterColumns } from '@/lib/column-filter';
 import { formatUTCTimestamp } from '@/lib/formatting';
 
 const EVENT_TYPES = ['All', 'transfer', 'webhook', 'search_case', 'take_message', 'schedule_callback'];
@@ -208,6 +210,14 @@ function EventCard({ event }: { event: SentryParsedEvent }) {
 }
 
 export default function SentryPage() {
+  const { config, isAdmin } = useClientConfig();
+
+  // Apply column visibility filtering from client config
+  const visibleColumns = useMemo(
+    () => isAdmin ? columns : filterColumns(columns, config?.columns.sentry),
+    [isAdmin, config]
+  );
+
   const [eventType, setEventType] = useState('All');
   const [level, setLevel] = useState('error'); // Default to errors
   const [statsPeriod, setStatsPeriod] = useState('30d'); // Default to 30 days
@@ -273,6 +283,9 @@ export default function SentryPage() {
   const sentryExplorerUrl = selectedCorrelationId
     ? `https://helloounsil.sentry.io/explore/logs/?environment=${sentryEnv}&logsFields=timestamp&logsFields=correlation_id&logsFields=message&logsQuery=correlation_id%3A${selectedCorrelationId}&logsSortBys=-timestamp`
     : null;
+
+  // Route guard: hide page if disabled for this client
+  if (!isAdmin && config && !config.pages.sentry) return null;
 
   return (
     <div className="h-full flex flex-col p-4 md:p-6 overflow-hidden">
@@ -524,7 +537,7 @@ export default function SentryPage() {
             <Skeleton className="h-full" />
           ) : (
             <DataTable
-              columns={columns}
+              columns={visibleColumns}
               data={accumulatedData?.summary ?? []}
               total={accumulatedData?.summary?.length ?? 0}
               offset={0}

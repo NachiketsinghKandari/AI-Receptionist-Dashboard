@@ -23,6 +23,8 @@ import type { SortOrder } from '@/types/api';
 import { formatUTCTimestamp } from '@/lib/formatting';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { parseWebhookPayload, enrichTransfersWithDatabaseData } from '@/lib/webhook-utils';
+import { useClientConfig } from '@/hooks/use-client-config';
+import { filterColumns } from '@/lib/column-filter';
 
 const columns: ColumnDef<Webhook>[] = [
   {
@@ -72,6 +74,14 @@ const columns: ColumnDef<Webhook>[] = [
 ];
 
 export default function WebhooksPage() {
+  const { config, isAdmin } = useClientConfig();
+
+  // Apply column visibility filtering from client config
+  const visibleColumns = useMemo(
+    () => isAdmin ? columns : filterColumns(columns, config?.columns.webhooks),
+    [isAdmin, config]
+  );
+
   // Shared date filter state from context
   const {
     dateFilterMode,
@@ -182,6 +192,9 @@ export default function WebhooksPage() {
     if (hasNext) setSelectedWebhook(dataArray[currentIndex + 1]);
   };
 
+  // Route guard: hide page if disabled for this client
+  if (!isAdmin && config && !config.pages.webhooks) return null;
+
   return (
     <div className="flex h-full">
       <ResponsiveFilterSidebar
@@ -264,7 +277,7 @@ export default function WebhooksPage() {
         {/* Table - scrollable */}
         <div className="flex-1 min-h-0">
           <DataTable
-            columns={columns}
+            columns={visibleColumns}
             data={data?.data ?? []}
             total={data?.total ?? 0}
             offset={offset}

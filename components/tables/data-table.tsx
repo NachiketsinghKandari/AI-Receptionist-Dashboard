@@ -144,7 +144,7 @@ export function DataTable<TData, TValue>({
         <Table unstyled className={cn(isRefetching && "opacity-50 transition-opacity")}>
           <TableHeader className="sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-background hover:bg-background">
+              <TableRow key={headerGroup.id} className="bg-[var(--table-header)] hover:bg-[var(--table-header)]">
                 {headerGroup.headers.map((header) => {
                   const columnId = header.column.id;
                   const isSortable = sortableColumns.includes(columnId);
@@ -152,7 +152,7 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableHead
                       key={header.id}
-                      className={`bg-background border-b ${isSortable ? 'cursor-pointer select-none hover:bg-muted/50' : ''}`}
+                      className={`bg-[var(--table-header)] border-b ${isSortable ? 'cursor-pointer select-none hover:brightness-95' : ''}`}
                       onClick={() => isSortable && onSort?.(columnId)}
                     >
                       <div className="flex items-center">

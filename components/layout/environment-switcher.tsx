@@ -10,9 +10,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Database } from 'lucide-react';
+import { useClientConfig } from '@/hooks/use-client-config';
 
 export function EnvironmentSwitcher() {
   const { environment, setEnvironment } = useEnvironment();
+  const { config, isAdmin } = useClientConfig();
+
+  // Hide if feature is disabled for this client
+  if (!isAdmin && config && config.features.environmentSwitcher === false) {
+    return null;
+  }
 
   return (
     <Select value={environment} onValueChange={(value) => setEnvironment(value as Environment)}>

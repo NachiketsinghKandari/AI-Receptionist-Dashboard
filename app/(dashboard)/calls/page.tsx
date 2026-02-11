@@ -32,6 +32,8 @@ import type { HighlightReasons } from '@/components/details/call-detail-panel';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { CALL_FILTER_FIELDS } from '@/lib/filter-fields';
+import { useClientConfig } from '@/hooks/use-client-config';
+import { filterColumns } from '@/lib/column-filter';
 import type { DynamicFilter } from '@/types/api';
 
 // Helper to create columns with error, important, mismatch, and Cekura state access
@@ -165,6 +167,7 @@ export default function CallsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { environment } = useEnvironment();
+  const { config, isAdmin } = useClientConfig();
 
   // === Sync environment from URL (e.g., shared links from a different environment) ===
   useSyncEnvironmentFromUrl(searchParams.get('e'));
@@ -1178,9 +1181,15 @@ export default function CallsPage() {
   }), [cekuraCallsData, cekuraIsLoading, cekuraIsFullyLoaded, cekuraHasError]);
 
   // Memoize columns with Sentry error, important call, mismatch, and Cekura data
-  const columns = useMemo(
+  const allColumns = useMemo(
     () => createColumns(errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData),
     [errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData]
+  );
+
+  // Apply column visibility filtering from client config
+  const columns = useMemo(
+    () => isAdmin ? allColumns : filterColumns(allColumns, config?.columns.calls),
+    [allColumns, isAdmin, config]
   );
 
   const handleRowSelect = (row: CallListItem | FlaggedCallListItem | null) => {
@@ -1287,6 +1296,9 @@ export default function CallsPage() {
     }
   }, [pendingNavigation, dataArray, updateCallIdInUrl]);
 
+  // Route guard: hide page if disabled for this client
+  if (!isAdmin && config && !config.pages.calls) return null;
+
   return (
     <div className="flex h-full">
       {/* Filter Sidebar */}
@@ -1306,12 +1318,14 @@ export default function CallsPage() {
         limit={limit}
         onLimitChange={setLimit}
         headerAction={
-          <DynamicFilterBuilder
-            fields={CALL_FILTER_FIELDS}
-            filters={dynamicFilters}
-            onFiltersChange={setDynamicFilters}
-            onApply={() => setOffset(0)}
-          />
+          (isAdmin || !config || config.features.dynamicFilters !== false) ? (
+            <DynamicFilterBuilder
+              fields={CALL_FILTER_FIELDS}
+              filters={dynamicFilters}
+              onFiltersChange={setDynamicFilters}
+              onApply={() => setOffset(0)}
+            />
+          ) : undefined
         }
       >
         {/* Call-specific filters in compact 2x2 grid - only show when not in flagged mode */}

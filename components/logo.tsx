@@ -15,6 +15,27 @@ export function HelloCounselIcon({ className }: { className?: string }) {
   );
 }
 
+export function BrandedLogo({
+  logoUrl,
+  displayName,
+  className,
+}: {
+  logoUrl?: string | null;
+  displayName?: string | null;
+  className?: string;
+}) {
+  if (logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logoUrl} alt={displayName || 'Logo'} className={className} />
+    );
+  }
+  if (displayName) {
+    return <span className={className}>{displayName}</span>;
+  }
+  return <HelloCounselLogo className={className} />;
+}
+
 export function HelloCounselLogo({ className }: { className?: string }) {
   return (
     <svg

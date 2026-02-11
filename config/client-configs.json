@@ -1,0 +1,115 @@
+{
+  "adminDomains": [
+    "hellocounsel.ai"
+  ],
+  "userFirmMappings": [
+    {
+      "email": "admin@beyandassociates.com",
+      "firmId": 1
+    }
+  ],
+  "firms": {
+    "1": {
+      "firmId": 1,
+      "firmName": "Bey & Associates",
+      "pages": {
+        "calls": true,
+        "reports": true,
+        "emails": true,
+        "transfers": true,
+        "sentry": false,
+        "webhooks": false
+      },
+      "columns": {
+        "calls": {
+          "platform_call_id": false,
+          "feedback": false,
+          "status": false,
+          "cekura_status": false
+        },
+        "emails": {},
+        "transfers": {},
+        "webhooks": {},
+        "sentry": {}
+      },
+      "features": {
+        "aiReports": true,
+        "cekuraIntegration": true,
+        "chat": true,
+        "accurateTranscript": true,
+        "dynamicFilters": true,
+        "environmentSwitcher": false
+      },
+      "branding": {
+        "displayName": "Bey & Associates",
+        "logoUrl": "https://beyandassociates.com/wp-content/uploads/2021/08/bey-logo.png",
+        "theme": {
+          "radius": "0",
+          "background": "oklch(0.978 0.008 80)",
+          "foreground": "oklch(0.335 0.021 224.2)",
+          "card": "oklch(0.993 0.005 80)",
+          "card-foreground": "oklch(0.335 0.021 224.2)",
+          "popover": "oklch(0.993 0.005 80)",
+          "popover-foreground": "oklch(0.335 0.021 224.2)",
+          "primary": "oklch(0.672 0.193 53.9)",
+          "primary-foreground": "oklch(0.993 0 0)",
+          "secondary": "oklch(0.920 0.025 210)",
+          "secondary-foreground": "oklch(0.456 0.075 215.3)",
+          "muted": "oklch(0.935 0.020 210)",
+          "muted-foreground": "oklch(0.547 0.040 211)",
+          "accent": "oklch(0.900 0.035 210)",
+          "accent-foreground": "oklch(0.370 0.060 215)",
+          "destructive": "oklch(0.577 0.245 27.325)",
+          "border": "oklch(0.880 0.025 210)",
+          "input": "oklch(0.880 0.025 210)",
+          "ring": "oklch(0.671 0.099 203.5)",
+          "table-header": "oklch(0.469 0.057 211.0)",
+          "table-header-foreground": "oklch(0.985 0 0)",
+          "sidebar": "oklch(0.370 0.050 215)",
+          "sidebar-foreground": "oklch(0.978 0.008 80)",
+          "sidebar-primary": "oklch(0.672 0.193 53.9)",
+          "sidebar-primary-foreground": "oklch(0.993 0 0)",
+          "sidebar-accent": "oklch(0.440 0.060 211)",
+          "sidebar-accent-foreground": "oklch(0.978 0.008 80)",
+          "sidebar-border": "oklch(0.440 0.045 215)",
+          "sidebar-ring": "oklch(0.671 0.099 203.5)",
+          "chart-1": "oklch(0.671 0.099 203.5)",
+          "chart-2": "oklch(0.672 0.193 53.9)",
+          "chart-3": "oklch(0.547 0.085 210.5)",
+          "chart-4": "oklch(0.456 0.075 215.3)",
+          "chart-5": "oklch(0.750 0.070 203)"
+        }
+      }
+    }
+  },
+  "defaults": {
+    "pages": {
+      "calls": true,
+      "reports": true,
+      "emails": true,
+      "transfers": true,
+      "sentry": true,
+      "webhooks": true
+    },
+    "columns": {
+      "calls": {},
+      "emails": {},
+      "transfers": {},
+      "webhooks": {},
+      "sentry": {}
+    },
+    "features": {
+      "aiReports": true,
+      "cekuraIntegration": true,
+      "chat": true,
+      "accurateTranscript": true,
+      "dynamicFilters": true,
+      "environmentSwitcher": true
+    },
+    "branding": {
+      "displayName": null,
+      "logoUrl": null,
+      "theme": null
+    }
+  }
+}

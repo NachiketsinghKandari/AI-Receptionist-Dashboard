@@ -20,6 +20,8 @@ import { formatUTCTimestamp } from '@/lib/formatting';
 import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/date-utils';
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { EMAIL_FILTER_FIELDS } from '@/lib/filter-fields';
+import { useClientConfig } from '@/hooks/use-client-config';
+import { filterColumns } from '@/lib/column-filter';
 
 const columns: ColumnDef<Email>[] = [
   {
@@ -86,6 +88,14 @@ const columns: ColumnDef<Email>[] = [
 ];
 
 export default function EmailsPage() {
+  const { config, isAdmin } = useClientConfig();
+
+  // Apply column visibility filtering from client config
+  const visibleColumns = useMemo(
+    () => isAdmin ? columns : filterColumns(columns, config?.columns.emails),
+    [isAdmin, config]
+  );
+
   // Shared date filter state from context
   const {
     dateFilterMode,
@@ -225,6 +235,9 @@ export default function EmailsPage() {
     if (hasNext) setSelectedEmail(dataArray[currentIndex + 1]);
   };
 
+  // Route guard: hide page if disabled for this client
+  if (!isAdmin && config && !config.pages.emails) return null;
+
   return (
     <div className="flex h-full">
       <ResponsiveFilterSidebar
@@ -242,12 +255,14 @@ export default function EmailsPage() {
         limit={limit}
         onLimitChange={setLimit}
         headerAction={
-          <DynamicFilterBuilder
-            fields={EMAIL_FILTER_FIELDS}
-            filters={dynamicFilters}
-            onFiltersChange={setDynamicFilters}
-            onApply={() => setOffset(0)}
-          />
+          (isAdmin || !config || config.features.dynamicFilters !== false) ? (
+            <DynamicFilterBuilder
+              fields={EMAIL_FILTER_FIELDS}
+              filters={dynamicFilters}
+              onFiltersChange={setDynamicFilters}
+              onApply={() => setOffset(0)}
+            />
+          ) : undefined
         }
       />
 
@@ -284,7 +299,7 @@ export default function EmailsPage() {
         {/* Table - scrollable */}
         <div className="flex-1 min-h-0">
           <DataTable
-            columns={columns}
+            columns={visibleColumns}
             data={data?.data ?? []}
             total={data?.total ?? 0}
             offset={offset}
