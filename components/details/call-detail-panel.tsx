@@ -1864,6 +1864,9 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
   const cekuraCallInfo = platformCallId ? cekuraData?.calls.get(platformCallId) : undefined;
   const errorMetrics = cekuraCallInfo?.errorMetrics || [];
 
+  // Resolve firm name from cached firms list (must be before early returns)
+  const { data: firmsData } = useFirms();
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -1886,9 +1889,6 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
 
   const { call } = data;
   const webhooksList = webhooks || [];
-
-  // Resolve firm name from cached firms list
-  const { data: firmsData } = useFirms();
   const firmName = firmsData?.firms?.find(f => f.id === call.firm_id)?.name || null;
 
   return (
