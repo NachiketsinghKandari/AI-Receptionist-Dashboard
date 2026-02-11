@@ -192,9 +192,9 @@ Return a JSON object with this exact structure:
     - corrected: The corrected text
     - source: One of "audio", "tool_call", "context_inference"
     - evidence: Brief explanation of why this correction was made
-- accuracy_score: Float 0.0-1.0 representing overall accuracy of the original transcription
+- accuracy_score: Float 0.0-1.0 representing overall accuracy of the original transcription. IMPORTANT: Only count MAJOR corrections when calculating this score — name errors, data errors, number errors, missing speech, and meaning changes. Do NOT penalize the score for minor issues like filler omissions, general word misheard that don't change meaning, or formatting differences.
 - total_utterances: Total number of utterances in the transcript
-- corrected_utterances: Number of utterances that required any correction
+- corrected_utterances: Number of utterances that required a MAJOR correction (name, data, number, missing speech, or meaning change). Do not count utterances that only have minor corrections like filler omissions or insignificant word differences.
 - correction_categories: Object counting corrections by type:
   - name_corrections: Person names, firm names, staff names misspelled or wrong
   - data_corrections: Factual data errors
