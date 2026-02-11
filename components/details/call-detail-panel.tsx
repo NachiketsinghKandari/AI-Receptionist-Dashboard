@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { useCallDetail } from '@/hooks/use-calls';
+import { useFirms } from '@/hooks/use-firms';
 import { useWebhooksForCall } from '@/hooks/use-webhooks';
 import { useSentryEventsForCall } from '@/hooks/use-sentry-events';
 import { useCekuraCallMapping, buildCekuraUrl, useCekuraFeedbackMutation } from '@/hooks/use-cekura';
@@ -1886,6 +1887,10 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
   const { call } = data;
   const webhooksList = webhooks || [];
 
+  // Resolve firm name from cached firms list
+  const { data: firmsData } = useFirms();
+  const firmName = firmsData?.firms?.find(f => f.id === call.firm_id)?.name || null;
+
   return (
     <div className="flex flex-col h-full p-4 space-y-4">
       {/* Audio Player */}
@@ -1908,6 +1913,7 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
         <TranscriptSection
           callId={callId}
           recordingUrl={call.recording_url}
+          firmName={firmName}
           transcription={call.transcription}
           webhooks={webhooksList}
           webhooksLoading={webhooksLoading}
@@ -2117,6 +2123,7 @@ function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, erro
 function TranscriptSection({
   callId,
   recordingUrl,
+  firmName,
   transcription,
   webhooks,
   webhooksLoading,
@@ -2125,6 +2132,7 @@ function TranscriptSection({
 }: {
   callId: number | string;
   recordingUrl: string | null;
+  firmName: string | null;
   transcription: string | null;
   webhooks: Webhook[];
   webhooksLoading: boolean;
@@ -2234,6 +2242,7 @@ function TranscriptSection({
                   callId,
                   recordingUrl,
                   webhookPayload: endOfCallPayload,
+                  firmName: firmName || undefined,
                 });
               }
             }}

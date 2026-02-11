@@ -141,7 +141,12 @@ function buildPrompt(
   toolCallContext: string,
   transferTranscripts: string,
   originalTranscript: string,
+  firmName?: string,
 ): string {
+  const firmNameSection = firmName
+    ? `\n## Firm Name (GROUND TRUTH)\nThis call was handled for the law firm: **${firmName}**. This is the correct spelling of the firm name. If the firm name is spoken in the call, ensure it is transcribed using this exact spelling.\n`
+    : '';
+
   return `You are a transcription accuracy evaluator for a law firm call routing system. Your job is to produce the most accurate transcript possible by combining multiple sources of information.
 
 ## Your Inputs
@@ -162,7 +167,7 @@ Listen to the entire audio recording and compare it against the original transcr
 5. **Inferring from context**: When the audio is genuinely ambiguous, use the full conversation context to determine what was most likely said.
 6. **Noting background speech**: If there is audible background speech, include it in brackets like [background: "..."].
 
-## Database Lookup Results (ABSOLUTE TRUTH)
+${firmNameSection}## Database Lookup Results (ABSOLUTE TRUTH)
 The following data was fetched from the database during the call. These are the DEFINITIVE correct values.
 
 ${toolCallContext}
@@ -239,6 +244,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = await request.json().catch(() => ({}));
     const recordingUrl = body.recordingUrl as string | undefined;
     const webhookPayload = body.webhookPayload as Record<string, unknown> | undefined;
+    const firmName = body.firmName as string | undefined;
 
     // Await params (required by Next.js 16 route signature)
     await params;
@@ -339,7 +345,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // 9. Call Gemini 3 Flash Preview with audio + text prompt
     const geminiClient = new GoogleGenAI({ apiKey: geminiApiKey });
-    const promptText = buildPrompt(toolCallContext, transferTranscripts, originalTranscript);
+    const promptText = buildPrompt(toolCallContext, transferTranscripts, originalTranscript, firmName);
 
     let geminiResponse;
     try {
