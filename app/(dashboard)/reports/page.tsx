@@ -777,7 +777,7 @@ export default function EODReportsPage() {
       </Drawer>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 pb-20 md:p-6 md:pb-6 overflow-hidden">
         {/* Header */}
         <div className="shrink-0">
           <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 flex items-center gap-2">
@@ -1045,22 +1045,20 @@ function EODReportDetailPanel({
               </ScrollArea>
             </TabsContent>
             <TabsContent value="reports" className="flex-1 min-h-0 mt-0 overflow-hidden">
-              <ScrollArea className="h-full">
-                <EODRightPanel
-                  report={report}
-                  onRetrySuccessReport={onRetrySuccessReport}
-                  onRetryFailureReport={onRetryFailureReport}
-                  onRetryFullReport={onRetryFullReport}
-                  isRetryingSuccess={isRetryingSuccess}
-                  isRetryingFailure={isRetryingFailure}
-                  isRetryingFull={isRetryingFull}
-                  successError={successError}
-                  failureError={failureError}
-                  fullError={fullError}
-                  isMobile
-                  hideSuccessFailure={isWeeklyReport}
-                />
-              </ScrollArea>
+              <EODRightPanel
+                report={report}
+                onRetrySuccessReport={onRetrySuccessReport}
+                onRetryFailureReport={onRetryFailureReport}
+                onRetryFullReport={onRetryFullReport}
+                isRetryingSuccess={isRetryingSuccess}
+                isRetryingFailure={isRetryingFailure}
+                isRetryingFull={isRetryingFull}
+                successError={successError}
+                failureError={failureError}
+                fullError={fullError}
+                isMobile
+                hideSuccessFailure={isWeeklyReport}
+              />
             </TabsContent>
           </Tabs>
         )}

@@ -314,9 +314,9 @@ export function PDFExportButton({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          <Printer className="h-4 w-4 mr-2" />
-          Print / Save PDF
-          <ChevronDown className="h-3 w-3 ml-1" />
+          <Printer className="h-4 w-4 md:mr-2" />
+          <span className="hidden md:inline">Print / Save PDF</span>
+          <ChevronDown className="h-3 w-3 md:ml-1" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

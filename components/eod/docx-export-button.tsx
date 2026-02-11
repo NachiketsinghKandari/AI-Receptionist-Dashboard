@@ -51,11 +51,11 @@ export function DocxExportButton({
       disabled={isExporting}
     >
       {isExporting ? (
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
       ) : (
-        <FileText className="h-4 w-4 mr-2" />
+        <FileText className="h-4 w-4 md:mr-2" />
       )}
-      Save as Doc
+      <span className="hidden md:inline">Save as Doc</span>
     </Button>
   );
 }
