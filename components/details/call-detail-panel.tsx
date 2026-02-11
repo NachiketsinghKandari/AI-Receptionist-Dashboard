@@ -1926,44 +1926,196 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
 }
 
 /**
- * Single bubble in the accurate transcript view.
- * Shows corrections inline with strikethrough for originals.
+ * Accurate transcript rendered in advanced-transcript style with timestamps, tool calls, etc.
+ * Merges webhook message structure with corrected utterance content from the accurate transcript.
  */
-function AccurateTranscriptBubble({ utterance }: { utterance: AccurateUtterance }) {
-  const isAssistant = utterance.role === 'assistant';
-  const hasCorrections = utterance.corrections.length > 0;
+function AccurateAdvancedTranscript({
+  messages,
+  transfers,
+  endedReason,
+  accurateUtterances,
+}: {
+  messages: WebhookMessage[];
+  transfers: TransferAttempt[];
+  endedReason?: string;
+  accurateUtterances: AccurateUtterance[];
+}) {
+  // Build tool results map (same as AdvancedTranscript)
+  const { toolResults, toolResultTimestamps } = useMemo(() => {
+    const results = new Map<string, string>();
+    const timestamps = new Map<string, number>();
+    for (const msg of messages) {
+      if (msg.role === 'tool_call_result' && msg.toolCallId) {
+        if (msg.result) results.set(msg.toolCallId, msg.result);
+        timestamps.set(msg.toolCallId, msg.secondsFromStart);
+      }
+    }
+    return { toolResults: results, toolResultTimestamps: timestamps };
+  }, [messages]);
+
+  // Build display messages (same as AdvancedTranscript)
+  const displayMessages = useMemo(() => {
+    const filtered = messages
+      .filter(msg => msg.role !== 'system' && msg.role !== 'tool_call_result')
+      .map(msg => {
+        if (msg.role === 'tool_calls' && msg.toolCalls && msg.toolCalls.length > 0) {
+          let latestResultTime = msg.secondsFromStart;
+          for (const tc of msg.toolCalls) {
+            const resultTime = toolResultTimestamps.get(tc.id);
+            if (resultTime !== undefined && resultTime > latestResultTime) {
+              latestResultTime = resultTime;
+            }
+          }
+          if (latestResultTime !== msg.secondsFromStart) {
+            return { ...msg, secondsFromStart: latestResultTime };
+          }
+        }
+        return msg;
+      });
+    return filtered.sort((a, b) => a.secondsFromStart - b.secondsFromStart);
+  }, [messages, toolResultTimestamps]);
+
+  // Build a map: for each bot/user message index, find the matching accurate utterance
+  const correctionMap = useMemo(() => {
+    const map = new Map<number, AccurateUtterance>();
+    let utteranceIdx = 0;
+    for (let i = 0; i < displayMessages.length; i++) {
+      const msg = displayMessages[i];
+      if ((msg.role === 'bot' || msg.role === 'user') && msg.message) {
+        if (utteranceIdx < accurateUtterances.length) {
+          map.set(i, accurateUtterances[utteranceIdx]);
+          utteranceIdx++;
+        }
+      }
+    }
+    return map;
+  }, [displayMessages, accurateUtterances]);
+
+  let transferCallIndex = 0;
 
   return (
-    <div className={cn('flex', isAssistant ? 'justify-start' : 'justify-end')}>
-      <div className={cn(
-        'max-w-[80%] px-3 py-2 rounded-lg text-sm',
-        isAssistant
-          ? 'bg-muted text-foreground rounded-bl-none'
-          : 'bg-primary text-primary-foreground rounded-br-none',
-        hasCorrections && 'ring-1 ring-emerald-500/30'
-      )}>
-        <span className="text-xs font-medium opacity-70 block mb-0.5">
-          {isAssistant ? 'Agent' : 'Caller'}
-          {hasCorrections && (
-            <span className="ml-1 text-emerald-500">
-              ({utterance.corrections.length} {utterance.corrections.length === 1 ? 'fix' : 'fixes'})
-            </span>
-          )}
-        </span>
-        <p>{utterance.content}</p>
-        {hasCorrections && (
-          <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
-            {utterance.corrections.map((c, i) => (
-              <div key={i} className="text-xs opacity-80">
-                <span className="line-through opacity-60">{c.original}</span>
-                {' \u2192 '}
-                <span className="font-medium">{c.corrected}</span>
-                <span className="opacity-50 ml-1">({c.source})</span>
+    <div className="space-y-2">
+      {displayMessages.map((msg, idx) => {
+        const timestamp = formatSecondsToTime(msg.secondsFromStart);
+
+        // Tool calls - render exactly like AdvancedTranscript
+        if (msg.role === 'tool_calls' && msg.toolCalls && msg.toolCalls.length > 0) {
+          const transferToolCalls = msg.toolCalls.filter(tc => tc.function.name === 'transfer_call');
+          const otherToolCalls = msg.toolCalls.filter(tc => tc.function.name !== 'transfer_call');
+
+          return (
+            <div key={idx}>
+              {otherToolCalls.map((tc) => (
+                <ToolCallCard
+                  key={tc.id}
+                  toolCall={tc}
+                  result={toolResults.get(tc.id)}
+                  timestamp={timestamp}
+                />
+              ))}
+              {transferToolCalls.map((tc) => {
+                const currentTransferIndex = transferCallIndex;
+                transferCallIndex++;
+                const transfer = transfers[currentTransferIndex];
+                return (
+                  <div key={tc.id}>
+                    <ToolCallCard
+                      toolCall={tc}
+                      result={toolResults.get(tc.id)}
+                      timestamp={timestamp}
+                    />
+                    {transfer && transfer.transcript && (
+                      <TransferConversationCard transfer={transfer} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
+        // Bot (Agent) messages - use corrected content if available
+        if (msg.role === 'bot' && msg.message) {
+          const accurate = correctionMap.get(idx);
+          const hasCorrections = accurate && accurate.corrections.length > 0;
+          return (
+            <div key={idx} className="flex justify-start">
+              <div className={cn(
+                "max-w-[75%] px-3 py-2 rounded-lg text-sm bg-muted text-foreground rounded-bl-none",
+                hasCorrections && "ring-1 ring-emerald-500/30"
+              )}>
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-xs font-medium opacity-70">
+                    Agent
+                    {hasCorrections && (
+                      <span className="ml-1 text-emerald-500">
+                        ({accurate.corrections.length} {accurate.corrections.length === 1 ? 'fix' : 'fixes'})
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono tabular-nums">{timestamp}</span>
+                </div>
+                {accurate ? accurate.content : msg.message}
+                {hasCorrections && (
+                  <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
+                    {accurate.corrections.map((c, i) => (
+                      <div key={i} className="text-xs opacity-80">
+                        <span className="line-through opacity-60">{c.original}</span>
+                        {' \u2192 '}
+                        <span className="font-medium">{c.corrected}</span>
+                        <span className="opacity-50 ml-1">({c.source})</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          );
+        }
+
+        // User (Caller) messages - use corrected content if available
+        if (msg.role === 'user' && msg.message) {
+          const accurate = correctionMap.get(idx);
+          const hasCorrections = accurate && accurate.corrections.length > 0;
+          return (
+            <div key={idx} className="flex justify-end">
+              <div className={cn(
+                "max-w-[75%] px-3 py-2 rounded-lg text-sm bg-primary text-primary-foreground rounded-br-none",
+                hasCorrections && "ring-1 ring-emerald-500/30"
+              )}>
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-xs font-medium opacity-70">
+                    Caller
+                    {hasCorrections && (
+                      <span className="ml-1 text-emerald-500">
+                        ({accurate.corrections.length} {accurate.corrections.length === 1 ? 'fix' : 'fixes'})
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] opacity-70 font-mono tabular-nums">{timestamp}</span>
+                </div>
+                {accurate ? accurate.content : msg.message}
+                {hasCorrections && (
+                  <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
+                    {accurate.corrections.map((c, i) => (
+                      <div key={i} className="text-xs opacity-80">
+                        <span className="line-through opacity-60">{c.original}</span>
+                        {' \u2192 '}
+                        <span className="font-medium">{c.corrected}</span>
+                        <span className="opacity-50 ml-1">({c.source})</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })}
+
+      {endedReason && <EndedReasonCard reason={endedReason} />}
     </div>
   );
 }
@@ -1972,13 +2124,16 @@ function AccurateTranscriptBubble({ utterance }: { utterance: AccurateUtterance 
  * Accurate transcript view with on-demand generation via Gemini AI.
  * Shows a generate button initially, loading state, error state, or the corrected transcript.
  */
-function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, error, reset }: {
+function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, error, reset, messages, transfers, endedReason }: {
   onGenerate: () => void;
   canGenerate: boolean;
   data: TranscriptionAccuracyResult | undefined;
   isPending: boolean;
   error: Error | null;
   reset: () => void;
+  messages: WebhookMessage[];
+  transfers: TransferAttempt[];
+  endedReason?: string;
 }) {
 
   if (!data && !isPending && !error) {
@@ -2107,12 +2262,13 @@ function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, erro
         </div>
       )}
 
-      {/* Transcript Messages */}
-      <div className="space-y-3">
-        {data.accurate_transcript.map((utterance, idx) => (
-          <AccurateTranscriptBubble key={idx} utterance={utterance} />
-        ))}
-      </div>
+      {/* Transcript Messages - Advanced-style with corrections */}
+      <AccurateAdvancedTranscript
+        messages={messages}
+        transfers={transfers}
+        endedReason={endedReason}
+        accurateUtterances={data.accurate_transcript}
+      />
     </div>
   );
 }
@@ -2236,6 +2392,9 @@ function TranscriptSection({
           </div>
         ) : mode === 'accurate' ? (
           <AccurateTranscriptView
+            messages={extractedData?.messages || []}
+            transfers={extractedData?.transfers || []}
+            endedReason={extractedData?.endedReason}
             onGenerate={() => {
               if (recordingUrl && endOfCallPayload) {
                 accurateTranscript.mutate({
