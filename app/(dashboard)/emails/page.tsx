@@ -41,7 +41,7 @@ const columns: ColumnDef<Email>[] = [
     accessorKey: 'subject',
     header: 'Subject',
     cell: ({ row }) => (
-      <span className="truncate max-w-[200px] block">{row.getValue('subject')}</span>
+      <span className="block">{row.getValue('subject')}</span>
     ),
   },
   {
@@ -50,7 +50,7 @@ const columns: ColumnDef<Email>[] = [
     cell: ({ row }) => {
       const recipients = row.getValue('recipients') as string[];
       return (
-        <div className="max-w-[180px]">
+        <div className="max-w-[250px] overflow-hidden">
           <RecipientsDisplay recipients={recipients} compact className="text-sm" />
         </div>
       );

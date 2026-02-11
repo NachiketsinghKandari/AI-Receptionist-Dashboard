@@ -23,7 +23,7 @@ export function RecipientsDisplay({ recipients, className, compact = false }: Re
 
   // If only one recipient, just show it
   if (recipientList.length === 1) {
-    return <span className={className}>{recipientList[0]}</span>;
+    return <span className={cn('truncate block', className)}>{recipientList[0]}</span>;
   }
 
   // Multiple recipients - show first with dropdown
@@ -35,7 +35,7 @@ export function RecipientsDisplay({ recipients, className, compact = false }: Re
       <PopoverTrigger asChild>
         <button
           className={cn(
-            'inline-flex items-center gap-1 text-left hover:text-primary transition-colors group',
+            'inline-flex items-center gap-1 text-left hover:text-primary transition-colors group max-w-full',
             className
           )}
         >
