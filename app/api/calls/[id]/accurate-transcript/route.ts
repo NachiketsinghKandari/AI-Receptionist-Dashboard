@@ -185,16 +185,16 @@ ${originalTranscript}
 Return a JSON object with this exact structure:
 - accurate_transcript: Array of utterance objects, each with:
   - role: "assistant" or "user"
-  - content: What was ACTUALLY spoken (from audio + context), including all umms, pauses, fillers
+  - content: What was ACTUALLY spoken (from audio + context), including all umms, pauses, fillers. This must be the most accurate version possible — fix EVERYTHING you find, no matter how minor.
   - original_transcription: What was originally transcribed by STT for this utterance
-  - corrections: Array of correction objects (empty if no corrections needed), each with:
+  - corrections: Array of ALL correction objects found for this utterance (empty if none needed). Include every correction — major and minor, names and fillers, everything. Each with:
     - original: The original incorrect text
     - corrected: The corrected text
     - source: One of "audio", "tool_call", "context_inference"
     - evidence: Brief explanation of why this correction was made
-- accuracy_score: Float 0.0-1.0 representing overall accuracy of the original transcription. IMPORTANT: Only count MAJOR corrections when calculating this score — name errors, data errors, number errors, missing speech, and meaning changes. Do NOT penalize the score for minor issues like filler omissions, general word misheard that don't change meaning, or formatting differences.
+- accuracy_score: Float 0.0-1.0 representing how accurate the original transcription was on things that MATTER. Only factor in major corrections: name errors, data errors, number errors, missing speech, and meaning changes. Do NOT penalize for filler omissions, minor word variants that preserve meaning, or formatting differences. A transcript that only missed some "um"s but got all names and data right should score very high.
 - total_utterances: Total number of utterances in the transcript
-- corrected_utterances: Number of utterances that required a MAJOR correction (name, data, number, missing speech, or meaning change). Do not count utterances that only have minor corrections like filler omissions or insignificant word differences.
+- corrected_utterances: Number of utterances that had at least one MAJOR correction (name, data, number, missing speech, or meaning change). Do NOT count utterances where the only corrections were minor (fillers, insignificant word differences).
 - correction_categories: Object counting corrections by type:
   - name_corrections: Person names, firm names, staff names misspelled or wrong
   - data_corrections: Factual data errors
