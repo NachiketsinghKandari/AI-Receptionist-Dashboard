@@ -6,9 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { getSupabaseClient } from '@/lib/supabase/client';
 import { authenticateRequest } from '@/lib/api/auth';
-import { errorResponse, parseEnvironment, decodeBase64Payload } from '@/lib/api/utils';
+import { errorResponse } from '@/lib/api/utils';
 import type { TranscriptionAccuracyResult } from '@/types/api';
 
 // DB lookup tools whose results are considered absolute ground truth
@@ -236,79 +235,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return errorResponse(auth.error || 'Unauthorized', 401, 'UNAUTHORIZED');
     }
 
-    // 2. Parse parameters
-    const { searchParams } = new URL(request.url);
-    const env = parseEnvironment(searchParams.get('env'));
-    const { id } = await params;
+    // 2. Parse request body
+    const body = await request.json().catch(() => ({}));
+    const recordingUrl = body.recordingUrl as string | undefined;
+    const webhookPayload = body.webhookPayload as Record<string, unknown> | undefined;
 
-    // Support both numeric ID and correlation ID (UUID format)
-    const isCorrelationId = id.includes('-') && id.length > 20;
-    const callId = isCorrelationId ? null : parseInt(id, 10);
-
-    if (!isCorrelationId && (callId === null || Number.isNaN(callId))) {
-      return errorResponse('Invalid call ID', 400, 'INVALID_CALL_ID');
-    }
-
-    const client = getSupabaseClient(env);
-
-    // 3. Fetch the call record
-    const callQuery = isCorrelationId
-      ? client.from('calls').select('*').eq('platform_call_id', id).single()
-      : client.from('calls').select('*').eq('id', callId).single();
-
-    const callResponse = await callQuery;
-
-    if (callResponse.error) {
-      console.error('Error fetching call:', callResponse.error);
-      return errorResponse('Call not found', 404, 'CALL_NOT_FOUND');
-    }
-
-    const call = callResponse.data;
-    const recordingUrl = call.recording_url as string | null;
-    const platformCallId = call.platform_call_id as string | null;
+    // Await params (required by Next.js 16 route signature)
+    await params;
 
     if (!recordingUrl) {
       return errorResponse(
-        'No recording URL available for this call',
+        'No recording URL provided',
         400,
         'NO_RECORDING_URL',
       );
     }
 
-    if (!platformCallId) {
+    if (!webhookPayload) {
       return errorResponse(
-        'No platform call ID available for this call',
-        400,
-        'NO_PLATFORM_CALL_ID',
-      );
-    }
-
-    // 4. Fetch end-of-call-report webhook
-    const webhookResponse = await client
-      .from('webhook_dumps')
-      .select('payload')
-      .eq('platform_call_id', platformCallId)
-      .eq('webhook_type', 'end-of-call-report')
-      .order('received_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (webhookResponse.error || !webhookResponse.data) {
-      console.error('Error fetching webhook:', webhookResponse.error);
-      return errorResponse(
-        'No webhook data available for transcript context',
+        'No webhook payload provided',
         400,
         'NO_WEBHOOK_DATA',
       );
     }
 
-    // Decode payload (may be compressed base64 or raw JSON)
-    const payload = typeof webhookResponse.data.payload === 'string'
-      ? decodeBase64Payload(webhookResponse.data.payload)
-      : (webhookResponse.data.payload as Record<string, unknown>) || {};
-
-    const message = payload.message as Record<string, unknown> | undefined;
-    const artifact = (message?.artifact ?? payload.artifact) as Record<string, unknown> | undefined;
+    // 3. Extract messages from the webhook payload
+    const message = webhookPayload.message as Record<string, unknown> | undefined;
+    const artifact = (message?.artifact ?? webhookPayload.artifact) as Record<string, unknown> | undefined;
 
     const messages = (
       (message?.messages as Record<string, unknown>[]) ??
@@ -318,20 +271,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (messages.length === 0) {
       return errorResponse(
-        'No webhook data available for transcript context',
+        'No message data available in webhook payload',
         400,
         'NO_WEBHOOK_DATA',
       );
     }
 
-    // 5. Build context strings
+    // 4. Build context strings
     const originalTranscript = buildOriginalTranscript(messages);
     const toolCallContext = buildToolCallContext(messages);
     const transferTranscripts = artifact
       ? buildTransferTranscripts(artifact)
       : 'No transfer conversations occurred.';
 
-    // 6. Download the audio file
+    // 5. Download the audio file
     let audioBuffer: ArrayBuffer;
     let audioMimeType: string;
 
@@ -362,7 +315,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 7. Validate audio size
+    // 6. Validate audio size
     if (audioBuffer.byteLength > MAX_AUDIO_SIZE_BYTES) {
       return errorResponse(
         `Audio file too large (${(audioBuffer.byteLength / 1024 / 1024).toFixed(1)} MB). Maximum is 20 MB.`,
@@ -371,10 +324,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 8. Encode audio as base64
+    // 7. Encode audio as base64
     const base64AudioData = Buffer.from(audioBuffer).toString('base64');
 
-    // 9. Check for Gemini API key
+    // 8. Check for Gemini API key
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
       return errorResponse(
@@ -384,7 +337,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 10. Call Gemini 3 Flash Preview with audio + text prompt
+    // 9. Call Gemini 3 Flash Preview with audio + text prompt
     const geminiClient = new GoogleGenAI({ apiKey: geminiApiKey });
     const promptText = buildPrompt(toolCallContext, transferTranscripts, originalTranscript);
 
@@ -416,7 +369,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 11. Parse and validate the response
+    // 10. Parse and validate the response
     const responseText = geminiResponse.text;
     if (!responseText) {
       return errorResponse(
@@ -448,7 +401,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 12. Return the result
+    // 11. Return the result
     return NextResponse.json({ result: parsedResult });
   } catch (error) {
     console.error('Accurate transcript API error:', error);

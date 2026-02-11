@@ -1907,6 +1907,7 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
       <div className="flex-1 min-h-0">
         <TranscriptSection
           callId={callId}
+          recordingUrl={call.recording_url}
           transcription={call.transcription}
           webhooks={webhooksList}
           webhooksLoading={webhooksLoading}
@@ -1965,9 +1966,9 @@ function AccurateTranscriptBubble({ utterance }: { utterance: AccurateUtterance 
  * Accurate transcript view with on-demand generation via Gemini AI.
  * Shows a generate button initially, loading state, error state, or the corrected transcript.
  */
-function AccurateTranscriptView({ callId, mutate, data, isPending, error, reset }: {
-  callId: number | string;
-  mutate: (callId: number | string) => void;
+function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, error, reset }: {
+  onGenerate: () => void;
+  canGenerate: boolean;
   data: TranscriptionAccuracyResult | undefined;
   isPending: boolean;
   error: Error | null;
@@ -1984,16 +1985,18 @@ function AccurateTranscriptView({ callId, mutate, data, isPending, error, reset 
         <div className="text-center space-y-2">
           <h3 className="text-sm font-medium">Accurate Transcript</h3>
           <p className="text-xs text-muted-foreground max-w-[300px]">
-            Generate a corrected transcript by analyzing the call audio with AI.
-            This compares the recording against the STT transcript to fix errors.
+            {canGenerate
+              ? 'Generate a corrected transcript by analyzing the call audio with AI. This compares the recording against the STT transcript to fix errors.'
+              : 'No recording or webhook data available for this call. An audio recording and end-of-call report are required to generate an accurate transcript.'}
           </p>
         </div>
         <Button
-          onClick={() => mutate(callId)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          onClick={onGenerate}
+          disabled={!canGenerate}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
         >
           <Sparkles className="h-4 w-4 mr-2" />
-          Generate Accurate Transcript
+          {canGenerate ? 'Generate Accurate Transcript' : 'No recording available'}
         </Button>
       </div>
     );
@@ -2113,6 +2116,7 @@ function AccurateTranscriptView({ callId, mutate, data, isPending, error, reset 
  */
 function TranscriptSection({
   callId,
+  recordingUrl,
   transcription,
   webhooks,
   webhooksLoading,
@@ -2120,6 +2124,7 @@ function TranscriptSection({
   errorMetricsLoading,
 }: {
   callId: number | string;
+  recordingUrl: string | null;
   transcription: string | null;
   webhooks: Webhook[];
   webhooksLoading: boolean;
@@ -2133,6 +2138,9 @@ function TranscriptSection({
     if (webhooksLoading) return null;
     return extractWebhookMessages(webhooks);
   }, [webhooks, webhooksLoading]);
+
+  const endOfCallWebhook = webhooks.find(w => w.webhook_type === 'end-of-call-report');
+  const endOfCallPayload = endOfCallWebhook?.payload || null;
 
   const hasAdvancedData = extractedData !== null && extractedData.messages.length > 0;
   const hasErrorMetrics = errorMetrics && errorMetrics.length > 0;
@@ -2220,8 +2228,16 @@ function TranscriptSection({
           </div>
         ) : mode === 'accurate' ? (
           <AccurateTranscriptView
-            callId={callId}
-            mutate={accurateTranscript.mutate}
+            onGenerate={() => {
+              if (recordingUrl && endOfCallPayload) {
+                accurateTranscript.mutate({
+                  callId,
+                  recordingUrl,
+                  webhookPayload: endOfCallPayload,
+                });
+              }
+            }}
+            canGenerate={!!recordingUrl && !!endOfCallPayload}
             data={accurateTranscript.data}
             isPending={accurateTranscript.isPending}
             error={accurateTranscript.error}
