@@ -1925,6 +1925,13 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
   );
 }
 
+/** Check if a correction is just phone number formatting (e.g. "941 770 6295" vs "941-770-6295") */
+function isFormatOnlyCorrection(original: string, corrected: string): boolean {
+  const origDigits = original.replace(/\D/g, '');
+  const corrDigits = corrected.replace(/\D/g, '');
+  return origDigits === corrDigits && origDigits.length >= 7 && origDigits.length <= 15;
+}
+
 /**
  * Accurate transcript rendered in advanced-transcript style with timestamps, tool calls, etc.
  * Merges webhook message structure with corrected utterance content from the accurate transcript.
@@ -2037,7 +2044,10 @@ function AccurateAdvancedTranscript({
         // Bot (Agent) messages - use corrected content if available
         if (msg.role === 'bot' && msg.message) {
           const accurate = correctionMap.get(idx);
-          const hasCorrections = accurate && accurate.corrections.length > 0;
+          const realCorrections = accurate
+            ? accurate.corrections.filter(c => !isFormatOnlyCorrection(c.original, c.corrected))
+            : [];
+          const hasCorrections = realCorrections.length > 0;
           return (
             <div key={idx} className="flex justify-start">
               <div className={cn(
@@ -2049,7 +2059,7 @@ function AccurateAdvancedTranscript({
                     Agent
                     {hasCorrections && (
                       <span className="ml-1 text-emerald-500">
-                        ({accurate.corrections.length} {accurate.corrections.length === 1 ? 'fix' : 'fixes'})
+                        ({realCorrections.length} {realCorrections.length === 1 ? 'fix' : 'fixes'})
                       </span>
                     )}
                   </span>
@@ -2058,7 +2068,7 @@ function AccurateAdvancedTranscript({
                 {accurate ? accurate.content : msg.message}
                 {hasCorrections && (
                   <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
-                    {accurate.corrections.map((c, i) => (
+                    {realCorrections.map((c, i) => (
                       <div key={i} className="text-xs opacity-80">
                         <span className="line-through opacity-60">{c.original}</span>
                         {' \u2192 '}
@@ -2076,7 +2086,10 @@ function AccurateAdvancedTranscript({
         // User (Caller) messages - use corrected content if available
         if (msg.role === 'user' && msg.message) {
           const accurate = correctionMap.get(idx);
-          const hasCorrections = accurate && accurate.corrections.length > 0;
+          const realCorrections = accurate
+            ? accurate.corrections.filter(c => !isFormatOnlyCorrection(c.original, c.corrected))
+            : [];
+          const hasCorrections = realCorrections.length > 0;
           return (
             <div key={idx} className="flex justify-end">
               <div className={cn(
@@ -2088,7 +2101,7 @@ function AccurateAdvancedTranscript({
                     Caller
                     {hasCorrections && (
                       <span className="ml-1 text-emerald-500">
-                        ({accurate.corrections.length} {accurate.corrections.length === 1 ? 'fix' : 'fixes'})
+                        ({realCorrections.length} {realCorrections.length === 1 ? 'fix' : 'fixes'})
                       </span>
                     )}
                   </span>
@@ -2097,7 +2110,7 @@ function AccurateAdvancedTranscript({
                 {accurate ? accurate.content : msg.message}
                 {hasCorrections && (
                   <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
-                    {accurate.corrections.map((c, i) => (
+                    {realCorrections.map((c, i) => (
                       <div key={i} className="text-xs opacity-80">
                         <span className="line-through opacity-60">{c.original}</span>
                         {' \u2192 '}
