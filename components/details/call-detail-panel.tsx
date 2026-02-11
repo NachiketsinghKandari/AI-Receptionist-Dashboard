@@ -2224,6 +2224,13 @@ function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, erro
             </span>
           </>
         )}
+        <div className="ml-auto">
+          <CopyButton
+            value={data.accurate_transcript
+              .map(u => `${u.role === 'assistant' ? 'Agent' : 'Caller'}: ${u.content}`)
+              .join('\n')}
+          />
+        </div>
       </div>
 
       {/* Correction Categories */}
