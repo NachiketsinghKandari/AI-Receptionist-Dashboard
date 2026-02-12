@@ -73,6 +73,28 @@
 							"path": ["api", "auth", "login"]
 						}
 					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "logout"]
+						}
+					}
+				},
+				{
+					"name": "Get Session",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/auth/session",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "session"]
+						}
+					}
 				}
 			]
 		},
@@ -84,7 +106,7 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/calls?env=staging&limit=20&offset=0&firmId=1&callType=inbound&startDate=2025-01-01&endDate=2025-01-31&search=example&sortBy=created_at&sortOrder=desc",
+							"raw": "{{base_url}}/api/calls?env=staging&limit=20&offset=0&firmId=1&callType=inbound&startDate=2025-01-01&endDate=2025-01-31&search=example&sortBy=id&sortOrder=desc&callTypeValues=inbound,outbound&callTypeUseUnion=true&transferType=warm&transferTypeValues=warm,cold&transferTypeUseIntersection=false&platformCallId=abc123&multipleTransfers=true&excludeTransferType=warm&excludeCallType=outbound&requireHasTransfer=true&toolCallResult=success&correlationIds=id1,id2&excludeCorrelationIds=id3&status=completed&statusValues=completed,failed&dynamicFilters={}",
 							"host": ["{{base_url}}"],
 							"path": ["api", "calls"],
 							"query": [
@@ -93,10 +115,26 @@
 								{ "key": "offset", "value": "0", "disabled": true },
 								{ "key": "firmId", "value": "1", "disabled": true },
 								{ "key": "callType", "value": "inbound", "disabled": true },
+								{ "key": "callTypeValues", "value": "inbound,outbound", "disabled": true },
+								{ "key": "callTypeUseUnion", "value": "true", "disabled": true },
+								{ "key": "transferType", "value": "warm", "disabled": true },
+								{ "key": "transferTypeValues", "value": "warm,cold", "disabled": true },
+								{ "key": "transferTypeUseIntersection", "value": "false", "disabled": true },
 								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
 								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
 								{ "key": "search", "value": "example", "disabled": true },
-								{ "key": "sortBy", "value": "created_at", "disabled": true },
+								{ "key": "platformCallId", "value": "abc123", "disabled": true },
+								{ "key": "multipleTransfers", "value": "true", "disabled": true },
+								{ "key": "excludeTransferType", "value": "warm", "disabled": true },
+								{ "key": "excludeCallType", "value": "outbound", "disabled": true },
+								{ "key": "requireHasTransfer", "value": "true", "disabled": true },
+								{ "key": "toolCallResult", "value": "success", "disabled": true },
+								{ "key": "correlationIds", "value": "id1,id2", "disabled": true },
+								{ "key": "excludeCorrelationIds", "value": "id3", "disabled": true },
+								{ "key": "status", "value": "completed", "disabled": true },
+								{ "key": "statusValues", "value": "completed,failed", "disabled": true },
+								{ "key": "dynamicFilters", "value": "{}", "disabled": true },
+								{ "key": "sortBy", "value": "id", "disabled": true },
 								{ "key": "sortOrder", "value": "desc", "disabled": true }
 							]
 						}
@@ -120,11 +158,49 @@
 					}
 				},
 				{
+					"name": "Get Date Range",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/calls/date-range?env=staging",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", "date-range"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true }
+							]
+						}
+					}
+				},
+				{
+					"name": "Request Accurate Transcript",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recordingUrl\": \"https://example.com/recording.wav\",\n  \"webhookPayload\": {},\n  \"firmName\": \"Example Firm\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/calls/:id/accurate-transcript",
+							"host": ["{{base_url}}"],
+							"path": ["api", "calls", ":id", "accurate-transcript"],
+							"variable": [
+								{ "key": "id", "value": "1" }
+							]
+						}
+					}
+				},
+				{
 					"name": "List Flagged Calls",
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/calls/flagged?env=staging&limit=20&offset=0&firmId=1&flagType=silence",
+							"raw": "{{base_url}}/api/calls/flagged?env=staging&limit=20&offset=0&firmId=1&flagType=sentry&startDate=2025-01-01&endDate=2025-01-31&search=example&sortBy=id&sortOrder=desc",
 							"host": ["{{base_url}}"],
 							"path": ["api", "calls", "flagged"],
 							"query": [
@@ -132,7 +208,12 @@
 								{ "key": "limit", "value": "20", "disabled": true },
 								{ "key": "offset", "value": "0", "disabled": true },
 								{ "key": "firmId", "value": "1", "disabled": true },
-								{ "key": "flagType", "value": "silence", "disabled": true }
+								{ "key": "flagType", "value": "sentry", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "search", "value": "example", "disabled": true },
+								{ "key": "sortBy", "value": "id", "disabled": true },
+								{ "key": "sortOrder", "value": "desc", "disabled": true }
 							]
 						}
 					}
@@ -194,7 +275,7 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/emails?env=staging&limit=20&offset=0&firmId=1&callId=1&search=example",
+							"raw": "{{base_url}}/api/emails?env=staging&limit=20&offset=0&firmId=1&callId=1&search=example&startDate=2025-01-01&endDate=2025-01-31&sortBy=id&sortOrder=desc&dynamicFilters={}",
 							"host": ["{{base_url}}"],
 							"path": ["api", "emails"],
 							"query": [
@@ -203,7 +284,12 @@
 								{ "key": "offset", "value": "0", "disabled": true },
 								{ "key": "firmId", "value": "1", "disabled": true },
 								{ "key": "callId", "value": "1", "disabled": true },
-								{ "key": "search", "value": "example", "disabled": true }
+								{ "key": "search", "value": "example", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "sortBy", "value": "id", "disabled": true },
+								{ "key": "sortOrder", "value": "desc", "disabled": true },
+								{ "key": "dynamicFilters", "value": "{}", "disabled": true }
 							]
 						}
 					}
@@ -218,7 +304,7 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/transfers?env=staging&limit=20&offset=0&firmId=1&callId=1&status=completed&transferType=warm",
+							"raw": "{{base_url}}/api/transfers?env=staging&limit=20&offset=0&firmId=1&callId=1&status=completed&transferType=warm&startDate=2025-01-01&endDate=2025-01-31&toolCallResult=success&dynamicFilters={}&sortBy=id&sortOrder=desc",
 							"host": ["{{base_url}}"],
 							"path": ["api", "transfers"],
 							"query": [
@@ -228,7 +314,13 @@
 								{ "key": "firmId", "value": "1", "disabled": true },
 								{ "key": "callId", "value": "1", "disabled": true },
 								{ "key": "status", "value": "completed", "disabled": true },
-								{ "key": "transferType", "value": "warm", "disabled": true }
+								{ "key": "transferType", "value": "warm", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "toolCallResult", "value": "success", "disabled": true },
+								{ "key": "dynamicFilters", "value": "{}", "disabled": true },
+								{ "key": "sortBy", "value": "id", "disabled": true },
+								{ "key": "sortOrder", "value": "desc", "disabled": true }
 							]
 						}
 					}
@@ -243,7 +335,7 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/webhooks?env=staging&limit=20&offset=0&platform=bland&callId=1&platformCallId=abc123",
+							"raw": "{{base_url}}/api/webhooks?env=staging&limit=20&offset=0&platform=bland&callId=1&platformCallId=abc123&startDate=2025-01-01&endDate=2025-01-31&multipleTransfers=true&sortBy=id&sortOrder=desc",
 							"host": ["{{base_url}}"],
 							"path": ["api", "webhooks"],
 							"query": [
@@ -252,7 +344,12 @@
 								{ "key": "offset", "value": "0", "disabled": true },
 								{ "key": "platform", "value": "bland", "disabled": true },
 								{ "key": "callId", "value": "1", "disabled": true },
-								{ "key": "platformCallId", "value": "abc123", "disabled": true }
+								{ "key": "platformCallId", "value": "abc123", "disabled": true },
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "multipleTransfers", "value": "true", "disabled": true },
+								{ "key": "sortBy", "value": "id", "disabled": true },
+								{ "key": "sortOrder", "value": "desc", "disabled": true }
 							]
 						}
 					}
@@ -267,13 +364,15 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/stats?env=staging&startDate=2025-01-01&endDate=2025-01-31",
+							"raw": "{{base_url}}/api/stats?env=staging&period=Today&chartStartDate=2025-01-01&chartEndDate=2025-01-31&isHourly=false",
 							"host": ["{{base_url}}"],
 							"path": ["api", "stats"],
 							"query": [
 								{ "key": "env", "value": "staging", "disabled": true },
-								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
-								{ "key": "endDate", "value": "2025-01-31", "disabled": true }
+								{ "key": "period", "value": "Today", "disabled": true },
+								{ "key": "chartStartDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "chartEndDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "isHourly", "value": "false", "disabled": true }
 							]
 						}
 					}
@@ -283,13 +382,12 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/stats/overview?env=staging&startDate=2025-01-01&endDate=2025-01-31",
+							"raw": "{{base_url}}/api/stats/overview?env=staging&period=Today",
 							"host": ["{{base_url}}"],
 							"path": ["api", "stats", "overview"],
 							"query": [
 								{ "key": "env", "value": "staging", "disabled": true },
-								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
-								{ "key": "endDate", "value": "2025-01-31", "disabled": true }
+								{ "key": "period", "value": "Today", "disabled": true }
 							]
 						}
 					}
@@ -299,13 +397,14 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/stats/chart?env=staging&startDate=2025-01-01&endDate=2025-01-31",
+							"raw": "{{base_url}}/api/stats/chart?env=staging&startDate=2025-01-01&endDate=2025-01-31&isHourly=false",
 							"host": ["{{base_url}}"],
 							"path": ["api", "stats", "chart"],
 							"query": [
 								{ "key": "env", "value": "staging", "disabled": true },
 								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
-								{ "key": "endDate", "value": "2025-01-31", "disabled": true }
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "isHourly", "value": "false", "disabled": true }
 							]
 						}
 					}
@@ -335,17 +434,38 @@
 			"name": "Sentry",
 			"item": [
 				{
+					"name": "Browse Sentry Issues",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/sentry/browse?eventType=error&level=error&search=example&sentryEnv=production&statsPeriod=7d",
+							"host": ["{{base_url}}"],
+							"path": ["api", "sentry", "browse"],
+							"query": [
+								{ "key": "eventType", "value": "error", "disabled": true },
+								{ "key": "level", "value": "error", "disabled": true },
+								{ "key": "search", "value": "example", "disabled": true },
+								{ "key": "sentryEnv", "value": "production", "disabled": true },
+								{ "key": "statsPeriod", "value": "7d", "disabled": true }
+							]
+						}
+					}
+				},
+				{
 					"name": "Get Sentry Events",
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/sentry/events?query=error&limit=20&cursor=",
+							"raw": "{{base_url}}/api/sentry/events?correlationId=abc123&query=error&limit=20&cursor=&environment=production&statsPeriod=7d",
 							"host": ["{{base_url}}"],
 							"path": ["api", "sentry", "events"],
 							"query": [
+								{ "key": "correlationId", "value": "abc123", "disabled": true },
 								{ "key": "query", "value": "error", "disabled": true },
 								{ "key": "limit", "value": "20", "disabled": true },
-								{ "key": "cursor", "value": "", "disabled": true }
+								{ "key": "cursor", "value": "", "disabled": true },
+								{ "key": "environment", "value": "production", "disabled": true },
+								{ "key": "statsPeriod", "value": "7d", "disabled": true }
 							]
 						}
 					}
@@ -355,27 +475,12 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/sentry/error-check?correlationId=abc123",
+							"raw": "{{base_url}}/api/sentry/error-check?environment=production&statsPeriod=7d",
 							"host": ["{{base_url}}"],
 							"path": ["api", "sentry", "error-check"],
 							"query": [
-								{ "key": "correlationId", "value": "abc123", "disabled": true }
-							]
-						}
-					}
-				},
-				{
-					"name": "Browse Sentry Issues",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/sentry/browse?query=error&limit=20&cursor=",
-							"host": ["{{base_url}}"],
-							"path": ["api", "sentry", "browse"],
-							"query": [
-								{ "key": "query", "value": "error", "disabled": true },
-								{ "key": "limit", "value": "20", "disabled": true },
-								{ "key": "cursor", "value": "", "disabled": true }
+								{ "key": "environment", "value": "production", "disabled": true },
+								{ "key": "statsPeriod", "value": "7d", "disabled": true }
 							]
 						}
 					}
@@ -390,13 +495,16 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/cekura/call-mapping?env=staging&limit=20&offset=0",
+							"raw": "{{base_url}}/api/cekura/call-mapping?startDate=2025-01-01&endDate=2025-01-31&environment=staging&page=1&pageSize=20&fetchAll=false",
 							"host": ["{{base_url}}"],
 							"path": ["api", "cekura", "call-mapping"],
 							"query": [
-								{ "key": "env", "value": "staging", "disabled": true },
-								{ "key": "limit", "value": "20", "disabled": true },
-								{ "key": "offset", "value": "0", "disabled": true }
+								{ "key": "startDate", "value": "2025-01-01", "disabled": true },
+								{ "key": "endDate", "value": "2025-01-31", "disabled": true },
+								{ "key": "environment", "value": "staging", "disabled": true },
+								{ "key": "page", "value": "1", "disabled": true },
+								{ "key": "pageSize", "value": "20", "disabled": true },
+								{ "key": "fetchAll", "value": "false", "disabled": true }
 							]
 						}
 					}
@@ -413,7 +521,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"id\": 1,\n  \"status\": \"reviewed\"\n}"
+							"raw": "{\n  \"cekuraId\": 1,\n  \"status\": \"reviewed_success\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/cekura/status",
@@ -434,7 +542,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"id\": 1,\n  \"feedback\": \"example feedback\"\n}"
+							"raw": "{\n  \"cekuraId\": 1,\n  \"feedback\": \"example feedback\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/cekura/feedback",
@@ -446,27 +554,90 @@
 			]
 		},
 		{
-			"name": "EOD Reports",
+			"name": "Reports",
 			"item": [
 				{
-					"name": "List EOD Reports",
+					"name": "List Reports",
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports?env=staging&limit=20&offset=0&reportDate=2025-01-15",
+							"raw": "{{base_url}}/api/reports?env=staging&firmId=1&reportType=eod&limit=20&offset=0&sortBy=id&sortOrder=desc",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports"],
+							"path": ["api", "reports"],
 							"query": [
 								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "firmId", "value": "1", "disabled": true },
+								{ "key": "reportType", "value": "eod", "disabled": true },
 								{ "key": "limit", "value": "20", "disabled": true },
 								{ "key": "offset", "value": "0", "disabled": true },
-								{ "key": "reportDate", "value": "2025-01-15", "disabled": true }
+								{ "key": "sortBy", "value": "id", "disabled": true },
+								{ "key": "sortOrder", "value": "desc", "disabled": true }
 							]
 						}
 					}
 				},
 				{
-					"name": "Create EOD Report",
+					"name": "Create Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"rawData\": {},\n  \"triggerType\": \"manual\",\n  \"reportType\": \"eod\",\n  \"firmId\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/reports",
+							"host": ["{{base_url}}"],
+							"path": ["api", "reports"]
+						}
+					}
+				},
+				{
+					"name": "Get Report by Date",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/reports/:date?env=staging&type=eod",
+							"host": ["{{base_url}}"],
+							"path": ["api", "reports", ":date"],
+							"query": [
+								{ "key": "env", "value": "staging", "disabled": true },
+								{ "key": "type", "value": "eod", "disabled": true }
+							],
+							"variable": [
+								{ "key": "date", "value": "15012025" }
+							]
+						}
+					}
+				},
+				{
+					"name": "AI Generate Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reportId\": 1,\n  \"rawData\": {},\n  \"reportType\": \"full\",\n  \"dataFormat\": \"json\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/reports/ai-generate",
+							"host": ["{{base_url}}"],
+							"path": ["api", "reports", "ai-generate"]
+						}
+					}
+				},
+				{
+					"name": "Payload Generate Report",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -480,14 +651,14 @@
 							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports",
+							"raw": "{{base_url}}/api/reports/payload-generate",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports"]
+							"path": ["api", "reports", "payload-generate"]
 						}
 					}
 				},
 				{
-					"name": "Generate EOD Report",
+					"name": "Weekly Generate Report",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -498,17 +669,17 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"reportDate\": \"2025-01-15\"\n}"
+							"raw": "{}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports/payload-generate",
+							"raw": "{{base_url}}/api/reports/weekly-generate",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports", "payload-generate"]
+							"path": ["api", "reports", "weekly-generate"]
 						}
 					}
 				},
 				{
-					"name": "AI Generate EOD Report",
+					"name": "Format Compare",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -519,12 +690,211 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"reportDate\": \"2025-01-15\",\n  \"reportType\": \"full\"\n}"
+							"raw": "{}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/eod-reports/ai-generate",
+							"raw": "{{base_url}}/api/reports/format-compare",
 							"host": ["{{base_url}}"],
-							"path": ["api", "eod-reports", "ai-generate"]
+							"path": ["api", "reports", "format-compare"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Chat",
+			"item": [
+				{
+					"name": "Send Chat Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"How many calls were made today?\"\n    }\n  ],\n  \"environment\": \"production\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat",
+							"host": ["{{base_url}}"],
+							"path": ["api", "chat"]
+						}
+					}
+				},
+				{
+					"name": "Get Chat History",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/chat/history",
+							"host": ["{{base_url}}"],
+							"path": ["api", "chat", "history"]
+						}
+					}
+				},
+				{
+					"name": "Save Chat Conversation",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"conversation\": {\n    \"id\": \"conv-123\",\n    \"messages\": [\n      {\n        \"role\": \"user\",\n        \"content\": \"How many calls were made today?\"\n      },\n      {\n        \"role\": \"assistant\",\n        \"content\": \"There were 42 calls made today.\"\n      }\n    ],\n    \"title\": \"Daily call count\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat/history",
+							"host": ["{{base_url}}"],
+							"path": ["api", "chat", "history"]
+						}
+					}
+				},
+				{
+					"name": "Rename Chat Conversation",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": \"conv-123\",\n  \"title\": \"Updated title\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat/history",
+							"host": ["{{base_url}}"],
+							"path": ["api", "chat", "history"]
+						}
+					}
+				},
+				{
+					"name": "Delete Chat Conversation",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{base_url}}/api/chat/history?id=conv-123",
+							"host": ["{{base_url}}"],
+							"path": ["api", "chat", "history"],
+							"query": [
+								{ "key": "id", "value": "conv-123", "disabled": true },
+								{ "key": "all", "value": "true", "disabled": true }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Get Admin Config",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/admin/config",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "config"]
+						}
+					}
+				},
+				{
+					"name": "Update Admin Config",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"key\": \"value\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/config",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "config"]
+						}
+					}
+				},
+				{
+					"name": "Get Firm Config",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/admin/config/:firmId",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "config", ":firmId"],
+							"variable": [
+								{ "key": "firmId", "value": "1" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Firm Config",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"key\": \"value\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/config/:firmId",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "config", ":firmId"],
+							"variable": [
+								{ "key": "firmId", "value": "1" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Firm Config",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{base_url}}/api/admin/config/:firmId",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "config", ":firmId"],
+							"variable": [
+								{ "key": "firmId", "value": "1" }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Client Config",
+			"item": [
+				{
+					"name": "Get Client Config",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/api/client-config",
+							"host": ["{{base_url}}"],
+							"path": ["api", "client-config"]
 						}
 					}
 				}

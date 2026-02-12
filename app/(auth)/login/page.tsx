@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,47 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { HelloCounselLogo } from '@/components/logo';
 import { createAuthBrowserClient } from '@/lib/supabase/auth-client';
 
-// Pre-computed wave heights to avoid hydration mismatch
-const WAVE_BARS = Array.from({ length: 60 }, (_, i) => ({
-  height: Math.round(Math.abs(Math.sin(i * 0.4) * 60 + Math.cos(i * 0.2) * 40 + 40)),
-  duration: 1.5 + (i % 4) * 0.3,
-  delay: Math.round(i * 0.03 * 100) / 100,
-}));
-
-function AudioWaveBackground() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional hydration check
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-      {/* Gradient fade for readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background/90" />
-
-      {/* Audio wave visualization at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-48 flex items-end justify-center gap-1 opacity-[0.08] dark:opacity-[0.04]">
-        {WAVE_BARS.map((bar, i) => (
-          <div
-            key={i}
-            className="w-1.5 bg-primary rounded-full animate-pulse"
-            style={{
-              height: `${bar.height}%`,
-              animationDuration: `${bar.duration}s`,
-              animationDelay: `${bar.delay}s`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Invalid email or password.',
@@ -241,7 +200,6 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative">
-      <AudioWaveBackground />
       <Suspense fallback={
         <Card className="w-full max-w-md mx-4 relative z-10">
           <CardHeader className="text-center">

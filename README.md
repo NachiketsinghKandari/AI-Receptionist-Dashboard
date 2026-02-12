@@ -12,7 +12,7 @@ A Next.js 16 dashboard application migrated from the Streamlit `unified_dashboar
 - **Auth:** JWT sessions with Supabase user authentication
 - **Database:** Supabase PostgreSQL
 - **Monitoring:** Sentry API integration (server-side proxy)
-- **AI/LLM:** OpenAI + Google Gemini (for report generation)
+- **AI/LLM:** OpenAI + Google Gemini (for reports, chat, and accurate transcripts)
 - **Call Observability:** Cekura integration
 - **PDF Export:** html2pdf.js
 - **Markdown:** react-markdown + remark-gfm + rehype-highlight
@@ -63,15 +63,21 @@ npm run build
 npm start
 ```
 
-## Default Users
+## Authentication
 
-Login credentials (from `lib/auth/config.ts`):
+This app uses Supabase email/password authentication. Credentials are managed through Supabase's auth system.
 
-| Username | Password | Access |
-|----------|----------|--------|
-| `admin` | `admin123` | Full access |
-| `dashboard_user` | `dash123` | Dashboard only |
-| `analytics_user` | `analytics123` | Analytics only |
+To set up initial users, configure them in your Supabase project's Authentication dashboard. Allowed emails can be restricted via the `ALLOWED_EMAILS` environment variable.
+
+## API Documentation
+
+A Postman collection is available at `postman/hellocounsel-dashboard-api.json`. Import it into Postman to explore all API endpoints.
+
+Collection variables to configure:
+- `base_url` -- Your server URL (default: `https://hellocounsel-dashboard.vercel.app`)
+- `email` -- Your login email
+- `password` -- Your login password
+- `access_token` -- Auto-populated after running the Login request
 
 ## Project Structure
 
@@ -88,17 +94,20 @@ Login credentials (from `lib/auth/config.ts`):
 │   │   ├── transfers/         # Transfers table
 │   │   ├── webhooks/          # Webhooks table
 │   │   ├── sentry/            # Sentry event search
-│   │   └── eod-reports/       # AI-powered end-of-day reports
+│   │   └── reports/           # AI-powered end-of-day reports
 │   └── api/                   # BFF API routes
 │       ├── auth/              # Login/logout/session
 │       ├── calls/             # Calls list, detail, flagged, important
 │       ├── cekura/            # Cekura call observability integration
+│       ├── chat/              # AI chat with streaming + conversation history
+│       ├── client-config/     # Client configuration endpoint
 │       ├── emails/            # Emails list
-│       ├── eod-reports/       # End-of-day report generation (including AI)
+│       ├── reports/           # End-of-day report generation (including AI)
 │       ├── transfers/         # Transfers list
 │       ├── webhooks/          # Webhooks list
 │       ├── firms/             # Firms dropdown
 │       ├── stats/             # KPI statistics (overview, chart)
+│       ├── admin/             # Admin panel configuration (per-firm theming)
 │       └── sentry/            # Sentry proxy (keeps tokens private)
 ├── components/
 │   ├── ui/                    # shadcn/ui components
@@ -107,6 +116,7 @@ Login credentials (from `lib/auth/config.ts`):
 │   ├── details/               # CallDetailPanel
 │   ├── filters/               # FilterSidebar
 │   ├── charts/                # KPICard, CallVolumeChart
+│   ├── chat/                  # AI chat panel, messages, history, charts
 │   ├── cekura/                # Cekura feedback and status components
 │   ├── email/                 # Email body display, recipients
 │   ├── eod/                   # Markdown report, PDF export
@@ -117,6 +127,10 @@ Login credentials (from `lib/auth/config.ts`):
 │   ├── use-transfers.ts       # Transfers data fetching
 │   ├── use-cekura.ts          # Cekura integration
 │   ├── use-eod-reports.ts     # End-of-day reports
+│   ├── use-chat.ts            # Chat data fetching
+│   ├── use-chat-history.ts    # Chat conversation history
+│   ├── use-client-config.ts   # Client configuration
+│   ├── use-accurate-transcript.ts # Gemini-powered accurate transcripts
 │   ├── use-flagged-calls.ts   # Flagged calls
 │   ├── use-is-mobile.ts       # Mobile detection
 │   └── ...                    # Additional hooks
@@ -124,6 +138,7 @@ Login credentials (from `lib/auth/config.ts`):
 │   ├── api/utils.ts           # API utilities (validation, error handling)
 │   ├── auth/                  # Auth config + session management + allowlist
 │   ├── supabase/              # Supabase client (auth-client, auth-server)
+│   ├── chat/                  # Gemini chat logic and streaming
 │   ├── sentry/                # Sentry API client (server-only)
 │   ├── llm/                   # LLM provider abstraction (OpenAI, Gemini)
 │   ├── eod/                   # End-of-day report generation logic
@@ -183,12 +198,23 @@ Login credentials (from `lib/auth/config.ts`):
   - Context/extra data
   - Exception info
 
-### EOD Reports Page (`/eod-reports`)
+### Reports Page (`/reports`)
 - AI-powered end-of-day report generation
 - Multiple LLM provider support (OpenAI, Gemini)
 - Markdown report rendering with syntax highlighting
 - PDF export functionality
 - Historical report viewing
+
+### Chat
+- AI-powered data analysis chat with Google Gemini
+- Streaming responses with real-time output
+- Conversation history (server-side persistence)
+- Inline chart and table rendering from query results
+- Accessible via a floating panel across all dashboard pages
+
+### Admin Panel (`/admin`)
+- Per-firm white-label theming configuration
+- Customize branding and appearance per firm
 
 ### Cekura Integration
 - Call observability and quality scoring
@@ -229,7 +255,7 @@ TanStack Query caching:
 Abstraction layer in `lib/llm/` supports multiple AI providers:
 - Pluggable provider interface (OpenAI, Gemini)
 - Graceful fallback and error handling
-- Used for AI-powered EOD report generation
+- Used for AI-powered report generation and chat
 
 ### Environment Switching
 `components/providers/environment-provider.tsx` enables switching between production and staging Supabase environments:
@@ -262,8 +288,9 @@ npm run lint     # Run ESLint
 | `SENTRY_PROJECT` | No | Sentry project slug |
 | `SENTRY_AUTH_TOKEN` | No | Sentry API auth token |
 | `OPENAI_API_KEY` | No | OpenAI API key (for AI report generation) |
-| `GOOGLE_AI_API_KEY` | No | Google Gemini API key (for AI report generation) |
+| `GEMINI_API_KEY` | No | Google Gemini API key (for chat, reports, and accurate transcripts) |
 | `CEKURA_API_KEY` | No | Cekura API key (for call observability) |
+| `ALLOWED_EMAILS` | No | Comma-separated list of allowed login emails |
 
 ## Migration from Streamlit
 
