@@ -63,14 +63,14 @@ const TOOLS: Tool[] = [
       {
         name: 'generate_chart',
         description:
-          'Generate a chart visualization from the most recent SQL result. Use after run_sql returns data.',
+          'Generate a chart from the most recent run_sql result. xKey and yKeys MUST exactly match column aliases returned by that query — any mismatch produces an empty chart.',
         parameters: {
           type: Type.OBJECT,
           properties: {
             type: {
               type: Type.STRING,
               enum: ['bar', 'line', 'pie'],
-              description: 'Chart type: bar, line, or pie',
+              description: 'Chart type: bar for comparisons/categories, line for time series, pie for proportions',
             },
             title: {
               type: Type.STRING,
@@ -78,12 +78,12 @@ const TOOLS: Tool[] = [
             },
             xKey: {
               type: Type.STRING,
-              description: 'Column name for the x-axis / labels',
+              description: 'Exact column alias from the SQL result to use for x-axis labels',
             },
             yKeys: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: 'Column name(s) for the y-axis / values',
+              description: 'Exact column alias(es) from the SQL result to use for y-axis values',
             },
           },
           required: ['type', 'title', 'xKey', 'yKeys'],
