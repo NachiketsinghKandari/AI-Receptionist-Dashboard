@@ -95,14 +95,16 @@ CREATE TABLE eod_reports (
 `.trim();
 
 export const SCHEMA_NOTES = `
-Key relationships:
-- calls.firm_id → firms.id
-- transfers_details.call_id → calls.id
-- transfers_details.firm_id → firms.id
-- email_logs.call_id → calls.id
-- email_logs.firm_id → firms.id
-- webhook_dumps.call_id → calls.id (nullable)
-- eod_reports.firm_id → firms.id
+Foreign keys (always use these for JOINs — never guess relationships):
+- calls.firm_id → firms.id (every call belongs to a firm)
+- transfers_details.call_id → calls.id (every transfer belongs to a call)
+- transfers_details.firm_id → firms.id (every transfer belongs to a firm)
+- email_logs.call_id → calls.id (every email was triggered by a call)
+- email_logs.firm_id → firms.id (every email belongs to a firm)
+- webhook_dumps.call_id → calls.id (nullable — some webhooks aren't tied to a call)
+- eod_reports.firm_id → firms.id (every report belongs to a firm)
+
+When the user mentions a firm name, caller, or any cross-table detail, JOIN through these foreign keys. Never assume a relationship that isn't listed here.
 
 Table selection guide (use this to decide which table to query):
 - "calls", "call volume", "callers", "phone calls", "duration", "how long", "call types" → calls table
@@ -112,15 +114,10 @@ Table selection guide (use this to decide which table to query):
 - "webhooks", "events", "payloads", "platform events", "vapi events" → webhook_dumps table
 - "reports", "EOD", "end of day", "daily report" → eod_reports table
 
-Common query patterns:
-- Join calls with firms using calls.firm_id = firms.id to get firm names
-- Join transfers_details with calls using transfers_details.call_id = calls.id to get caller info for a transfer
-- Filter by date range: use started_at (calls), transfer_started_at (transfers), sent_at (emails), received_at (webhooks)
-- Group by firm: JOIN with firms and GROUP BY firms.name
-- call_duration is in SECONDS — divide by 60 for minutes, by 3600 for hours
-- time_to_pickup_seconds is in SECONDS — this measures how fast a supervisor answered a transfer
-- Use DATE(started_at) or DATE_TRUNC('day', started_at) for daily aggregation
-- Use DATE_TRUNC('week', started_at) or DATE_TRUNC('month', started_at) for weekly/monthly rollups
-- For "today", use WHERE started_at >= CURRENT_DATE
-- For "last N days", use WHERE started_at >= NOW() - INTERVAL 'N days'
+Date patterns:
+- Filter by date: started_at (calls), transfer_started_at (transfers), sent_at (emails), received_at (webhooks)
+- Group by firm: JOIN firms ON firm_id = firms.id, GROUP BY firms.name
+- Daily/weekly/monthly: DATE_TRUNC('day', col), DATE_TRUNC('week', col), DATE_TRUNC('month', col)
+- "today" → WHERE col >= CURRENT_DATE
+- "last N days" → WHERE col >= NOW() - INTERVAL 'N days'
 `.trim();
