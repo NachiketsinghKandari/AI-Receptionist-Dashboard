@@ -56,4 +56,5 @@ next-env.d.ts
 scripts/
 misc-ignore/
 schema.sql
+.data/
 
