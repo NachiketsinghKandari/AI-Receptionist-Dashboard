@@ -55,10 +55,13 @@ export function useChat({ onMessagesChange }: UseChatOptions = {}) {
       const abortController = new AbortController();
       abortRef.current = abortController;
 
-      // Build messages payload (only role + content for the API)
+      // Build messages payload (include tool metadata for multi-turn context)
       const apiMessages = [...messages, userMessage].map((m) => ({
         role: m.role,
         content: m.content,
+        ...(m.sql && { sql: m.sql }),
+        ...(m.result && { result: m.result }),
+        ...(m.chart && { chart: m.chart }),
       }));
 
       try {

@@ -8,6 +8,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 import { streamChat } from '@/lib/chat/gemini-chat';
+import type { ChatMessagePayload } from '@/types/chat';
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -43,6 +44,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const validatedMessages: ChatMessagePayload[] = (messages as Record<string, unknown>[]).map(
+    (msg) => {
+      const payload: ChatMessagePayload = {
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content as string,
+      };
+      if (typeof msg.sql === 'string') payload.sql = msg.sql;
+      if (msg.result != null && typeof msg.result === 'object') payload.result = msg.result as ChatMessagePayload['result'];
+      if (msg.chart != null && typeof msg.chart === 'object') payload.chart = msg.chart as ChatMessagePayload['chart'];
+      return payload;
+    },
+  );
+
   const environment = parseEnvironment(envParam ?? null);
 
   // Create a readable stream of NDJSON events
@@ -50,10 +64,7 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of streamChat(
-          messages as { role: 'user' | 'assistant'; content: string }[],
-          environment,
-        )) {
+        for await (const event of streamChat(validatedMessages, environment)) {
           controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
         }
       } catch (err) {

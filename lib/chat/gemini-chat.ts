@@ -36,7 +36,7 @@
 import { GoogleGenAI, Type, ThinkingLevel, type Content, type Part, type Tool } from '@google/genai';
 import { validateSql } from './sql-validator';
 import { buildSystemPrompt } from './system-prompt';
-import type { SqlResult, ChartSpec, StreamEvent } from '@/types/chat';
+import type { SqlResult, ChartSpec, StreamEvent, ChatMessagePayload } from '@/types/chat';
 import type { Environment } from '@/lib/constants';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
@@ -48,7 +48,7 @@ const TOOLS: Tool[] = [
       {
         name: 'run_sql',
         description:
-          'Execute a read-only PostgreSQL SELECT query against the dashboard database. The query is validated for safety before execution.',
+          'Execute a read-only PostgreSQL SELECT query. Rules: (1) Only SELECT or WITH (CTE) allowed. (2) Always include LIMIT — default 100 for detail, max 1000 for aggregations. (3) Use explicit JOIN syntax with table aliases. (4) Never access system tables. The query is validated and rejected if unsafe.',
         parameters: {
           type: Type.OBJECT,
           properties: {
@@ -130,11 +130,90 @@ async function executeSql(
 }
 
 /**
+ * Reconstruct Gemini Content[] history from ChatMessagePayload[],
+ * re-inserting function call/response pairs for messages that used tools.
+ */
+function buildGeminiHistory(messages: ChatMessagePayload[]): Content[] {
+  const contents: Content[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'user') {
+      contents.push({ role: 'user', parts: [{ text: msg.content }] });
+      continue;
+    }
+
+    // Assistant message with tool data — reconstruct the function call round-trip
+    if (msg.sql && msg.result) {
+      // 1. Model called run_sql
+      const modelParts: Part[] = [
+        { functionCall: { name: 'run_sql', args: { sql: msg.sql } } },
+      ];
+
+      // If there's also a chart, model called generate_chart in the same turn
+      if (msg.chart) {
+        modelParts.push({
+          functionCall: {
+            name: 'generate_chart',
+            args: {
+              type: msg.chart.type,
+              title: msg.chart.title,
+              xKey: msg.chart.xKey,
+              yKeys: msg.chart.yKeys,
+            },
+          },
+        });
+      }
+
+      contents.push({ role: 'model', parts: modelParts });
+
+      // 2. Function responses (role: 'user' in Gemini's format)
+      const responseParts: Part[] = [
+        {
+          functionResponse: {
+            name: 'run_sql',
+            response: {
+              columns: msg.result.columns,
+              rowCount: msg.result.rowCount,
+              truncated: msg.result.truncated,
+              sampleRows: msg.result.rows.slice(0, 50),
+              ...(msg.result.rowCount > 50 && {
+                note: `Showing first 50 of ${msg.result.rowCount} rows. Analyze based on the full rowCount, not just the sample.`,
+              }),
+            },
+          },
+        },
+      ];
+
+      if (msg.chart) {
+        responseParts.push({
+          functionResponse: {
+            name: 'generate_chart',
+            response: { success: true },
+          },
+        });
+      }
+
+      contents.push({ role: 'user', parts: responseParts });
+
+      // 3. Model's text analysis
+      if (msg.content) {
+        contents.push({ role: 'model', parts: [{ text: msg.content }] });
+      }
+    } else {
+      // Plain assistant message (no tools)
+      contents.push({ role: 'model', parts: [{ text: msg.content }] });
+    }
+  }
+
+  return contents;
+}
+
+/**
  * Stream chat responses from Gemini with function calling.
  * Yields NDJSON StreamEvent objects.
  */
 export async function* streamChat(
-  messages: { role: 'user' | 'assistant'; content: string }[],
+  messages: ChatMessagePayload[],
   environment: Environment,
 ): AsyncGenerator<StreamEvent> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -146,11 +225,8 @@ export async function* streamChat(
 
   const genai = new GoogleGenAI({ apiKey });
 
-  // Build conversation history for Gemini
-  const contents: Content[] = messages.map((m) => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
+  // Build conversation history for Gemini (with tool-call reconstruction)
+  const contents: Content[] = buildGeminiHistory(messages);
 
   let lastSqlResult: SqlResult | undefined;
   let toolRounds = 0;
@@ -218,8 +294,10 @@ export async function* streamChat(
                     columns: result.columns,
                     rowCount: result.rowCount,
                     truncated: result.truncated,
-                    // Send sample rows to Gemini for analysis (first 50)
                     sampleRows: result.rows.slice(0, 50),
+                    ...(result.rowCount > 50 && {
+                      note: `Showing first 50 of ${result.rowCount} rows. Analyze based on the full rowCount, not just the sample.`,
+                    }),
                   },
                 },
               });

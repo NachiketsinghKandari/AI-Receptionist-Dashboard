@@ -28,6 +28,15 @@ export interface ChartSpec {
   data: Record<string, unknown>[];
 }
 
+/** Payload shape sent from the client to POST /api/chat */
+export interface ChatMessagePayload {
+  role: 'user' | 'assistant';
+  content: string;
+  sql?: string;
+  result?: SqlResult;
+  chart?: ChartSpec;
+}
+
 export interface Conversation {
   id: string;
   title: string;
