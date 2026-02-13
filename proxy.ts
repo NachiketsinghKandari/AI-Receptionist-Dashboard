@@ -66,14 +66,24 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    // API routes get JSON 401 instead of redirect (better for external tools)
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json(
-        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    return NextResponse.redirect(new URL('/login', request.url));
+    // Clear stale auth cookies to prevent "Invalid Refresh Token" loops.
+    // When a refresh token is revoked/expired server-side, the browser still
+    // holds the old sb-* cookies. Without clearing them, every subsequent
+    // request triggers a failed refresh attempt and an AuthApiError.
+    const staleResponse = pathname.startsWith('/api/')
+      ? NextResponse.json(
+          { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+          { status: 401 }
+        )
+      : NextResponse.redirect(new URL('/login', request.url));
+
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith('sb-')) {
+        staleResponse.cookies.delete(name);
+      }
+    });
+
+    return staleResponse;
   }
 
   return response;
