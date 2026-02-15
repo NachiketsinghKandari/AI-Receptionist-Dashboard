@@ -33,47 +33,32 @@ export function useChatHistory() {
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
 
-  // Debounced server persistence
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<Conversation | null>(null);
+  // Track in-flight save to coalesce rapid updates
+  const savingRef = useRef(false);
+  const queuedRef = useRef<Conversation | null>(null);
 
-  const flushPersist = useCallback(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    const conv = pendingRef.current;
-    if (conv) {
-      pendingRef.current = null;
-      api('/api/chat/history', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation: conv }),
-      });
+  /** Persist a conversation to the server immediately, coalescing rapid calls */
+  const persistNow = useCallback((conversation: Conversation) => {
+    if (savingRef.current) {
+      // A save is already in-flight — queue this one so it fires when the current finishes
+      queuedRef.current = conversation;
+      return;
     }
-  }, []);
 
-  const debouncedPersist = useCallback(
-    (conversation: Conversation) => {
-      pendingRef.current = conversation;
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(flushPersist, 1000);
-    },
-    [flushPersist],
-  );
-
-  // Flush pending save on unmount / page unload
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      const conv = pendingRef.current;
-      if (conv) {
-        pendingRef.current = null;
-        fetch('/api/chat/history', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation: conv }),
-          keepalive: true,
-        }).catch(() => {});
+    savingRef.current = true;
+    api('/api/chat/history', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation }),
+    }).finally(() => {
+      savingRef.current = false;
+      // If another save was queued while we were saving, fire it now
+      const queued = queuedRef.current;
+      if (queued) {
+        queuedRef.current = null;
+        persistNow(queued);
       }
-    };
+    });
   }, []);
 
   // Hydrate from server on mount
@@ -101,7 +86,7 @@ export function useChatHistory() {
           ),
         );
         const existing = conversationsRef.current.find((c) => c.id === activeId);
-        debouncedPersist({
+        persistNow({
           id: activeId,
           title,
           messages,
@@ -119,27 +104,25 @@ export function useChatHistory() {
         };
         setActiveId(newConv.id);
         setConversations((prev) => [newConv, ...prev]);
-        debouncedPersist(newConv);
+        persistNow(newConv);
       }
     },
-    [activeId, debouncedPersist],
+    [activeId, persistNow],
   );
 
   const loadConversation = useCallback(
     (id: string): ChatMessage[] | null => {
-      flushPersist();
       const conv = conversations.find((c) => c.id === id);
       if (!conv) return null;
       setActiveId(id);
       return conv.messages;
     },
-    [conversations, flushPersist],
+    [conversations],
   );
 
   const startNewChat = useCallback(() => {
-    flushPersist();
     setActiveId(null);
-  }, [flushPersist]);
+  }, []);
 
   const renameConversation = useCallback((id: string, newTitle: string) => {
     const trimmed = newTitle.trim();

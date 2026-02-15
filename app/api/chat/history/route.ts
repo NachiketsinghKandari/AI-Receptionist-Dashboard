@@ -1,5 +1,5 @@
 /**
- * Chat history CRUD API — server-side JSON file storage
+ * Chat history CRUD API — server-side CSV file storage
  *
  * GET    /api/chat/history           — list conversations for current user
  * PUT    /api/chat/history           — save / update a conversation
