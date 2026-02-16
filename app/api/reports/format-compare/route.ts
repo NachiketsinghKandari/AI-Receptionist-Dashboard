@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 import { buildReportInputData, formatInputData } from '@/lib/eod/generate-ai-report';
-import { getSupabaseClient } from '@/lib/supabase/client';
+import { ensureCloned, getReportsDb, getReportById } from '@/lib/sqlite/reports-db';
 import type { EODReportType } from '@/types/api';
 
 const VALID_REPORT_TYPES = new Set<EODReportType>(['success', 'failure', 'full', 'weekly']);
@@ -37,14 +37,11 @@ export async function POST(request: NextRequest) {
     // Fetch the report's raw_data from DB (or accept rawData from body for ad-hoc use)
     let rawData = body.rawData;
     if (!rawData && reportId) {
-      const supabase = getSupabaseClient(environment);
-      const { data: report, error } = await supabase
-        .from('reports')
-        .select('raw_data')
-        .eq('id', reportId)
-        .single<{ raw_data: Record<string, unknown> }>();
+      await ensureCloned(environment);
+      const db = getReportsDb(environment);
+      const report = getReportById(db, reportId);
 
-      if (error || !report) {
+      if (!report) {
         return errorResponse('Report not found', 404, 'NOT_FOUND');
       }
       rawData = report.raw_data;

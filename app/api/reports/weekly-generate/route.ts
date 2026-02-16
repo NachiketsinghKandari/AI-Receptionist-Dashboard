@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
-import { getSupabaseClient } from '@/lib/supabase/client';
+import { ensureCloned, getReportsDb, getReportsForWeeklyAggregation } from '@/lib/sqlite/reports-db';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import type {
   EODRawData,
@@ -41,33 +41,12 @@ export async function POST(request: NextRequest) {
     const weekStart = format(monday, 'yyyy-MM-dd');
     const weekEnd = format(sunday, 'yyyy-MM-dd');
 
-    const supabase = getSupabaseClient(environment);
+    await ensureCloned(environment);
+    const db = getReportsDb(environment);
 
-    // Query reports table for EOD reports in the date range
-    let query = supabase
-      .from('reports')
-      .select('*')
-      .gte('report_date', weekStart)
-      .lte('report_date', weekEnd);
+    const eodReports = getReportsForWeeklyAggregation(db, weekStart, weekEnd, firmId);
 
-    // Filter to only EOD reports (report_type is 'eod' or null for backward compat)
-    query = query.or('report_type.eq.eod,report_type.is.null');
-
-    // Filter by firmId using the dedicated column
-    if (firmId != null) {
-      query = query.eq('firm_id', firmId);
-    } else {
-      query = query.is('firm_id', null);
-    }
-
-    const { data: eodReports, error } = await query.order('report_date', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching EOD reports for weekly aggregation:', error);
-      return errorResponse('Failed to fetch EOD reports', 500, 'DB_ERROR');
-    }
-
-    if (!eodReports || eodReports.length === 0) {
+    if (eodReports.length === 0) {
       return errorResponse(
         `No EOD reports found for week ${weekStart} to ${weekEnd}`,
         404,

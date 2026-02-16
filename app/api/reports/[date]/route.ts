@@ -4,9 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase/client';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
+import { ensureCloned, getReportsDb, getReportByDateAndType } from '@/lib/sqlite/reports-db';
 
 export async function GET(
   request: NextRequest,
@@ -39,22 +39,13 @@ export async function GET(
       return errorResponse('Invalid date', 400, 'INVALID_DATE');
     }
 
-    const supabase = getSupabaseClient(environment);
+    await ensureCloned(environment);
+    const db = getReportsDb(environment);
 
-    // Fetch report by date and type
-    const { data, error } = await supabase
-      .from('reports')
-      .select('*')
-      .eq('report_date', reportDate)
-      .eq('report_type', reportType)
-      .single();
+    const data = getReportByDateAndType(db, reportDate, reportType);
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return errorResponse('Report not found', 404, 'NOT_FOUND');
-      }
-      console.error('Error fetching report:', error);
-      return errorResponse('Failed to fetch report', 500, 'DB_ERROR');
+    if (!data) {
+      return errorResponse('Report not found', 404, 'NOT_FOUND');
     }
 
     return NextResponse.json({ report: data });

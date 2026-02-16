@@ -58,3 +58,8 @@ misc-ignore/
 schema.sql
 .data/
 
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+

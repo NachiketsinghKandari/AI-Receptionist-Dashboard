@@ -5,6 +5,7 @@
 
 import { generateContent, type GeminiConfig, type LLMModel, type LLMProvider } from '@/lib/llm';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { ensureCloned, getReportsDb, updateReportColumns } from '@/lib/sqlite/reports-db';
 import type { Environment } from '@/lib/constants';
 import type { EODRawData, WeeklyRawData, EODReportType, EODCallRawData, DataFormat } from '@/types/api';
 import { encode as toonEncode } from '@toon-format/toon';
@@ -315,18 +316,12 @@ export async function generateAIReportForEOD(
         );
       }
 
-      const { error: updateError } = await supabase
-        .from('reports')
-        .update({
-          [COLUMN_MAP[reportType]]: aiResult.ai_response,
-          errors: weeklyData.failure_count,
-        })
-        .eq('id', reportId);
-
-      if (updateError) {
-        console.error('Error updating weekly report with AI results:', updateError);
-        return { success: false, error: 'Failed to save AI results' };
-      }
+      await ensureCloned(environment);
+      const reportsDb = getReportsDb(environment);
+      updateReportColumns(reportsDb, reportId, {
+        [COLUMN_MAP[reportType]]: aiResult.ai_response,
+        errors: weeklyData.failure_count,
+      });
 
       console.log(
         `AI weekly report generation completed for report ${reportId} using ${provider}/${model}`
@@ -348,15 +343,9 @@ export async function generateAIReportForEOD(
         ? 'No failed calls to analyze for this period.'
         : 'No calls to analyze for this period.';
 
-      const { error: updateError } = await supabase
-        .from('reports')
-        .update({ [COLUMN_MAP[reportType]]: emptyMessage })
-        .eq('id', reportId);
-
-      if (updateError) {
-        console.error('Error updating EOD report:', updateError);
-        return { success: false, error: 'Failed to save empty report' };
-      }
+      await ensureCloned(environment);
+      const emptyDb = getReportsDb(environment);
+      updateReportColumns(emptyDb, reportId, { [COLUMN_MAP[reportType]]: emptyMessage });
 
       console.log(`No ${reportType} calls for report ${reportId}, saved empty message`);
       return { success: true, reportType };
@@ -433,18 +422,12 @@ export async function generateAIReportForEOD(
       : (eodRawData.failure || []).length;
 
     // Update the appropriate column based on report type, and also update errors count
-    const { error: updateError } = await supabase
-      .from('reports')
-      .update({
-        [COLUMN_MAP[reportType]]: aiResult.ai_response,
-        errors: errorCount,
-      })
-      .eq('id', reportId);
-
-    if (updateError) {
-      console.error('Error updating EOD report with AI results:', updateError);
-      return { success: false, error: 'Failed to save AI results' };
-    }
+    await ensureCloned(environment);
+    const eodDb = getReportsDb(environment);
+    updateReportColumns(eodDb, reportId, {
+      [COLUMN_MAP[reportType]]: aiResult.ai_response,
+      errors: errorCount,
+    });
 
     console.log(
       `AI ${reportType} report generation completed for report ${reportId} using ${provider}/${model}`
