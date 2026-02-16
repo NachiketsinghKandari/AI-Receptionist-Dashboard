@@ -1,5 +1,5 @@
 /**
- * Chat history CRUD API — server-side CSV file storage
+ * Chat history CRUD API — Turso-backed conversation storage
  *
  * GET    /api/chat/history           — list conversations for current user
  * PUT    /api/chat/history           — save / update a conversation
@@ -33,7 +33,7 @@ export async function GET() {
   const userId = await getUserId();
   if (!userId) return errorResponse('Unauthorized', 401);
 
-  const conversations = getConversations(userId);
+  const conversations = await getConversations(userId);
   return NextResponse.json({ conversations });
 }
 
@@ -57,7 +57,7 @@ export async function PUT(request: NextRequest) {
     return errorResponse('conversation with id and messages is required', 400);
   }
 
-  saveConversation(userId, conversation);
+  await saveConversation(userId, conversation);
   return NextResponse.json({ ok: true });
 }
 
@@ -77,7 +77,7 @@ export async function PATCH(request: NextRequest) {
     return errorResponse('id and title are required', 400);
   }
 
-  const success = renameConversation(userId, id, title.trim());
+  const success = await renameConversation(userId, id, title.trim());
   if (!success) return errorResponse('Conversation not found', 404);
 
   return NextResponse.json({ ok: true });
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
   const all = searchParams.get('all');
 
   if (all === 'true') {
-    clearConversations(userId);
+    await clearConversations(userId);
     return NextResponse.json({ ok: true });
   }
 
@@ -100,7 +100,7 @@ export async function DELETE(request: NextRequest) {
     return errorResponse('id query param or all=true is required', 400);
   }
 
-  const success = deleteConversation(userId, id);
+  const success = await deleteConversation(userId, id);
   if (!success) return errorResponse('Conversation not found', 404);
 
   return NextResponse.json({ ok: true });

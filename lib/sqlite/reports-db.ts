@@ -4,10 +4,11 @@
  * On first access per environment, clones existing data from Supabase.
  */
 
-import { createClient, type Client, type Row } from '@libsql/client';
+import { type Row } from '@libsql/client';
 import crypto from 'crypto';
 import type { Environment } from '@/lib/constants';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { getTursoClient } from '@/lib/turso/client';
 
 // --- Types ---
 
@@ -34,23 +35,6 @@ interface ListReportsOptions {
   offset: number;
 }
 
-// --- Turso client singleton ---
-
-let client: Client | null = null;
-
-function getClient(): Client {
-  if (client) return client;
-
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
-
-  if (!url) throw new Error('TURSO_DATABASE_URL is not set');
-  if (!authToken) throw new Error('TURSO_AUTH_TOKEN is not set');
-
-  client = createClient({ url, authToken });
-  return client;
-}
-
 // --- Schema initialization ---
 
 let schemaInitialized = false;
@@ -58,7 +42,7 @@ let schemaInitialized = false;
 async function ensureSchema(): Promise<void> {
   if (schemaInitialized) return;
 
-  const db = getClient();
+  const db = getTursoClient();
   await db.batch(
     [
       {
@@ -103,7 +87,7 @@ export async function ensureCloned(environment: Environment): Promise<void> {
 
   if (clonedEnvironments.has(environment)) return;
 
-  const db = getClient();
+  const db = getTursoClient();
   const result = await db.execute({
     sql: 'SELECT COUNT(*) as cnt FROM reports WHERE environment = ?',
     args: [environment],
@@ -134,7 +118,7 @@ async function cloneFromSupabase(environment: Environment): Promise<void> {
   console.log(`[reports-db] Cloning reports from Supabase (${environment}) to Turso...`);
 
   const supabase = getSupabaseClient(environment);
-  const db = getClient();
+  const db = getTursoClient();
   const PAGE_SIZE = 500;
   let offset = 0;
   let total = 0;
@@ -228,7 +212,7 @@ export async function listReports(
   const safeSortBy = SORTABLE_COLUMNS.has(sortBy) ? sortBy : 'report_date';
   const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
-  const db = getClient();
+  const db = getTursoClient();
 
   const countResult = await db.execute({
     sql: `SELECT COUNT(*) as cnt FROM reports ${where}`,
@@ -251,7 +235,7 @@ export async function getReportByDateAndType(
   reportDate: string,
   reportType: string
 ): Promise<ReportRow | null> {
-  const db = getClient();
+  const db = getTursoClient();
   const result = await db.execute({
     sql: 'SELECT * FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? LIMIT 1',
     args: [environment, reportDate, reportType],
@@ -266,7 +250,7 @@ export async function findReportByDateTypeAndFirm(
   reportType: string,
   firmId: number | null
 ): Promise<{ id: string } | null> {
-  const db = getClient();
+  const db = getTursoClient();
   let result;
 
   if (firmId != null) {
@@ -303,7 +287,7 @@ export async function updateReport(
 
   if (fields.length === 0) return getReportById(id);
 
-  const db = getClient();
+  const db = getTursoClient();
   params.push(id);
   await db.execute({
     sql: `UPDATE reports SET ${fields.join(', ')} WHERE id = ?`,
@@ -320,7 +304,7 @@ export async function insertReport(
   const id = crypto.randomUUID();
   const rawData = JSON.stringify(data.raw_data);
 
-  const db = getClient();
+  const db = getTursoClient();
   await db.execute({
     sql: `INSERT INTO reports (id, environment, report_date, raw_data, generated_at, trigger_type, full_report, success_report, failure_report, report_type, errors, firm_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -357,7 +341,7 @@ export async function updateReportColumns(
 
   if (fields.length === 0) return;
 
-  const db = getClient();
+  const db = getTursoClient();
   params.push(id);
   await db.execute({
     sql: `UPDATE reports SET ${fields.join(', ')} WHERE id = ?`,
@@ -371,7 +355,7 @@ export async function getReportsForWeeklyAggregation(
   weekEnd: string,
   firmId: number | null | undefined
 ): Promise<ReportRow[]> {
-  const db = getClient();
+  const db = getTursoClient();
   let result;
 
   if (firmId != null) {
@@ -398,7 +382,7 @@ export async function getReportsForWeeklyAggregation(
 }
 
 export async function getReportById(id: string): Promise<ReportRow | null> {
-  const db = getClient();
+  const db = getTursoClient();
   const result = await db.execute({
     sql: 'SELECT * FROM reports WHERE id = ?',
     args: [id],

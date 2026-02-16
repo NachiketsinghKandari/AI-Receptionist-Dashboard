@@ -1,270 +1,156 @@
 /**
- * Server-side chat history store.
- * In-memory Map<userId, Conversation[]> backed by a CSV file on disk.
+ * Server-side chat history store backed by Turso (libSQL).
  *
- * CSV columns: userId, conversationId, title, messages (JSON), createdAt, updatedAt
+ * Table: conversations
+ *   id          TEXT PRIMARY KEY
+ *   user_id     TEXT NOT NULL
+ *   title       TEXT NOT NULL
+ *   messages    TEXT NOT NULL   (JSON-serialised ChatMessage[])
+ *   created_at  INTEGER NOT NULL
+ *   updated_at  INTEGER NOT NULL
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import { getTursoClient } from '@/lib/turso/client';
 import type { Conversation } from '@/types/chat';
 
-const DATA_DIR = join(process.cwd(), '.data');
-const STORE_FILE = join(DATA_DIR, 'chat-history.csv');
 const MAX_CONVERSATIONS_PER_USER = 50;
 
-const CSV_HEADER = 'userId,conversationId,title,messages,createdAt,updatedAt';
+// --- Schema ---
 
-/* ------------------------------------------------------------------ */
-/*  CSV helpers                                                        */
-/* ------------------------------------------------------------------ */
+let schemaReady = false;
 
-/** Escape a value for CSV — wraps in double-quotes if needed */
-function csvEscape(value: string): string {
-  if (
-    value.includes(',') ||
-    value.includes('"') ||
-    value.includes('\n') ||
-    value.includes('\r')
-  ) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
+async function ensureSchema(): Promise<void> {
+  if (schemaReady) return;
+
+  const db = getTursoClient();
+  await db.batch(
+    [
+      {
+        sql: `CREATE TABLE IF NOT EXISTS conversations (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          messages TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )`,
+        args: [],
+      },
+      {
+        sql: 'CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id)',
+        args: [],
+      },
+      {
+        sql: 'CREATE INDEX IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at)',
+        args: [],
+      },
+    ],
+    'write',
+  );
+
+  schemaReady = true;
 }
 
-/** Parse a single CSV row that may contain quoted fields with commas/newlines */
-function parseCsvRow(row: string): string[] {
-  const fields: string[] = [];
-  let i = 0;
+// --- Helpers ---
 
-  while (i <= row.length) {
-    if (i === row.length) {
-      // trailing comma → empty field
-      break;
-    }
-
-    if (row[i] === '"') {
-      // Quoted field
-      let value = '';
-      i++; // skip opening quote
-      while (i < row.length) {
-        if (row[i] === '"') {
-          if (i + 1 < row.length && row[i + 1] === '"') {
-            // Escaped double-quote
-            value += '"';
-            i += 2;
-          } else {
-            // Closing quote
-            i++; // skip closing quote
-            break;
-          }
-        } else {
-          value += row[i];
-          i++;
-        }
-      }
-      fields.push(value);
-      // Skip comma separator
-      if (i < row.length && row[i] === ',') i++;
-    } else {
-      // Unquoted field
-      const nextComma = row.indexOf(',', i);
-      if (nextComma === -1) {
-        fields.push(row.slice(i));
-        i = row.length;
-      } else {
-        fields.push(row.slice(i, nextComma));
-        i = nextComma + 1;
-      }
-    }
-  }
-
-  return fields;
+function rowToConversation(row: Record<string, unknown>): Conversation {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    messages: JSON.parse(row.messages as string),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
 }
 
-/**
- * Split CSV text into logical rows.
- * Handles newlines inside quoted fields correctly.
- */
-function splitCsvRows(text: string): string[] {
-  const rows: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-
-    if (ch === '"') {
-      if (inQuotes && i + 1 < text.length && text[i + 1] === '"') {
-        current += '""';
-        i++; // skip escaped quote
-      } else {
-        inQuotes = !inQuotes;
-        current += ch;
-      }
-    } else if (ch === '\n' && !inQuotes) {
-      if (current.trim()) rows.push(current);
-      current = '';
-    } else if (ch === '\r' && !inQuotes) {
-      // skip \r, the \n that follows will trigger row push
-    } else {
-      current += ch;
-    }
-  }
-
-  if (current.trim()) rows.push(current);
-  return rows;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Store internals                                                    */
-/* ------------------------------------------------------------------ */
-
-/** In-memory HashMap: userId → Conversation[] */
-let store: Map<string, Conversation[]> | null = null;
-
-function ensureLoaded(): Map<string, Conversation[]> {
-  if (store) return store;
-
-  store = new Map();
-
-  if (existsSync(STORE_FILE)) {
-    try {
-      const raw = readFileSync(STORE_FILE, 'utf-8');
-      const rows = splitCsvRows(raw);
-
-      // Skip header row
-      for (let r = 1; r < rows.length; r++) {
-        const fields = parseCsvRow(rows[r]);
-        if (fields.length < 6) continue;
-
-        const [userId, conversationId, title, messagesJson, createdAt, updatedAt] = fields;
-
-        let messages;
-        try {
-          messages = JSON.parse(messagesJson);
-        } catch {
-          continue; // skip corrupted row
-        }
-
-        const conversation: Conversation = {
-          id: conversationId,
-          title,
-          messages,
-          createdAt: Number(createdAt),
-          updatedAt: Number(updatedAt),
-        };
-
-        const existing = store.get(userId) ?? [];
-        existing.push(conversation);
-        store.set(userId, existing);
-      }
-    } catch {
-      // Corrupted file — start fresh
-      store = new Map();
-    }
-  }
-
-  return store;
-}
-
-function persistToDisk(): void {
-  const map = ensureLoaded();
-
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  const lines: string[] = [CSV_HEADER];
-
-  for (const [userId, conversations] of map) {
-    for (const conv of conversations) {
-      const messagesJson = JSON.stringify(conv.messages);
-      lines.push(
-        [
-          csvEscape(userId),
-          csvEscape(conv.id),
-          csvEscape(conv.title),
-          csvEscape(messagesJson),
-          String(conv.createdAt),
-          String(conv.updatedAt),
-        ].join(','),
-      );
-    }
-  }
-
-  writeFileSync(STORE_FILE, lines.join('\n') + '\n', 'utf-8');
-}
-
-/* ------------------------------------------------------------------ */
-/*  Public API                                                         */
-/* ------------------------------------------------------------------ */
+// --- Public API (all async) ---
 
 /** Get all conversations for a user, sorted by most recent first */
-export function getConversations(userId: string): Conversation[] {
-  const map = ensureLoaded();
-  const conversations = map.get(userId) ?? [];
-  return [...conversations].sort((a, b) => b.updatedAt - a.updatedAt);
+export async function getConversations(userId: string): Promise<Conversation[]> {
+  await ensureSchema();
+
+  const db = getTursoClient();
+  const result = await db.execute({
+    sql: 'SELECT * FROM conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?',
+    args: [userId, MAX_CONVERSATIONS_PER_USER],
+  });
+
+  return result.rows.map(rowToConversation);
 }
 
 /** Insert or update a conversation for a user */
-export function saveConversation(userId: string, conversation: Conversation): void {
-  const map = ensureLoaded();
-  const conversations = map.get(userId) ?? [];
+export async function saveConversation(userId: string, conversation: Conversation): Promise<void> {
+  await ensureSchema();
 
-  const idx = conversations.findIndex((c) => c.id === conversation.id);
-  if (idx >= 0) {
-    // Update existing — preserve original createdAt
-    conversations[idx] = { ...conversation, createdAt: conversations[idx].createdAt };
+  const db = getTursoClient();
+  const messagesJson = JSON.stringify(conversation.messages);
+
+  // Check if it already exists to preserve original createdAt
+  const existing = await db.execute({
+    sql: 'SELECT created_at FROM conversations WHERE id = ? AND user_id = ?',
+    args: [conversation.id, userId],
+  });
+
+  if (existing.rows.length > 0) {
+    // Update — keep original createdAt
+    await db.execute({
+      sql: 'UPDATE conversations SET title = ?, messages = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+      args: [conversation.title, messagesJson, conversation.updatedAt, conversation.id, userId],
+    });
   } else {
-    // Insert new at front
-    conversations.unshift(conversation);
-  }
+    // Insert new
+    await db.execute({
+      sql: 'INSERT INTO conversations (id, user_id, title, messages, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [conversation.id, userId, conversation.title, messagesJson, conversation.createdAt, conversation.updatedAt],
+    });
 
-  // Cap per-user conversations
-  map.set(userId, conversations.slice(0, MAX_CONVERSATIONS_PER_USER));
-  persistToDisk();
+    // Cap per-user conversations: delete oldest beyond the limit
+    await db.execute({
+      sql: `DELETE FROM conversations WHERE user_id = ? AND id NOT IN (
+        SELECT id FROM conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?
+      )`,
+      args: [userId, userId, MAX_CONVERSATIONS_PER_USER],
+    });
+  }
 }
 
 /** Rename a conversation. Returns false if not found. */
-export function renameConversation(
+export async function renameConversation(
   userId: string,
   conversationId: string,
   title: string,
-): boolean {
-  const map = ensureLoaded();
-  const conversations = map.get(userId);
-  if (!conversations) return false;
+): Promise<boolean> {
+  await ensureSchema();
 
-  const conv = conversations.find((c) => c.id === conversationId);
-  if (!conv) return false;
+  const db = getTursoClient();
+  const result = await db.execute({
+    sql: 'UPDATE conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+    args: [title, Date.now(), conversationId, userId],
+  });
 
-  conv.title = title;
-  conv.updatedAt = Date.now();
-  persistToDisk();
-  return true;
+  return (result.rowsAffected ?? 0) > 0;
 }
 
 /** Delete a single conversation. Returns false if not found. */
-export function deleteConversation(userId: string, conversationId: string): boolean {
-  const map = ensureLoaded();
-  const conversations = map.get(userId);
-  if (!conversations) return false;
+export async function deleteConversation(userId: string, conversationId: string): Promise<boolean> {
+  await ensureSchema();
 
-  const idx = conversations.findIndex((c) => c.id === conversationId);
-  if (idx < 0) return false;
+  const db = getTursoClient();
+  const result = await db.execute({
+    sql: 'DELETE FROM conversations WHERE id = ? AND user_id = ?',
+    args: [conversationId, userId],
+  });
 
-  conversations.splice(idx, 1);
-  if (conversations.length === 0) {
-    map.delete(userId);
-  }
-  persistToDisk();
-  return true;
+  return (result.rowsAffected ?? 0) > 0;
 }
 
 /** Delete all conversations for a user */
-export function clearConversations(userId: string): void {
-  const map = ensureLoaded();
-  map.delete(userId);
-  persistToDisk();
+export async function clearConversations(userId: string): Promise<void> {
+  await ensureSchema();
+
+  const db = getTursoClient();
+  await db.execute({
+    sql: 'DELETE FROM conversations WHERE user_id = ?',
+    args: [userId],
+  });
 }
