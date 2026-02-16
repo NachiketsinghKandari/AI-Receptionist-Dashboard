@@ -35,7 +35,7 @@ export async function logVisitToSheet(userId: string, email: string) {
   const auth = getOAuth2Client();
   const sheets = google.sheets({ version: 'v4', auth });
 
-  const timestamp = new Date().toISOString();
+  const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
