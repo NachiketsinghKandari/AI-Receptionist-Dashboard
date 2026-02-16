@@ -9,14 +9,18 @@ graph TD
     A[RootLayout] --> B[ThemeProvider]
     B --> C[DashboardLayout]
     C --> D[QueryProvider<br/>TanStack Query]
-    D --> E[EnvironmentProvider<br/>prod/staging]
-    E --> F[DateFilterProvider<br/>shared date state]
-    F --> G[Navbar + Page Content]
+    D --> E[AuthListenerProvider<br/>Supabase auth state]
+    E --> F[ClientConfigProvider<br/>per-firm config/branding]
+    F --> G[EnvironmentProvider<br/>prod/staging]
+    G --> H[DateFilterProvider<br/>shared date state]
+    H --> I[Navbar + Page Content]
 ```
 
 The nesting order is critical. Each provider depends on the outer providers:
 - ThemeProvider must wrap entire app for dark/light mode
 - QueryProvider must be in layout for client-side hooks
+- AuthListenerProvider monitors Supabase auth state changes
+- ClientConfigProvider fetches per-firm config and applies branding
 - EnvironmentProvider must wrap all data fetching
 - DateFilterProvider wraps pages that need shared date filtering
 
@@ -70,6 +74,68 @@ The nesting order is critical. Each provider depends on the outer providers:
 
 **Important:** Auth always uses staging Supabase. Only data queries respect this setting.
 
+### ThemeProvider (`components/providers/theme-provider.tsx`)
+
+**Purpose:** Wrapper around next-themes ThemeProvider for dark/light mode.
+
+**Configuration:**
+```typescript
+{
+  attribute: "class",
+  defaultTheme: "system",
+  enableSystem: true,
+  disableTransitionOnChange: true,
+}
+```
+
+**Supported themes:**
+- `light` - Light mode
+- `dark` - Dark mode
+- `system` - Match OS preference
+
+**Usage in components:**
+```typescript
+import { useTheme } from 'next-themes'
+
+const { theme, setTheme } = useTheme()
+```
+
+### ClientConfigProvider (`components/providers/client-config-provider.tsx`)
+
+**Purpose:** Fetches per-firm configuration from `/api/client-config` and applies firm-specific branding (CSS custom properties, document title, forced light theme for branded firms).
+
+**Context API:**
+```typescript
+{
+  config: ClientConfig | null;
+  isAdmin: boolean;
+  isLoading: boolean;
+}
+```
+
+**Behavior:**
+1. On mount: fetches `/api/client-config` to resolve the current user's config
+2. If branding is present, applies CSS variables (`--primary`, etc.) and updates `document.title`
+3. Forces light theme for branded firms (overrides user's dark mode preference)
+4. Provides `isAdmin` flag for admin-only UI gating
+
+**Used by:**
+- Admin layout (checks `isAdmin` for access control)
+- Navbar (conditional page links based on `pages` config)
+- Feature-gated components (chat, cekura, accurate transcript)
+
+### AuthListenerProvider (`components/providers/auth-listener-provider.tsx`)
+
+**Purpose:** Monitors Supabase auth state changes (login, logout, token refresh) and keeps the app in sync.
+
+**Behavior:**
+1. Subscribes to `supabase.auth.onAuthStateChange`
+2. On `SIGNED_OUT`: redirects to `/login`
+3. On `TOKEN_REFRESHED`: updates session cookies
+4. Cleans up subscription on unmount
+
+**Why a provider?** Auth state changes can happen outside of React (e.g., token expiry), so a global listener ensures the app always reacts.
+
 ### DateFilterProvider (`components/providers/date-filter-provider.tsx`)
 
 **Purpose:** Shared date range state across multiple dashboard pages.
@@ -103,32 +169,6 @@ The nesting order is critical. Each provider depends on the outer providers:
 - Home page (uses overview stats)
 
 **Persistence:** Survives page refresh and navigation.
-
-### ThemeProvider (`components/providers/theme-provider.tsx`)
-
-**Purpose:** Wrapper around next-themes ThemeProvider for dark/light mode.
-
-**Configuration:**
-```typescript
-{
-  attribute: "class",
-  defaultTheme: "system",
-  enableSystem: true,
-  disableTransitionOnChange: true,
-}
-```
-
-**Supported themes:**
-- `light` - Light mode
-- `dark` - Dark mode
-- `system` - Match OS preference
-
-**Usage in components:**
-```typescript
-import { useTheme } from 'next-themes'
-
-const { theme, setTheme } = useTheme()
-```
 
 ## Data Fetching Hooks
 
@@ -576,6 +616,147 @@ All report mutations invalidate `['reports', 'list']` on success:
 - `useGenerateWeeklyReport` - POST /api/reports/generate-weekly
 - `useGenerateWeeklyAIReport` - POST /api/reports/ai-generate (section=weekly)
 
+### useChat (`hooks/use-chat.ts`)
+
+**NOT TanStack Query** - Custom hook managing chat state with streaming support.
+
+**Purpose:** Chat state management with NDJSON streaming, abort support, and message accumulation.
+
+**Input:**
+```typescript
+{
+  onMessagesChange?: (messages: ChatMessage[]) => void;
+}
+```
+
+**Return type:**
+```typescript
+{
+  messages: ChatMessage[];
+  isLoading: boolean;
+  send: (content: string) => Promise<void>;
+  stop: () => void;
+  setMessages: (messages: ChatMessage[]) => void;
+}
+```
+
+**Behavior:**
+1. `send()` POSTs to `/api/chat` with current message history
+2. Reads NDJSON stream, accumulating `text`, `sql`, `result`, `chart`, `error` events into messages
+3. `stop()` aborts the in-progress request via AbortController
+4. Calls `onMessagesChange` callback after each update for auto-saving
+
+**Stream Event Handling:**
+- `text` events append to current assistant message content
+- `sql` events add a SQL code block to the message
+- `result` events add a data table to the message
+- `chart` events add a chart specification to the message
+- `error` events display error inline
+- `done` signals stream completion
+
+### useChatHistory (`hooks/use-chat-history.ts`)
+
+**Purpose:** Turso-backed conversation CRUD with coalesced auto-saving.
+
+**Return type:**
+```typescript
+{
+  conversations: Conversation[];
+  saveMessages: (id: string, title: string, messages: ChatMessage[]) => void;
+  loadConversation: (id: string) => Promise<Conversation>;
+  startNewChat: () => string;
+  renameConversation: (id: string, title: string) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
+  clearAll: () => Promise<void>;
+}
+```
+
+**API Endpoints:**
+- `GET /api/chat/history` - List conversations
+- `PUT /api/chat/history` - Save/update conversation
+- `PATCH /api/chat/history` - Rename conversation
+- `DELETE /api/chat/history` - Delete one or all conversations
+
+**Auto-Save:** `saveMessages` is coalesced (debounced) to avoid excessive API calls during streaming.
+
+### useClientConfig (`hooks/use-client-config.ts`)
+
+**API:** `GET /api/client-config`
+
+**Query key:** `['client-config']`
+
+**Stale time:** 300s (5 minutes)
+
+**Return type:**
+```typescript
+{
+  config: ClientConfig | null;
+  isAdmin: boolean;
+  isLoading: boolean;
+}
+```
+
+**Purpose:** Per-firm feature flags, page toggles, column visibility, and branding configuration.
+
+### useAccurateTranscript (`hooks/use-accurate-transcript.ts`)
+
+**Purpose:** TanStack mutation for Gemini-powered transcript correction.
+
+**API:** `POST /api/calls/[id]/accurate-transcript`
+
+**Input:**
+```typescript
+{
+  callId: number;
+  recordingUrl: string;
+  webhookPayload: object;
+  firmName?: string;
+  env: string;
+}
+```
+
+**Return type:** `TranscriptionAccuracyResult`
+
+**Usage:** Triggered from call detail panel to get corrected transcripts.
+
+### usePIIMask (`hooks/use-pii-mask.ts`)
+
+**NOT TanStack Query** - Pure utility hook.
+
+**Purpose:** PII masking functions for displaying sensitive data.
+
+**Return type:**
+```typescript
+{
+  maskName: (name: string) => string;
+  maskPhone: (phone: string) => string;
+  maskEmail: (email: string) => string;
+}
+```
+
+**Behavior:**
+- `maskName`: Replaces characters after first letter with asterisks
+- `maskPhone`: Shows only last 4 digits
+- `maskEmail`: Masks local part, shows domain
+
+### useCallDateRange (`hooks/use-calls.ts`)
+
+**API:** `GET /api/calls/date-range`
+
+**Query key:** `['calls', 'date-range', env]`
+
+**Stale time:** 60s
+
+**Return type:**
+```typescript
+{
+  minDate: string;  // ISO timestamp
+  maxDate: string;  // ISO timestamp
+}
+```
+
+**Purpose:** Get the earliest and latest call dates for date picker boundaries.
+
 ### useUser (`hooks/use-user.ts`)
 
 **NOT TanStack Query** - Uses useState + useEffect pattern.
@@ -695,6 +876,18 @@ const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 
 **Use case:** Share link to specific environment (e.g., staging report).
 
+### useIsLandscape
+
+**Purpose:** Detect landscape orientation on mobile devices.
+
+**Implementation:** Uses `useMediaQuery('(orientation: landscape)')` internally.
+
+**Return type:** `boolean`
+
+**SSR safe:** Returns `false` during SSR.
+
+**Usage:** Adjusts layout in mobile views (e.g., call detail panels).
+
 ### useDashboardPrefetch (`hooks/use-dashboard-prefetch.ts`)
 
 **Purpose:** Prefetch data for home page to eliminate loading spinners.
@@ -731,6 +924,9 @@ const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 | Reports | 60s | `['reports', 'list', env, filters]` | EOD/weekly reports |
 | Cekura | 60s | `['cekura', 'call-data', ...]` | Call quality data |
 | Flag counts | 60s | `['calls', 'flagged', 'count', env]` | Badge counts |
+| Client config | 300s | `['client-config']` | Per-firm feature flags |
+| Call date range | 60s | `['calls', 'date-range', env]` | Date picker boundaries |
+| Chat history | N/A | Manual fetch | Turso-backed, not cached in TQ |
 
 ## Query Invalidation Patterns
 

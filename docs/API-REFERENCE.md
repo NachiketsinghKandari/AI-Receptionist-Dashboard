@@ -17,6 +17,11 @@ All API routes follow the BFF (Backend-for-Frontend) pattern. External credentia
 - [Sentry API](#sentry-api)
 - [Cekura API](#cekura-api)
 - [Reports API](#reports-api)
+- [Chat API](#chat-api)
+- [Admin Config API](#admin-config-api)
+- [Client Config API](#client-config-api)
+- [Analytics API](#analytics-api)
+- [Accurate Transcript API](#accurate-transcript-api)
 - [Cross-Cutting Concerns](#cross-cutting-concerns)
 
 ## Authentication
@@ -400,6 +405,67 @@ Get list of call IDs with transfer/email mismatch issues.
   "callIds": [number]
 }
 ```
+
+---
+
+### GET `/api/calls/date-range`
+
+Get the minimum and maximum call dates in the database.
+
+**Authentication**: Required
+
+**Query Parameters**:
+- `env` - Environment (default: `production`)
+
+**Response** (200):
+```json
+{
+  "minDate": "ISO timestamp",
+  "maxDate": "ISO timestamp"
+}
+```
+
+---
+
+### POST `/api/calls/[id]/accurate-transcript`
+
+Generate an accurate transcript correction using Gemini.
+
+**Authentication**: Required
+
+**URL Parameters**:
+- `id` - Call ID
+
+**Request Body**:
+```json
+{
+  "recordingUrl": "string",
+  "webhookPayload": {},
+  "firmName": "string (optional)",
+  "env": "production | staging"
+}
+```
+
+**Response** (200):
+```json
+{
+  "result": {
+    "correctedTranscript": "string",
+    "corrections": [
+      {
+        "original": "string",
+        "corrected": "string",
+        "reason": "string"
+      }
+    ],
+    "confidence": number
+  }
+}
+```
+
+**Error Codes**:
+- `400` - Missing required fields
+- `500` - Transcription error
 
 ---
 
@@ -1185,6 +1251,358 @@ Compare JSON vs Toon format for AI report generation.
 - `400` - Missing required fields or invalid reportType
 - `404` - Report not found (when using reportId)
 - `500` - Comparison error
+
+---
+
+## Chat API
+
+### POST `/api/chat`
+
+Send a message and receive a streaming NDJSON response with Gemini function calling.
+
+**Authentication**: Required
+
+**Request Body**:
+```json
+{
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string"
+    }
+  ],
+  "environment": "production | staging (optional, default: production)"
+}
+```
+
+**Response**: Streaming NDJSON (newline-delimited JSON). Each line is a JSON object with a `type` field:
+
+```
+{"type": "text", "content": "Here are the results..."}
+{"type": "sql", "query": "SELECT ..."}
+{"type": "result", "data": [...], "rowCount": 5}
+{"type": "chart", "spec": {"type": "bar", "data": [...], ...}}
+{"type": "error", "message": "Error description"}
+{"type": "done"}
+```
+
+**Event Types**:
+- `text` - Natural language text from Gemini
+- `sql` - SQL query being executed (for transparency)
+- `result` - Query result data
+- `chart` - Chart specification for client-side rendering
+- `error` - Error during processing
+- `done` - Stream complete
+
+**Behavior**:
+- Gemini function calling with `run_sql` and `generate_chart` tools
+- SQL validated to be SELECT-only (no mutations allowed)
+- SQL executed via Supabase RPC `execute_readonly_sql`
+- Max 8 rounds of function calling per request
+- Chat message logged to Google Sheets (fire-and-forget)
+
+**Error Codes**:
+- `400` - Missing or invalid messages
+- `401` - Unauthorized
+- `500` - Gemini API or SQL execution error
+
+---
+
+### GET `/api/chat/history`
+
+List all saved conversations.
+
+**Authentication**: Required
+
+**Response** (200):
+```json
+{
+  "conversations": [
+    {
+      "id": "string",
+      "title": "string",
+      "messages": [],
+      "createdAt": "ISO timestamp",
+      "updatedAt": "ISO timestamp"
+    }
+  ]
+}
+```
+
+---
+
+### PUT `/api/chat/history`
+
+Save or update a conversation.
+
+**Authentication**: Required
+
+**Request Body**:
+```json
+{
+  "id": "string",
+  "title": "string",
+  "messages": [
+    {
+      "role": "user | assistant",
+      "content": "string"
+    }
+  ]
+}
+```
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### PATCH `/api/chat/history`
+
+Rename a conversation.
+
+**Authentication**: Required
+
+**Request Body**:
+```json
+{
+  "id": "string",
+  "title": "string"
+}
+```
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### DELETE `/api/chat/history`
+
+Delete one or all conversations.
+
+**Authentication**: Required
+
+**Query Parameters**:
+- `id` - Conversation ID to delete (mutually exclusive with `all`)
+- `all` - Set to `true` to delete all conversations
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+**Error Codes**:
+- `400` - Must provide either `id` or `all=true`
+
+---
+
+## Admin Config API
+
+### GET `/api/admin/config`
+
+Get the full client configuration (admin only).
+
+**Authentication**: Required (admin only)
+
+**Response** (200):
+```json
+{
+  "adminDomains": ["string"],
+  "userFirmMappings": {
+    "email@example.com": "firmId"
+  },
+  "defaults": {
+    "pages": {},
+    "columns": {},
+    "features": {}
+  },
+  "firms": {
+    "firmId": {
+      "pages": {},
+      "columns": {},
+      "features": {},
+      "branding": {}
+    }
+  }
+}
+```
+
+**Error Codes**:
+- `403` - Not an admin user
+
+---
+
+### PUT `/api/admin/config`
+
+Update global configuration settings (admin only).
+
+**Authentication**: Required (admin only)
+
+**Request Body**:
+```json
+{
+  "adminDomains": ["string"],
+  "userFirmMappings": {},
+  "defaults": {}
+}
+```
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### GET `/api/admin/config/[firmId]`
+
+Get configuration for a specific firm.
+
+**Authentication**: Required (admin only)
+
+**URL Parameters**:
+- `firmId` - Firm identifier
+
+**Response** (200):
+```json
+{
+  "pages": {},
+  "columns": {},
+  "features": {},
+  "branding": {
+    "primaryColor": "string",
+    "logoUrl": "string",
+    "displayName": "string"
+  }
+}
+```
+
+---
+
+### PUT `/api/admin/config/[firmId]`
+
+Save configuration for a specific firm.
+
+**Authentication**: Required (admin only)
+
+**Request Body**: FirmConfig object
+```json
+{
+  "pages": {},
+  "columns": {},
+  "features": {},
+  "branding": {}
+}
+```
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### DELETE `/api/admin/config/[firmId]`
+
+Remove a firm-specific configuration (falls back to defaults).
+
+**Authentication**: Required (admin only)
+
+**URL Parameters**:
+- `firmId` - Firm identifier
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Client Config API
+
+### GET `/api/client-config`
+
+Get the resolved configuration for the current user. Resolves based on admin domain check, user-firm mapping, and defaults.
+
+**Authentication**: Required
+
+**Response** (200):
+```json
+{
+  "isAdmin": true,
+  "firmId": "string | null",
+  "pages": {
+    "calls": true,
+    "emails": true,
+    "transfers": true,
+    "webhooks": true,
+    "sentry": true,
+    "reports": true,
+    "admin": false
+  },
+  "columns": {},
+  "features": {
+    "chat": true,
+    "cekura": true,
+    "accurateTranscript": false
+  },
+  "branding": {
+    "primaryColor": "string | null",
+    "logoUrl": "string | null",
+    "displayName": "string | null"
+  }
+}
+```
+
+---
+
+## Analytics API
+
+### POST `/api/analytics/log-visit`
+
+Log a dashboard visit to Google Sheets.
+
+**Authentication**: Required
+
+**Request Body**:
+```json
+{
+  "userEmail": "string",
+  "page": "string (optional)"
+}
+```
+
+**Response** (200):
+```json
+{
+  "success": true
+}
+```
+
+**Notes**:
+- Timestamps are logged in IST (Indian Standard Time)
+- Fire-and-forget pattern; errors are logged but do not fail the request
+
+---
+
+## Accurate Transcript API
+
+See [POST `/api/calls/[id]/accurate-transcript`](#post-apicallsidaccurate-transcript) under Calls API.
 
 ---
 

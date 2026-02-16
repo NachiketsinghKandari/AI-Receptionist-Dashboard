@@ -5,10 +5,12 @@ This document traces the complete data pipeline for each page in the AI Receptio
 ## Shared Infrastructure
 
 All dashboard pages share:
-- **Dashboard Layout** (`app/(dashboard)/layout.tsx`): Wraps pages in QueryProvider > EnvironmentProvider > DateFilterProvider > Navbar + main content
-- **Navbar** (`components/layout/navbar.tsx`): Fetches user session via `GET /api/auth/session`, handles logout via `POST /api/auth/logout`, includes environment switcher (prod/staging)
+- **Dashboard Layout** (`app/(dashboard)/layout.tsx`): Wraps pages in QueryProvider > AuthListenerProvider > ClientConfigProvider > EnvironmentProvider > DateFilterProvider > Navbar + main content
+- **Navbar** (`components/layout/navbar.tsx`): Fetches user session via `GET /api/auth/session`, handles logout via `POST /api/auth/logout`, includes environment switcher (prod/staging). Page links are conditional based on `useClientConfig` page toggles.
 - **Date Filter Context**: Shared `dateFilterMode` (today/yesterday/custom/all) + start/end dates across Calls, Emails, Transfers, Webhooks pages. Persisted in localStorage.
 - **Environment Context**: Prod/staging toggle. Stored in localStorage. All hooks pass `?env=` param to API routes. Switching invalidates ALL query caches.
+- **Client Config Context**: Per-firm feature flags, page visibility, column toggles, and branding. Fetched from `/api/client-config` on mount.
+- **Auth Listener**: Monitors Supabase auth state changes (token refresh, sign out) to keep the app in sync.
 
 ---
 
@@ -717,6 +719,192 @@ On page load, `useSyncReportFromUrl()` opens the detail panel if URL params are 
 
 ---
 
+## 8. Admin Page (`/admin`)
+
+**File**: `app/(dashboard)/admin/page.tsx`
+
+**Purpose**: Admin-only configuration management for per-firm settings, page/column/feature toggles, and branding.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant AdminLayout
+    participant AdminPage
+    participant useClientConfig
+    participant API as API Routes
+    participant ConfigFile as config/client-configs.json
+
+    User->>AdminLayout: Navigate to /admin
+    AdminLayout->>useClientConfig: Check isAdmin
+    useClientConfig->>API: GET /api/client-config
+    API-->>useClientConfig: { isAdmin, ... }
+
+    alt Not Admin
+        useClientConfig-->>AdminLayout: isAdmin = false
+        AdminLayout->>User: Redirect to /
+    else Admin
+        useClientConfig-->>AdminLayout: isAdmin = true
+        AdminLayout->>AdminPage: Render admin UI
+    end
+
+    AdminPage->>API: GET /api/admin/config
+    API->>ConfigFile: Read full config
+    ConfigFile-->>API: ClientConfig JSON
+    API-->>AdminPage: Full config with all firms
+
+    User->>AdminPage: Edit firm config
+    AdminPage->>API: PUT /api/admin/config/[firmId]
+    API->>ConfigFile: Update firm config
+    ConfigFile-->>API: Saved
+    API-->>AdminPage: { success: true }
+
+    User->>AdminPage: Edit global settings
+    AdminPage->>API: PUT /api/admin/config
+    API->>ConfigFile: Update global config
+    ConfigFile-->>API: Saved
+    API-->>AdminPage: { success: true }
+```
+
+### Components
+
+**Firm Configuration Tab**:
+- **Page Toggles**: Enable/disable pages (calls, emails, transfers, webhooks, sentry, reports, admin) per firm
+- **Column Toggles**: Show/hide specific table columns per page per firm
+- **Feature Toggles**: Enable/disable features (chat, cekura, accurate transcript) per firm
+- **Branding Editor**: Set primary color, logo URL, display name per firm
+
+**Global Settings Tab**:
+- **Admin Domains**: List of email domains with admin access
+- **User-Firm Mappings**: Email-to-firm mappings for non-admin users
+
+### Access Control
+
+- Layout (`admin/layout.tsx`) checks `isAdmin` from `useClientConfig`
+- Non-admin users are redirected to the home page
+- Admin status is determined by matching user email domain against `adminDomains` in config
+
+---
+
+## 9. Chat Data Flow
+
+**Component**: `ChatPanel` (accessible from dashboard sidebar or dedicated route)
+
+**Purpose**: AI-powered natural language interface for querying call data, generating charts, and exploring metrics.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ChatPanel
+    participant useChatHistory
+    participant useChat
+    participant ChatAPI as POST /api/chat
+    participant Gemini as Google Gemini
+    participant Supabase as Supabase RPC
+    participant Turso as Turso DB
+    participant GSheets as Google Sheets
+
+    ChatPanel->>useChatHistory: Load conversations
+    useChatHistory->>Turso: GET /api/chat/history
+    Turso-->>useChatHistory: Conversation list
+    useChatHistory-->>ChatPanel: Display sidebar with history
+
+    User->>ChatPanel: Type message and send
+    ChatPanel->>useChat: send(message)
+
+    useChat->>ChatAPI: POST /api/chat (streaming)
+    ChatAPI->>Gemini: Generate with function calling tools
+
+    loop Gemini function calling (max 8 rounds)
+        alt run_sql tool call
+            Gemini-->>ChatAPI: run_sql({ query: "SELECT ..." })
+            ChatAPI->>ChatAPI: Validate SQL (SELECT only)
+            ChatAPI->>Supabase: RPC execute_readonly_sql
+            Supabase-->>ChatAPI: Query results
+            ChatAPI-->>useChat: Stream {type: "sql"} + {type: "result"}
+            ChatAPI->>Gemini: Feed results back for interpretation
+        else generate_chart tool call
+            Gemini-->>ChatAPI: generate_chart({ spec })
+            ChatAPI-->>useChat: Stream {type: "chart"}
+        else text response
+            Gemini-->>ChatAPI: Natural language text
+            ChatAPI-->>useChat: Stream {type: "text"}
+        end
+    end
+
+    ChatAPI-->>useChat: Stream {type: "done"}
+    useChat-->>ChatPanel: Update message display
+
+    ChatPanel->>useChatHistory: saveMessages (coalesced/debounced)
+    useChatHistory->>Turso: PUT /api/chat/history
+    Turso-->>useChatHistory: Saved
+
+    ChatPanel->>GSheets: Log chat message (fire-and-forget)
+```
+
+### Message Types
+
+Messages in the chat can contain multiple content blocks:
+- **Text**: Natural language responses from Gemini
+- **SQL**: Query shown for transparency
+- **Result**: Data table rendered from query results
+- **Chart**: Client-side rendered chart from Gemini-generated spec
+- **Error**: Inline error display
+
+### Conversation Management
+
+- **New Chat**: Creates a new conversation ID, clears messages
+- **Load Conversation**: Restores messages from Turso
+- **Rename**: Updates conversation title via PATCH
+- **Delete**: Removes from Turso via DELETE
+- **Clear All**: Removes all conversations via DELETE ?all=true
+- **Auto-Save**: Messages auto-saved after streaming completes (debounced to coalesce rapid updates)
+
+### Abort Support
+
+- Users can click "Stop" during streaming to abort the request
+- Uses AbortController to cancel the fetch and Gemini generation
+- Partial messages are preserved in the UI
+
+---
+
+## Reports Page Updates
+
+The Reports page (`/reports`) has been enhanced with the following additions:
+
+### LLM Abstraction
+
+Report generation now uses the LLM provider abstraction layer (`lib/llm/`) instead of direct API calls:
+
+```mermaid
+graph LR
+    ReportGen["Report Generation"]
+    Factory["getLLMProvider()"]
+    OpenAI["OpenAI Provider"]
+    Gemini["Gemini Provider"]
+
+    ReportGen --> Factory
+    Factory -->|"provider=openai"| OpenAI
+    Factory -->|"provider=gemini"| Gemini
+```
+
+- Provider and model are configured per prompt template in the `prompts` table
+- Supports switching between OpenAI and Gemini without code changes
+- TOON format option reduces token usage by 30-40%
+
+### Turso Report Storage
+
+EOD reports have been migrated from file-based SQLite to Turso for improved reliability:
+- Reports are stored and retrieved via Turso (libSQL)
+- Migration from the previous file-based approach provides remote access and better durability
+- No change to the API contract; the storage layer is transparent to consumers
+
+### Additional Endpoints
+
+- `POST /api/reports/format-compare`: Compare JSON vs TOON encoding for token/cost analysis
+- `POST /api/reports/weekly-generate`: Generate weekly aggregate reports from daily EOD reports
+
+---
+
 ## Data Flow Summary Table
 
 | Page | Primary Hooks | API Endpoints | External Services | Supabase Tables |
@@ -727,7 +915,9 @@ On page load, `useSyncReportFromUrl()` opens the detail panel if URL params are 
 | Transfers | useTransfers<br>useFirms | /api/transfers<br>/api/firms | - | transfers_details<br>calls<br>firms |
 | Webhooks | useWebhooks<br>useCallDetail<br>useFirms | /api/webhooks<br>/api/calls/{id}<br>/api/firms | - | webhook_dumps<br>calls<br>transfers_details<br>firms |
 | Sentry | useSentryBrowse | /api/sentry/browse | Sentry Discover API | calls (for correlation mapping) |
-| Reports | useEODReports<br>useWeeklyReports<br>useGenerateEODReport<br>useGenerateWeeklyReport<br>useGenerateSuccessReport<br>useGenerateFailureReport<br>useGenerateFullReport<br>useGenerateWeeklyAIReport<br>useSaveReport<br>useFirms | /api/reports<br>/api/reports/payload-generate<br>/api/reports/weekly-generate<br>/api/reports/ai-generate<br>/api/firms | Cekura API<br>Sentry API<br>OpenAI/Gemini LLM | calls<br>transfers_details<br>email_logs<br>webhook_dumps<br>reports<br>prompts<br>firms |
+| Reports | useEODReports<br>useWeeklyReports<br>useGenerateEODReport<br>useGenerateWeeklyReport<br>useGenerateSuccessReport<br>useGenerateFailureReport<br>useGenerateFullReport<br>useGenerateWeeklyAIReport<br>useSaveReport<br>useFirms | /api/reports<br>/api/reports/payload-generate<br>/api/reports/weekly-generate<br>/api/reports/ai-generate<br>/api/reports/format-compare<br>/api/firms | Cekura API<br>Sentry API<br>OpenAI/Gemini LLM<br>Turso | calls<br>transfers_details<br>email_logs<br>webhook_dumps<br>reports<br>prompts<br>firms |
+| Admin | useClientConfig | /api/admin/config<br>/api/admin/config/[firmId]<br>/api/client-config | - | config/client-configs.json (file) |
+| Chat | useChat<br>useChatHistory | /api/chat<br>/api/chat/history | Google Gemini<br>Turso<br>Google Sheets | calls (via RPC)<br>conversations (Turso) |
 
 ---
 
@@ -893,6 +1083,9 @@ sequenceDiagram
 | Global UI state | React Context | Component tree | Global |
 | Date filters | Context + localStorage | Both | Shared pages |
 | Environment | Context + localStorage | Both | Global |
+| Client config | Context + TanStack Query | In-memory | Global |
+| Chat history | Turso (libSQL) | Remote database | Per user |
+| Chat messages | React state | Component only | ChatPanel |
 
 ---
 

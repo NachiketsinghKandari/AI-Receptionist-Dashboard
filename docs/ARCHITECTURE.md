@@ -2,15 +2,16 @@
 
 ## System Summary
 
-AI Receptionist Dashboard is a Next.js 16 internal dashboard for monitoring AI-powered legal call center operations. Built with React 19, TypeScript, Tailwind CSS v4, and shadcn/ui. It follows the BFF (Backend-for-Frontend) pattern where all external API calls go through Next.js API routes. Data lives in two Supabase PostgreSQL projects (production and staging), with external integrations to Sentry (error tracking) and Cekura (call observability).
+AI Receptionist Dashboard is a Next.js 16 internal dashboard for monitoring AI-powered legal call center operations. Built with React 19, TypeScript, Tailwind CSS v4, and shadcn/ui. It follows the BFF (Backend-for-Frontend) pattern where all external API calls go through Next.js API routes. Data lives in two Supabase PostgreSQL projects (production and staging), with Turso (libSQL) for conversation and report persistence, and external integrations to Sentry (error tracking), Cekura (call observability), and Google Sheets (visit/chat logging).
 
 **Tech Stack:**
 - **Frontend**: Next.js 16 (App Router, Turbopack), React 19, TypeScript (strict), TanStack Query, TanStack Table, Recharts
 - **Backend**: Next.js API Routes (BFF pattern)
 - **Database**: Supabase (PostgreSQL) - separate production and staging projects
+- **Persistence**: Turso (libSQL) for conversation history and EOD report storage
 - **Auth**: Supabase Auth (email/password + OAuth) with cookie-based sessions
-- **External APIs**: Sentry (error tracking), Cekura (call quality observability)
-- **AI/LLM**: OpenAI (GPT-4o/4.1) and Google Gemini (2.5-flash/3.0-pro) for report generation
+- **External APIs**: Sentry (error tracking), Cekura (call quality observability), Google Sheets (visit/chat logging)
+- **AI/LLM**: OpenAI (GPT-4o/4.1) and Google Gemini (2.5-flash/3.0-pro) for report generation and chat
 - **Styling**: Tailwind CSS v4, shadcn/ui (Radix primitives), OKLCH color space
 
 ## High-Level Architecture
@@ -27,20 +28,24 @@ graph TB
     subgraph External["External Services"]
         SupaProd["Supabase<br/>(Production)"]
         SupaStaging["Supabase<br/>(Staging)"]
+        Turso["Turso/libSQL<br/>(Conversations, Reports)"]
         Sentry["Sentry API<br/>(Error Tracking)"]
         Cekura["Cekura API<br/>(Call Quality)"]
         OpenAI["OpenAI API<br/>(GPT-4o/4.1)"]
         Gemini["Google Gemini API<br/>(2.5-flash/3.0-pro)"]
+        GSheets["Google Sheets<br/>(Visit/Chat Logging)"]
     end
 
     Browser --> Pages
     Pages --> API
     API --> SupaProd
     API --> SupaStaging
+    API --> Turso
     API --> Sentry
     API --> Cekura
     API --> OpenAI
     API --> Gemini
+    API --> GSheets
 
     style NextJS fill:#2563eb,stroke:#1e40af,stroke-width:2px,color:#fff
     style External fill:#64748b,stroke:#475569,stroke-width:2px,color:#fff
@@ -70,6 +75,10 @@ graph LR
         SentryAPI["/api/sentry/*"]
         CekuraAPI["/api/cekura/*"]
         ReportsAPI["/api/reports/*"]
+        ChatAPI["/api/chat/*"]
+        AdminAPI["/api/admin/*"]
+        ClientConfigAPI["/api/client-config"]
+        AnalyticsAPI["/api/analytics/*"]
     end
 
     subgraph External["External Services"]
@@ -301,8 +310,9 @@ app/
 │   ├── transfers/               # Transfer listing
 │   ├── webhooks/                # Webhook event listing
 │   ├── sentry/                  # Sentry error browsing
-│   └── reports/                 # EOD & weekly reports
-├── api/                         # BFF API routes (28 route.ts files)
+│   ├── reports/                 # EOD & weekly reports
+│   └── admin/                   # Admin config management (admin only)
+├── api/                         # BFF API routes (36 route.ts files)
 │   ├── auth/                    # Login, logout, session
 │   │   ├── login/route.ts
 │   │   ├── logout/route.ts
@@ -331,10 +341,22 @@ app/
 │   │   ├── map/route.ts
 │   │   ├── status/route.ts
 │   │   └── feedback/route.ts
+│   ├── chat/                    # Chat with Gemini function calling
+│   │   ├── route.ts             # POST: Streaming NDJSON chat
+│   │   └── history/route.ts     # GET/PUT/PATCH/DELETE: Conversation CRUD
+│   ├── admin/                   # Admin configuration management
+│   │   └── config/
+│   │       ├── route.ts         # GET/PUT: Global config
+│   │       └── [firmId]/route.ts # GET/PUT/DELETE: Per-firm config
+│   ├── client-config/           # Resolved client config (per-firm)
+│   │   └── route.ts
+│   ├── analytics/               # Analytics and logging
+│   │   └── log-visit/route.ts   # POST: Google Sheets visit logging
 │   └── reports/                 # EOD/weekly report generation, AI insights
 │       ├── route.ts
 │       ├── ai-generate/route.ts
-│       └── format-compare/      # New: Format comparison endpoint
+│       ├── format-compare/route.ts
+│       └── weekly-generate/route.ts
 ├── auth/callback/               # OAuth callback handler
 │   └── route.ts
 └── layout.tsx                   # Root layout (fonts, theme)
@@ -344,7 +366,9 @@ components/
 │   ├── environment-provider.tsx # Prod/staging switching
 │   ├── query-provider.tsx       # TanStack Query setup
 │   ├── theme-provider.tsx       # Dark/light theme
-│   └── date-filter-provider.tsx # Shared date filter state
+│   ├── date-filter-provider.tsx # Shared date filter state
+│   ├── client-config-provider.tsx # Per-firm config, branding, feature flags
+│   └── auth-listener-provider.tsx # Supabase auth state monitoring
 ├── layout/                      # Layout components
 │   └── navbar.tsx               # Top navigation bar
 └── ui/                          # 28 shadcn/ui components
@@ -355,7 +379,7 @@ components/
     └── ...
 
 hooks/                           # TanStack Query hooks + utility hooks
-├── use-calls.ts                 # Call listing, detail, flagged, important
+├── use-calls.ts                 # Call listing, detail, flagged, important, date-range
 ├── use-emails.ts                # Email listing
 ├── use-transfers.ts             # Transfer listing
 ├── use-webhooks.ts              # Webhook listing
@@ -366,6 +390,11 @@ hooks/                           # TanStack Query hooks + utility hooks
 ├── use-eod-reports.ts           # EOD/weekly reports
 ├── use-environment.ts           # Environment switching
 ├── use-date-filter.ts           # Shared date filter
+├── use-chat.ts                  # Chat state management with streaming
+├── use-chat-history.ts          # Turso-backed conversation CRUD
+├── use-client-config.ts         # Per-firm feature flags and config
+├── use-accurate-transcript.ts   # Gemini transcript correction
+├── use-pii-mask.ts              # PII masking utilities
 └── ...
 
 lib/
@@ -378,12 +407,15 @@ lib/
 │   └── email-allowlist.ts       # OAuth email whitelist
 ├── supabase/                    # Supabase client factory
 │   └── client.ts                # getSupabaseClient(env) - prod/staging data clients
+├── turso/                       # Turso/libSQL client
+│   └── client.ts                # Turso connection (conversations, reports)
 ├── llm/                         # LLM provider abstraction
 │   ├── providers/               # OpenAI & Gemini implementations
 │   │   ├── openai.ts
 │   │   ├── gemini.ts
 │   │   └── index.ts             # Provider factory
 │   └── types.ts                 # LLM interfaces
+├── google-sheets.ts             # Google Sheets API (visit/chat logging)
 ├── eod/                         # AI report generation
 │   ├── generate-ai-report.ts    # Report generation logic
 │   └── prompts.ts               # Report generation prompts
@@ -515,7 +547,10 @@ erDiagram
 | `lib/eod/generate-ai-report.ts` | AI report generation | Changing report formats, prompts |
 | `lib/auth/config.ts` | Supabase auth client setup | Modifying auth configuration |
 | `lib/auth/session.ts` | Session validation logic | Changing session behavior |
+| `lib/turso/client.ts` | Turso/libSQL connection | Conversation/report persistence |
+| `lib/google-sheets.ts` | Google Sheets API wrapper | Visit/chat logging |
 | `lib/sentry/client.ts` | Sentry API integration | Updating Sentry API calls |
+| `config/client-configs.json` | Per-firm configuration | Adding firm-specific settings |
 | `lib/format-*.ts` | Formatting utilities | Changing display formats |
 | `hooks/use-*.ts` | Data fetching hooks | Adding new data queries |
 | `types/database.ts` | Database type definitions | Syncing with DB schema changes |
@@ -570,7 +605,9 @@ isValidInt4(value: number)                   // Validates PostgreSQL int4 range
 - Sentry auth token (API routes only)
 - Cekura API key (API routes only)
 - OpenAI API key (report generation only)
-- Gemini API key (report generation only)
+- Gemini API key (report generation and chat)
+- Turso database URL and auth token
+- Google Sheets credentials
 
 ### 5. Email Allowlist
 
@@ -711,6 +748,146 @@ sequenceDiagram
 - Model/provider logging for debugging
 - Caching of generated reports
 
+## Chat Architecture
+
+The dashboard includes an AI chat feature powered by Google Gemini with function calling capabilities. Users can ask natural language questions about call data, and the system translates them into SQL queries, executes them, and optionally generates charts.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ChatPanel as ChatPanel Component
+    participant useChat as useChat Hook
+    participant ChatAPI as POST /api/chat
+    participant Gemini as Google Gemini API
+    participant Supabase as Supabase RPC
+    participant Turso as Turso (History)
+    participant GSheets as Google Sheets
+
+    User->>ChatPanel: Send message
+    ChatPanel->>useChat: send(message)
+    useChat->>ChatAPI: POST /api/chat (NDJSON stream)
+
+    loop Up to 8 rounds of function calling
+        ChatAPI->>Gemini: Generate with tools
+        alt Gemini calls run_sql
+            Gemini-->>ChatAPI: run_sql(query)
+            ChatAPI->>ChatAPI: Validate SQL (SELECT only, no mutations)
+            ChatAPI->>Supabase: RPC execute_readonly_sql(query)
+            Supabase-->>ChatAPI: Query results
+            ChatAPI-->>useChat: Stream: {type: "sql", query} + {type: "result", data}
+            ChatAPI->>Gemini: Feed results back
+        else Gemini calls generate_chart
+            Gemini-->>ChatAPI: generate_chart(spec)
+            ChatAPI-->>useChat: Stream: {type: "chart", spec}
+        else Gemini returns text
+            Gemini-->>ChatAPI: Text response
+            ChatAPI-->>useChat: Stream: {type: "text", content}
+        end
+    end
+
+    ChatAPI-->>useChat: Stream: {type: "done"}
+    useChat-->>ChatPanel: Update messages
+
+    ChatPanel->>Turso: Auto-save conversation (coalesced)
+    ChatPanel->>GSheets: Log chat message (fire-and-forget)
+```
+
+**Key Design Decisions:**
+- **NDJSON Streaming**: Each event is a newline-delimited JSON object with a `type` field (`text`, `sql`, `result`, `chart`, `error`, `done`)
+- **SQL Validation**: Only SELECT queries are allowed; mutations (INSERT, UPDATE, DELETE, DROP, etc.) are rejected before execution
+- **Supabase RPC**: SQL is executed via `execute_readonly_sql` RPC function with read-only permissions
+- **Max 8 Rounds**: Function calling is capped at 8 iterations to prevent runaway loops
+- **Abort Support**: Users can cancel in-progress chat via AbortController
+
+## Turso/libSQL Persistence
+
+Turso (libSQL) is used for lightweight persistence that does not require a full Supabase table:
+
+**Conversations Table** (chat history):
+- Stores chat conversation metadata and messages
+- CRUD operations via `/api/chat/history`
+- Backed by `useChatHistory` hook with coalesced auto-saving
+
+**EOD Report Storage** (migrated from file-based SQLite):
+- Reports are stored and retrieved from Turso
+- Migration from the previous file-based SQLite approach provides better reliability and remote access
+
+**Client**: `lib/turso/client.ts` provides the Turso connection singleton.
+
+## Admin Config System
+
+The admin configuration system provides per-firm customization of the dashboard UI, stored in a file-based JSON configuration.
+
+**Storage**: `config/client-configs.json` (file-based)
+
+**Resolution Logic**:
+1. Check if the user's email domain matches an admin domain
+2. Look up firm mapping from `userFirmMappings` (email -> firmId)
+3. If a firm-specific config exists, merge it with defaults
+4. Fall back to global defaults
+
+**Configuration Scope**:
+- **Page Toggles**: Enable/disable pages per firm (calls, emails, transfers, webhooks, sentry, reports, admin)
+- **Column Toggles**: Show/hide table columns per page per firm
+- **Feature Toggles**: Enable/disable features (chat, cekura, accurate transcript, etc.)
+- **Branding**: Per-firm theming with custom primary color, logo URL, and display name (applied as CSS variables)
+
+**API Routes**:
+- `GET /api/admin/config` - Full config (admin only)
+- `PUT /api/admin/config` - Update global settings (adminDomains, userFirmMappings, defaults)
+- `GET /api/admin/config/[firmId]` - Per-firm config
+- `PUT /api/admin/config/[firmId]` - Save per-firm config
+- `DELETE /api/admin/config/[firmId]` - Remove per-firm config
+- `GET /api/client-config` - Resolved config for current user
+
+## Google Sheets Integration
+
+Google Sheets is used for lightweight analytics logging:
+
+**Visit Logging**:
+- `POST /api/analytics/log-visit` logs dashboard visits to a Google Sheet
+- Timestamps are converted to IST (Indian Standard Time) timezone
+- Triggered on dashboard open via `useDashboardPrefetch`
+
+**Chat Message Logging**:
+- Chat messages are logged to Google Sheets as a fire-and-forget side effect
+- Includes user email, message content, and timestamp (IST)
+
+**Implementation**: `lib/google-sheets.ts` provides the Google Sheets API wrapper.
+
+## Cekura Integration Details
+
+Cekura provides call quality observability data. The integration uses a progressive loading pattern:
+
+**Progressive Loading**:
+1. Page 1 fires immediately on mount (fast, first batch of results)
+2. If `hasMore=true`, a background query fetches all remaining pages
+3. Results are merged into a single `Map<correlationId, CekuraCallData>`
+4. UI renders partial data instantly, updates as full data loads
+
+**Mutations**:
+- `PATCH /api/cekura/status` - Update call review status with optimistic UI updates
+- `PATCH /api/cekura/feedback` - Submit feedback with optimistic UI updates
+
+## LLM Provider Abstraction
+
+The dashboard uses a unified LLM provider interface to support multiple AI providers:
+
+**Interface**: `lib/llm/types.ts` defines the common interface for all LLM providers
+
+**Providers**:
+- **OpenAI** (`lib/llm/providers/openai.ts`): GPT-4o, GPT-4.1
+- **Gemini** (`lib/llm/providers/gemini.ts`): Gemini 2.5-flash, 3.0-pro
+
+**Factory**: `lib/llm/providers/index.ts` provides `getLLMProvider(provider, model)` for runtime selection
+
+**TOON Format**: Token-Optimized Object Notation is supported as an alternative to JSON for LLM input, reducing token count by 30-40% while preserving data fidelity. Configurable per prompt template.
+
+**Usage**:
+- Report generation (EOD and weekly reports)
+- Chat responses (Gemini with function calling)
+- Accurate transcript correction (Gemini)
+
 ## Environment Variables
 
 ### Required
@@ -735,9 +912,18 @@ SENTRY_AUTH_TOKEN=xxx                           # Sentry API token
 # Cekura Integration (Call Quality)
 CEKURA_API_KEY=xxx                              # Cekura API key
 
-# LLM Providers (Report Generation)
+# LLM Providers (Report Generation + Chat)
 OPENAI_API_KEY=xxx                              # OpenAI API key
 GOOGLE_AI_API_KEY=xxx                           # Google Gemini API key
+
+# Turso (Conversation/Report Persistence)
+TURSO_DATABASE_URL=xxx                          # Turso database URL
+TURSO_AUTH_TOKEN=xxx                            # Turso auth token
+
+# Google Sheets (Analytics Logging)
+GOOGLE_SHEETS_PRIVATE_KEY=xxx                   # Google service account key
+GOOGLE_SHEETS_CLIENT_EMAIL=xxx                  # Google service account email
+GOOGLE_SHEETS_SPREADSHEET_ID=xxx                # Target spreadsheet ID
 ```
 
 ### Optional - Multi-Environment
@@ -996,6 +1182,6 @@ graph TB
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-02-08
+**Document Version**: 1.1
+**Last Updated**: 2026-02-17
 **Maintained By**: AI Receptionist Engineering Team

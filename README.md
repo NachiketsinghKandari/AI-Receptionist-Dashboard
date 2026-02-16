@@ -9,13 +9,17 @@ A Next.js 16 dashboard application migrated from the Streamlit `unified_dashboar
 - **Tables:** TanStack Table v8 (server-side pagination)
 - **Data Fetching:** TanStack Query (caching, background refetch)
 - **Charts:** Recharts
-- **Auth:** JWT sessions with Supabase user authentication
-- **Database:** Supabase PostgreSQL
+- **Auth:** Supabase Auth (cookie-based); legacy JWT sessions still present
+- **Database:** Supabase PostgreSQL + Turso/libSQL (conversation history, reports)
 - **Monitoring:** Sentry API integration (server-side proxy)
-- **AI/LLM:** OpenAI + Google Gemini (for reports, chat, and accurate transcripts)
+- **AI/LLM:** Google Gemini (`@google/genai`) + OpenAI (for reports, chat, and accurate transcripts)
+- **Data Format:** TOON format (`@toon-format/toon`) for token-optimized LLM data
 - **Call Observability:** Cekura integration
+- **Logging:** Google Sheets API (`googleapis`) for visit/chat logging
 - **PDF Export:** html2pdf.js
 - **Markdown:** react-markdown + remark-gfm + rehype-highlight
+- **URL Sharing:** lz-string for compressed filter state sharing
+- **Drawer:** vaul for mobile-friendly drawer component
 
 ## Quick Start
 
@@ -111,6 +115,7 @@ Collection variables to configure:
 │       └── sentry/            # Sentry proxy (keeps tokens private)
 ├── components/
 │   ├── ui/                    # shadcn/ui components
+│   ├── admin/                 # Admin panel components (page/column/feature toggles, branding)
 │   ├── layout/                # Sidebar, Header
 │   ├── tables/                # DataTable (generic)
 │   ├── details/               # CallDetailPanel
@@ -119,7 +124,7 @@ Collection variables to configure:
 │   ├── chat/                  # AI chat panel, messages, history, charts
 │   ├── cekura/                # Cekura feedback and status components
 │   ├── email/                 # Email body display, recipients
-│   ├── eod/                   # Markdown report, PDF export
+│   ├── eod/                   # Markdown report, PDF/DOCX export
 │   └── providers/             # Context providers (environment, date, theme, query)
 ├── hooks/                     # TanStack Query hooks
 │   ├── use-calls.ts           # Calls data fetching
@@ -134,19 +139,23 @@ Collection variables to configure:
 │   ├── use-flagged-calls.ts   # Flagged calls
 │   ├── use-is-mobile.ts       # Mobile detection
 │   └── ...                    # Additional hooks
+├── config/                    # Client configs (client-configs.json)
 ├── lib/
 │   ├── api/utils.ts           # API utilities (validation, error handling)
 │   ├── auth/                  # Auth config + session management + allowlist
 │   ├── supabase/              # Supabase client (auth-client, auth-server)
-│   ├── chat/                  # Gemini chat logic and streaming
+│   ├── chat/                  # Gemini chat orchestration, SQL validation, system prompt
 │   ├── sentry/                # Sentry API client (server-only)
 │   ├── llm/                   # LLM provider abstraction (OpenAI, Gemini)
 │   ├── eod/                   # End-of-day report generation logic
+│   ├── turso/                 # Turso client (conversation history, reports)
+│   ├── google-sheets.ts       # Google Sheets logging
 │   ├── share-url.ts           # URL sharing functionality
 │   ├── date-utils.ts          # Date manipulation utilities
 │   ├── formatting.ts          # Text formatting helpers
 │   ├── webhook-utils.ts       # Webhook parsing utilities
 │   └── constants.ts           # App constants
+├── scripts/                   # Utility scripts (Google Sheets auth, schema dump)
 ├── types/                     # TypeScript interfaces
 ├── design_principles/         # Design system documentation
 ├── docs/                      # Product requirements and documentation
@@ -206,21 +215,40 @@ Collection variables to configure:
 - Historical report viewing
 
 ### Chat
-- AI-powered data analysis chat with Google Gemini
-- Streaming responses with real-time output
-- Conversation history (server-side persistence)
+- AI-powered data analysis chat with Google Gemini function calling (`run_sql` + `generate_chart` tools)
+- NDJSON streaming responses with real-time output
+- Conversation history (server-side persistence via Turso)
 - Inline chart and table rendering from query results
+- SQL validation (whitelist approach, SELECT only, LIMIT enforced)
+- Max 8 tool rounds per conversation turn
 - Accessible via a floating panel across all dashboard pages
 
 ### Admin Panel (`/admin`)
-- Per-firm white-label theming configuration
+- Per-firm white-label theming configuration with OKLCH color space
+- Page/column/feature toggles per firm
 - Customize branding and appearance per firm
+- Admin domains and user-firm mappings
 
 ### Cekura Integration
-- Call observability and quality scoring
+- Call observability and quality scoring with progressive loading
 - Feedback submission for call quality
-- Status tracking and filtering
+- Status tracking, updates, and filtering
 - Integration with call details panel
+
+### Accurate Transcript
+- Gemini-powered transcript correction using audio + ground truth
+- Improves transcript quality for call analysis
+
+### PII Masking
+- Per-firm configurable masking of phones, names, emails, and transcripts
+
+### Visit/Chat Logging
+- Google Sheets integration for visit and chat activity logging
+- IST timezone timestamps
+
+### URL Sharing
+- Compressed filter state sharing via lz-string
+- Share dashboard views with specific filters applied
 
 ## Architecture Decisions
 
@@ -233,7 +261,7 @@ All database and external API calls go through Next.js API routes. This:
 ### Auth Proxy (Next.js 16)
 Uses the new `proxy.ts` convention (replaces deprecated `middleware.ts`):
 - Runs on Node.js runtime
-- Validates JWT sessions on every request
+- Validates sessions via Supabase Auth (`supabase.auth.getUser()`) using cookies (`sb-*` prefix)
 - Redirects unauthenticated users to `/login`
 
 ### SQL Injection Prevention
@@ -283,13 +311,25 @@ npm run lint     # Run ESLint
 |----------|----------|-------------|
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_KEY` | Yes | Supabase anon/service key |
-| `JWT_SECRET` | Yes | Secret for signing JWT sessions |
+| `JWT_SECRET` | Yes | Secret for signing JWT sessions (legacy) |
+| `SUPABASE_PROD_URL` | Yes | Production Supabase URL |
+| `SUPABASE_PROD_KEY` | Yes | Production Supabase key |
+| `SUPABASE_STAGE_URL` | No | Staging Supabase URL |
+| `SUPABASE_STAGE_KEY` | No | Staging Supabase key |
+| `NEXT_PUBLIC_SUPABASE_STAGE_URL` | No | Client-side staging Supabase URL |
+| `NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY` | No | Client-side staging Supabase anon key |
+| `GEMINI_API_KEY` | No | Google Gemini API key (chat, reports, accurate transcripts) |
+| `OPENAI_API_KEY` | No | OpenAI API key (report generation) |
+| `TURSO_DATABASE_URL` | No | Turso database URL (conversation history, reports) |
+| `TURSO_AUTH_TOKEN` | No | Turso auth token |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID (Sheets logging) |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+| `GOOGLE_REFRESH_TOKEN` | No | Google OAuth refresh token |
+| `GOOGLE_SHEET_ID` | No | Target Google Sheet ID |
 | `SENTRY_ORG` | No | Sentry organization slug |
 | `SENTRY_PROJECT` | No | Sentry project slug |
 | `SENTRY_AUTH_TOKEN` | No | Sentry API auth token |
-| `OPENAI_API_KEY` | No | OpenAI API key (for AI report generation) |
-| `GEMINI_API_KEY` | No | Google Gemini API key (for chat, reports, and accurate transcripts) |
-| `CEKURA_API_KEY` | No | Cekura API key (for call observability) |
+| `CEKURA_API_KEY` | No | Cekura API key (call observability) |
 | `ALLOWED_EMAILS` | No | Comma-separated list of allowed login emails |
 
 ## Migration from Streamlit
