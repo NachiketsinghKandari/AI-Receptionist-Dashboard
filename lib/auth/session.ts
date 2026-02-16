@@ -15,6 +15,8 @@ const getSecret = () => {
 };
 
 export interface SessionPayload extends JWTPayload {
+  id: string;
+  email: string;
   username: string;
   apps: string[];
 }
@@ -22,8 +24,13 @@ export interface SessionPayload extends JWTPayload {
 /**
  * Create a new session and set cookie
  */
-export async function createSession(username: string, apps: string[]): Promise<string> {
-  const token = await new SignJWT({ username, apps })
+export async function createSession(
+  id: string,
+  email: string,
+  apps: string[]
+): Promise<string> {
+  const username = email.split('@')[0] || 'User';
+  const token = await new SignJWT({ id, email, username, apps })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime(`${SESSION_EXPIRY_HOURS}h`)
     .setIssuedAt()
@@ -69,7 +76,7 @@ export async function destroySession(): Promise<void> {
 }
 
 /**
- * Verify a session token (for middleware)
+ * Verify a session token (for proxy/middleware)
  */
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {

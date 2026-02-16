@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAuthServerClient } from '@/lib/supabase/auth-server';
+import { destroySession } from '@/lib/auth/session';
 
 export async function POST() {
   try {
-    const supabase = await createAuthServerClient();
-    await supabase.auth.signOut();
+    await destroySession();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Logout error:', error);

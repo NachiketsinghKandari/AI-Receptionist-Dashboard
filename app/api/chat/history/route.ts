@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthServerClient } from '@/lib/supabase/auth-server';
+import { getSession } from '@/lib/auth/session';
 import { errorResponse } from '@/lib/api/utils';
 import {
   getConversations,
@@ -22,11 +22,8 @@ import type { Conversation } from '@/types/chat';
 
 async function getUserId(): Promise<string | null> {
   try {
-    const supabase = await createAuthServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    return user?.id ?? null;
+    const session = await getSession();
+    return session?.id ?? null;
   } catch {
     return null;
   }

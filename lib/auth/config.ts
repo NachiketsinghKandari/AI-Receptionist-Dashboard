@@ -1,66 +1,44 @@
 /**
- * Auth configuration - Hardcoded users
- * Ported from unified_dashboard/config.py
+ * Auth configuration - Local credentials
  */
 
 export interface UserConfig {
+  email: string;
   password: string;
   apps: string[];
 }
 
-// Hardcoded user credentials (from config.py)
-export const USERS: Record<string, UserConfig> = {
-  admin: {
-    password: 'admin123',
+// Hardcoded user credentials
+export const USERS: UserConfig[] = [
+  {
+    email: 'admin@receptionist.ai',
+    password: 'admin@receptionist.ai123',
     apps: ['dashboard', 'analytics'],
   },
-  dashboard_user: {
-    password: 'dash123',
-    apps: ['dashboard'],
-  },
-  analytics_user: {
-    password: 'analytics123',
-    apps: ['analytics'],
-  },
-};
-
-// App configuration
-export const APP_CONFIG = {
-  dashboard: {
-    name: 'Dashboard',
-    description: 'Monitor calls, emails, transfers, and webhooks',
-    icon: '📊',
-  },
-  analytics: {
-    name: 'Analytics',
-    description: 'Call analytics and resolution tracking',
-    icon: '📈',
-  },
-} as const;
+];
 
 // Session configuration
 export const SESSION_EXPIRY_HOURS = 24;
-export const SESSION_IDLE_TIMEOUT_HOURS = 4;
 
 /**
- * Verify username and password
+ * Verify email and password against local credentials
  */
-export function verifyCredentials(username: string, password: string): boolean {
-  const user = USERS[username];
-  return user !== undefined && user.password === password;
+export function verifyCredentials(email: string, password: string): UserConfig | null {
+  const user = USERS.find(
+    (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+  );
+  return user ?? null;
 }
 
 /**
- * Get list of apps available to user
+ * Generate a deterministic user ID from email
  */
-export function getUserApps(username: string): string[] {
-  const user = USERS[username];
-  return user?.apps ?? [];
-}
-
-/**
- * Check if user can access specific app
- */
-export function canAccessApp(username: string, appKey: string): boolean {
-  return getUserApps(username).includes(appKey);
+export function getUserId(email: string): string {
+  // Simple deterministic hash — sufficient for local auth
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    const char = email.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+  return `local-${Math.abs(hash).toString(36)}`;
 }

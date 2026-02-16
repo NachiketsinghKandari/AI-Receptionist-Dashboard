@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyCredentials, getUserId } from '@/lib/auth/config';
+import { createSession } from '@/lib/auth/session';
 import { errorResponse } from '@/lib/api/utils';
 
 export async function POST(request: NextRequest) {
@@ -11,34 +12,18 @@ export async function POST(request: NextRequest) {
       return errorResponse('Email and password are required', 400, 'MISSING_CREDENTIALS');
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_STAGE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return errorResponse('Auth configuration missing', 500, 'CONFIG_ERROR');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
+    const user = verifyCredentials(email, password);
+    if (!user) {
       return errorResponse('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
-    const session = data.session;
-    if (!session) {
-      return errorResponse('No session returned', 500, 'SESSION_ERROR');
-    }
+    const id = getUserId(user.email);
+    await createSession(id, user.email, user.apps);
 
     return NextResponse.json({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-      expires_in: session.expires_in,
-      expires_at: session.expires_at,
-      token_type: 'bearer',
       user: {
-        id: data.user.id,
-        email: data.user.email,
+        id,
+        email: user.email,
       },
     });
   } catch (error) {

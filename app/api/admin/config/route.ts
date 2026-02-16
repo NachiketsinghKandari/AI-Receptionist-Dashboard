@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthServerClient } from '@/lib/supabase/auth-server';
+import { getSession } from '@/lib/auth/session';
 import { readConfig, writeConfig } from '@/lib/client-config';
 import { isAdminEmail } from '@/lib/admin';
 import type { ClientConfig } from '@/types/client-config';
 
 async function requireAdmin() {
-  const supabase = await createAuthServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user?.email) {
+  if (!session?.email) {
     return { error: 'Unauthorized', status: 401 } as const;
   }
 
   const config = readConfig();
-  if (!isAdminEmail(user.email, config.adminDomains)) {
+  if (!isAdminEmail(session.email, config.adminDomains)) {
     return { error: 'Forbidden', status: 403 } as const;
   }
 
-  return { config, email: user.email } as const;
+  return { config, email: session.email } as const;
 }
 
 export async function GET() {

@@ -1,14 +1,14 @@
 /**
  * Auth proxy - protects dashboard routes
  * Next.js 16+ uses proxy.ts instead of middleware.ts
- * Uses Supabase Auth for session validation
+ * Uses local JWT session for validation
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { verifySession } from '@/lib/auth/session';
 
-const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/api/auth', '/auth/callback'];
+const PUBLIC_PATHS = ['/login', '/api/auth'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(p => pathname.startsWith(p));
@@ -28,65 +28,35 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_STAGE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY;
+  // Check for local JWT session cookie
+  const sessionToken = request.cookies.get('session')?.value;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('NEXT_PUBLIC_SUPABASE_STAGE_URL and NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY must be set');
+  if (!sessionToken) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Create a response that we can modify
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  const session = await verifySession(sessionToken);
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value)
-        );
-        response = NextResponse.next({
-          request,
-        });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
-        );
-      },
-    },
-  });
-
-  // Refresh session if expired - required for Server Components
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    // Clear stale auth cookies to prevent "Invalid Refresh Token" loops.
-    // When a refresh token is revoked/expired server-side, the browser still
-    // holds the old sb-* cookies. Without clearing them, every subsequent
-    // request triggers a failed refresh attempt and an AuthApiError.
-    const staleResponse = pathname.startsWith('/api/')
+  if (!session) {
+    // Invalid/expired token — clear the stale cookie
+    const response = pathname.startsWith('/api/')
       ? NextResponse.json(
           { error: 'Unauthorized', code: 'UNAUTHORIZED' },
           { status: 401 }
         )
       : NextResponse.redirect(new URL('/login', request.url));
 
-    request.cookies.getAll().forEach(({ name }) => {
-      if (name.startsWith('sb-')) {
-        staleResponse.cookies.delete(name);
-      }
-    });
-
-    return staleResponse;
+    response.cookies.delete('session');
+    return response;
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

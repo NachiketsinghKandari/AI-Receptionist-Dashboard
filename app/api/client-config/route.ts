@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createAuthServerClient } from '@/lib/supabase/auth-server';
+import { getSession } from '@/lib/auth/session';
 import { readConfig } from '@/lib/client-config';
 import { isAdminEmail, getUserFirmId } from '@/lib/admin';
 import type { FirmConfig, ResolvedClientConfig } from '@/types/client-config';
 
 export async function GET() {
   try {
-    const supabase = await createAuthServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getSession();
 
-    if (!user?.email) {
+    if (!session?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const config = readConfig();
-    const email = user.email;
+    const email = session.email;
     const admin = isAdminEmail(email, config.adminDomains);
 
     if (admin) {

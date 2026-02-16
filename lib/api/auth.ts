@@ -1,11 +1,12 @@
 /**
  * Shared auth helper for API routes
- * Supports Bearer token and Basic auth for external tool access (Postman, curl)
- * Requests without Authorization header are assumed to come through proxy with valid cookies
+ * Supports Bearer token (JWT) and Basic auth for external tool access (Postman, curl)
+ * Requests without Authorization header are assumed to come through proxy with valid session cookie
  */
 
 import { NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifySession } from '@/lib/auth/session';
+import { verifyCredentials } from '@/lib/auth/config';
 
 interface AuthResult {
   authenticated: boolean;
@@ -15,29 +16,20 @@ interface AuthResult {
 export async function authenticateRequest(request: NextRequest): Promise<AuthResult> {
   const authHeader = request.headers.get('authorization');
 
-  // No Authorization header — verify Supabase session cookies exist (set by proxy.ts auth)
+  // No Authorization header — verify session cookie exists (set by proxy.ts auth)
   if (!authHeader) {
-    const hasSupabaseCookies = request.cookies.getAll().some(c => c.name.startsWith('sb-'));
-    if (!hasSupabaseCookies) {
+    const hasSession = request.cookies.get('session')?.value;
+    if (!hasSession) {
       return { authenticated: false, error: 'No authorization credentials provided' };
     }
     return { authenticated: true };
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_STAGE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_STAGE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return { authenticated: false, error: 'Auth configuration missing' };
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-  // Bearer token auth
+  // Bearer token auth (JWT)
   if (authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data.user) {
+    const session = await verifySession(token);
+    if (!session) {
       return { authenticated: false, error: 'Invalid or expired token' };
     }
     return { authenticated: true };
@@ -59,8 +51,8 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
       return { authenticated: false, error: 'Invalid Base64 encoding' };
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
+    const user = verifyCredentials(email, password);
+    if (!user) {
       return { authenticated: false, error: 'Invalid email or password' };
     }
     return { authenticated: true };
