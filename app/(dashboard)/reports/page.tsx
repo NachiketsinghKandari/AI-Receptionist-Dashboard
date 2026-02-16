@@ -106,10 +106,9 @@ function getStoredLayout(): number {
 }
 
 interface GeneratingState {
-  reportId?: string;
-  success?: boolean;
-  failure?: boolean;
-  full?: boolean;
+  successReportId?: string;
+  failureReportId?: string;
+  fullReportId?: string;
 }
 
 function createColumns(generatingState?: GeneratingState, firms?: Firm[]): ColumnDef<EODReport>[] {
@@ -185,8 +184,10 @@ function createColumns(generatingState?: GeneratingState, firms?: Firm[]): Colum
         const hasSuccessReport = row.original.success_report !== null;
         const hasFailureReport = row.original.failure_report !== null;
         const hasFullReport = row.original.full_report !== null;
-        const isGenerating = generatingState?.reportId === row.original.id;
-        const isGeneratingAny = isGenerating && (generatingState?.success || generatingState?.failure || generatingState?.full);
+        const rowId = row.original.id;
+        const isGeneratingAny = generatingState?.successReportId === rowId
+          || generatingState?.failureReportId === rowId
+          || generatingState?.fullReportId === rowId;
         const isWeekly = !!(row.original.raw_data as EODRawData)?.week_start;
 
         if (isWeekly) {
@@ -327,13 +328,9 @@ export default function EODReportsPage() {
   const weekRangeLabel = `${format(weekDateObj.monday, 'MMM d')} - ${format(weekDateObj.sunday, 'MMM d, yyyy')}`;
 
   const generatingState: GeneratingState = useMemo(() => ({
-    reportId: successReportMutation.isPending ? successReportMutation.variables?.reportId
-            : failureReportMutation.isPending ? failureReportMutation.variables?.reportId
-            : fullReportMutation.isPending ? fullReportMutation.variables?.reportId
-            : undefined,
-    success: successReportMutation.isPending,
-    failure: failureReportMutation.isPending,
-    full: fullReportMutation.isPending,
+    successReportId: successReportMutation.isPending ? successReportMutation.variables?.reportId : undefined,
+    failureReportId: failureReportMutation.isPending ? failureReportMutation.variables?.reportId : undefined,
+    fullReportId: fullReportMutation.isPending ? fullReportMutation.variables?.reportId : undefined,
   }), [
     successReportMutation.isPending, successReportMutation.variables?.reportId,
     failureReportMutation.isPending, failureReportMutation.variables?.reportId,
@@ -848,12 +845,12 @@ export default function EODReportsPage() {
           onRetrySuccessReport={handleRetrySuccessReport}
           onRetryFailureReport={handleRetryFailureReport}
           onRetryFullReport={handleRetryFullReport}
-          isRetryingSuccess={successReportMutation.isPending}
-          isRetryingFailure={failureReportMutation.isPending}
-          isRetryingFull={fullReportMutation.isPending || weeklyAIReportMutation.isPending}
-          successError={successReportMutation.error?.message}
-          failureError={failureReportMutation.error?.message}
-          fullError={fullReportMutation.error?.message || weeklyAIReportMutation.error?.message}
+          isRetryingSuccess={successReportMutation.isPending && successReportMutation.variables?.reportId === selectedReport.id}
+          isRetryingFailure={failureReportMutation.isPending && failureReportMutation.variables?.reportId === selectedReport.id}
+          isRetryingFull={(fullReportMutation.isPending && fullReportMutation.variables?.reportId === selectedReport.id) || (weeklyAIReportMutation.isPending && weeklyAIReportMutation.variables?.reportId === selectedReport.id)}
+          successError={successReportMutation.variables?.reportId === selectedReport.id ? successReportMutation.error?.message : undefined}
+          failureError={failureReportMutation.variables?.reportId === selectedReport.id ? failureReportMutation.error?.message : undefined}
+          fullError={selectedReport.id === fullReportMutation.variables?.reportId ? fullReportMutation.error?.message : (selectedReport.id === weeklyAIReportMutation.variables?.reportId ? weeklyAIReportMutation.error?.message : undefined)}
         />
       )}
     </div>
