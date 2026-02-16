@@ -55,7 +55,7 @@ import {
   useGenerateWeeklyAIReport,
   useReportByDate,
 } from '@/hooks/use-eod-reports';
-import { useFirms } from '@/hooks/use-firms';
+import { useFirms, useRawFirms } from '@/hooks/use-firms';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useEnvironment } from '@/components/providers/environment-provider';
 import { useSyncEnvironmentFromUrl } from '@/hooks/use-sync-environment';
@@ -79,6 +79,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { EODReport, EODRawData, WeeklyRawData, SortOrder, EODReportCategory, DataFormat } from '@/types/api';
 import type { Firm } from '@/types/database';
+import { getAnonymizedFirmName, anonymizeContent } from '@/lib/firm-anonymizer';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { formatUTCTimestamp } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
@@ -111,7 +112,7 @@ interface GeneratingState {
   full?: boolean;
 }
 
-function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[] {
+function createColumns(generatingState?: GeneratingState, firms?: Firm[]): ColumnDef<EODReport>[] {
   return [
     {
       accessorKey: 'report_date',
@@ -129,8 +130,10 @@ function createColumns(generatingState?: GeneratingState): ColumnDef<EODReport>[
         if (firmId == null) {
           return <span className="text-muted-foreground">All</span>;
         }
-        const firmName = (row.original.raw_data as EODRawData)?.firm_name;
-        return <span>{firmName ?? `Firm ${firmId}`}</span>;
+        const firmName = firms?.length
+          ? getAnonymizedFirmName(firmId, firms)
+          : `Firm ${firmId}`;
+        return <span>{firmName}</span>;
       },
     },
     {
@@ -337,7 +340,7 @@ export default function EODReportsPage() {
     fullReportMutation.isPending, fullReportMutation.variables?.reportId,
   ]);
 
-  const columns = useMemo(() => createColumns(generatingState), [generatingState]);
+  const columns = useMemo(() => createColumns(generatingState, firmsData?.firms), [generatingState, firmsData?.firms]);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -1523,6 +1526,8 @@ function ReportContent({
   error?: string;
 }) {
   const markdownRef = useRef<HTMLDivElement>(null);
+  const { data: firmsData } = useFirms();
+  const { data: rawFirmsData } = useRawFirms();
   const hasReport = content !== null;
   const isWeekly = !!(report.raw_data as EODRawData)?.week_start;
   const titleMap = {
@@ -1531,6 +1536,12 @@ function ReportContent({
     full: isWeekly ? 'Weekly Report' : 'Full Report',
   };
   const title = titleMap[reportType];
+
+  // Replace real firm names in markdown with anonymized equivalents
+  const displayContent = useMemo(() => {
+    if (!content || !rawFirmsData?.firms?.length) return content;
+    return anonymizeContent(content, rawFirmsData.firms);
+  }, [content, rawFirmsData?.firms]);
 
   if (hasReport) {
     return (
@@ -1552,13 +1563,17 @@ function ReportContent({
               reportTitle={title}
               reportDate={report.report_date}
               firmId={(report.raw_data as EODRawData)?.firm_id}
-              firmName={(report.raw_data as EODRawData)?.firm_name}
+              firmName={
+                (report.raw_data as EODRawData)?.firm_id != null && firmsData?.firms?.length
+                  ? getAnonymizedFirmName((report.raw_data as EODRawData).firm_id!, firmsData.firms)
+                  : undefined
+              }
             />
             <DocxExportButton
-              markdown={content || ''}
+              markdown={displayContent || ''}
               filename={`${isWeekly ? 'weekly' : 'eod'}-${reportType}-report-${report.report_date}`}
             />
-            <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(content || '')} title="Copy to clipboard">
+            <Button variant="outline" size="icon" className="h-7 w-7 md:h-8 md:w-8" onClick={() => navigator.clipboard.writeText(displayContent || '')} title="Copy to clipboard">
               <Copy className="h-3 w-3 md:h-4 md:w-4" />
             </Button>
             <DropdownMenu>
@@ -1584,7 +1599,7 @@ function ReportContent({
         </CardHeader>
         <CardContent className="px-2 md:px-4 pb-2 md:pb-4 overflow-hidden">
           <div ref={markdownRef} className="overflow-x-auto text-xs md:text-sm">
-            <MarkdownReport content={content || ''} />
+            <MarkdownReport content={displayContent || ''} />
           </div>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 {
   "adminDomains": [
-    "hellocounsel.ai"
+    "hellocounsel.ai",
+    "receptionist.ai"
   ],
   "userFirmMappings": [
     {

@@ -53,7 +53,21 @@
       "Bash(git branch:*)",
       "Bash(npx skills find:*)",
       "WebFetch(domain:skills.sh)",
-      "Bash(npx skills:*)"
+      "Bash(npx skills:*)",
+      "Bash(for file in /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard/components/ui/*.tsx)",
+      "Bash(do wc -l \"$file\")",
+      "Bash(done)",
+      "WebFetch(domain:beyandassociates.com)",
+      "Bash(git merge:*)",
+      "Bash(git -C /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard status)",
+      "Bash(git -C /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard diff --stat)",
+      "Bash(git -C /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard log --oneline -3)",
+      "Bash(git -C /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard diff main...HEAD --stat)",
+      "Bash(git -C /Users/nachiket/workspace/github.com/Private/HelloCounsel-Dashboard log main...HEAD --oneline)",
+      "Bash(gh pr merge:*)",
+      "Bash(node:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git config:*)"
     ]
   }
 }
