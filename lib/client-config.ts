@@ -31,6 +31,7 @@ export function readConfig(): ClientConfig {
           accurateTranscript: true,
           dynamicFilters: true,
           environmentSwitcher: true,
+          piiMasking: { phones: false, names: false, emails: false, transcripts: false },
         },
         branding: { displayName: null, logoUrl: null, theme: null },
       },

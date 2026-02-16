@@ -67,6 +67,7 @@ import { EmailBodyDisplay } from '@/components/email/email-body-display';
 import { RecipientsDisplay } from '@/components/email/recipients-display';
 import { JsonViewer } from '@/components/ui/json-viewer';
 import { AudioPlayer } from '@/components/ui/audio-player';
+import { usePIIMask, type PIIMaskFunctions } from '@/hooks/use-pii-mask';
 
 // Map dashboard environment to Sentry environment for URL
 const SENTRY_ENV_MAP: Record<string, string> = {
@@ -126,7 +127,7 @@ function parseTranscript(transcription: string): TranscriptMessage[] {
   }).filter(msg => msg.text);
 }
 
-function TranscriptBubble({ message }: { message: TranscriptMessage }) {
+function TranscriptBubble({ message, pii }: { message: TranscriptMessage; pii?: PIIMaskFunctions }) {
   const isAgent = message.speaker === 'agent';
   return (
     <div className={cn('flex', isAgent ? 'justify-start' : 'justify-end')}>
@@ -139,7 +140,7 @@ function TranscriptBubble({ message }: { message: TranscriptMessage }) {
         <span className="text-xs font-medium opacity-70 block mb-0.5">
           {isAgent ? 'Agent' : 'Caller'}
         </span>
-        {message.text}
+        {pii ? pii.content(message.text) : message.text}
       </div>
     </div>
   );
@@ -476,7 +477,7 @@ function EndedReasonCard({ reason }: { reason: string }) {
  * Advanced transcript component using webhook messages
  * Shows tool calls as cards with their results, timestamps, and endedReason at the end
  */
-function AdvancedTranscript({ messages, transfers, endedReason }: { messages: WebhookMessage[]; transfers: TransferAttempt[]; endedReason?: string }) {
+function AdvancedTranscript({ messages, transfers, endedReason, pii }: { messages: WebhookMessage[]; transfers: TransferAttempt[]; endedReason?: string; pii?: PIIMaskFunctions }) {
   // Build maps for tool call results and their timestamps
   const { toolResults, toolResultTimestamps } = useMemo(() => {
     const results = new Map<string, string>();
@@ -578,7 +579,7 @@ function AdvancedTranscript({ messages, transfers, endedReason }: { messages: We
                   <span className="text-xs font-medium opacity-70">Agent</span>
                   <span className="text-[10px] text-muted-foreground font-mono tabular-nums">{timestamp}</span>
                 </div>
-                {msg.message}
+                {pii ? pii.content(msg.message) : msg.message}
               </div>
             </div>
           );
@@ -593,7 +594,7 @@ function AdvancedTranscript({ messages, transfers, endedReason }: { messages: We
                   <span className="text-xs font-medium opacity-70">Caller</span>
                   <span className="text-[10px] opacity-70 font-mono tabular-nums">{timestamp}</span>
                 </div>
-                {msg.message}
+                {pii ? pii.content(msg.message) : msg.message}
               </div>
             </div>
           );
@@ -615,10 +616,12 @@ function TranscriptTabContent({
   transcription,
   webhooks,
   webhooksLoading,
+  pii,
 }: {
   transcription: string | null;
   webhooks: Webhook[];
   webhooksLoading: boolean;
+  pii?: PIIMaskFunctions;
 }) {
   // Default to advanced mode
   const [mode, setMode] = useState<'basic' | 'advanced'>('advanced');
@@ -694,10 +697,11 @@ function TranscriptTabContent({
                 messages={extractedData!.messages}
                 transfers={extractedData!.transfers}
                 endedReason={extractedData!.endedReason}
+                pii={pii}
               />
             ) : transcription ? (
               parseTranscript(transcription).map((msg, idx) => (
-                <TranscriptBubble key={idx} message={msg} />
+                <TranscriptBubble key={idx} message={msg} pii={pii} />
               ))
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
@@ -723,7 +727,7 @@ function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode
   );
 }
 
-function TransferItem({ transfer, highlight, transcript }: { transfer: Transfer; highlight?: boolean; transcript?: string }) {
+function TransferItem({ transfer, highlight, transcript, pii }: { transfer: Transfer; highlight?: boolean; transcript?: string; pii?: PIIMaskFunctions }) {
   const [isOpen, setIsOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -745,7 +749,7 @@ function TransferItem({ transfer, highlight, transcript }: { transfer: Transfer;
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {transfer.caller_name || 'Unknown'} → {transfer.transferred_to_name}
+                    {(pii ? pii.name(transfer.caller_name) : transfer.caller_name) || 'Unknown'} → {pii ? pii.name(transfer.transferred_to_name) : transfer.transferred_to_name}
                   </p>
                   <p className="text-xs text-muted-foreground">{transfer.transfer_type}</p>
                 </div>
@@ -762,7 +766,7 @@ function TransferItem({ transfer, highlight, transcript }: { transfer: Transfer;
         <CollapsibleContent>
           <CardContent className="p-3 pt-0 border-t bg-muted/30">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-3">
-              <InfoRow label="Phone" value={transfer.transferred_to_phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
+              <InfoRow label="Phone" value={pii ? pii.phone(transfer.transferred_to_phone_number) : transfer.transferred_to_phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
               <InfoRow label="Pickup Time" value={transfer.time_to_pickup_seconds ? `${transfer.time_to_pickup_seconds}s` : '-'} icon={<Clock className="h-3.5 w-3.5" />} />
               <InfoRow label="Started" value={transfer.transfer_started_at} icon={<Calendar className="h-3.5 w-3.5" />} />
               <InfoRow label="Transfer ID" value={`#${transfer.id}`} icon={<Hash className="h-3.5 w-3.5" />} />
@@ -799,7 +803,7 @@ function TransferItem({ transfer, highlight, transcript }: { transfer: Transfer;
   );
 }
 
-function EmailItem({ email, highlight }: { email: Email; highlight?: boolean }) {
+function EmailItem({ email, highlight, pii }: { email: Email; highlight?: boolean; pii?: PIIMaskFunctions }) {
   const [isOpen, setIsOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -839,7 +843,7 @@ function EmailItem({ email, highlight }: { email: Email; highlight?: boolean }) 
                 <div className="text-muted-foreground mt-0.5"><User className="h-3.5 w-3.5" /></div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">Recipients</p>
-                  <RecipientsDisplay recipients={email.recipients} compact className="text-sm font-medium" />
+                  <RecipientsDisplay recipients={pii ? pii.recipients(email.recipients) : email.recipients} compact className="text-sm font-medium" />
                 </div>
               </div>
               <InfoRow label="Sent At" value={email.sent_at} icon={<Calendar className="h-3.5 w-3.5" />} />
@@ -850,7 +854,7 @@ function EmailItem({ email, highlight }: { email: Email; highlight?: boolean }) 
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground mb-2">Email Body</p>
                 <div className="p-3 bg-background rounded-md border max-h-60 overflow-auto">
-                  <EmailBodyDisplay body={email.body} compact />
+                  <EmailBodyDisplay body={email.body} compact pii={pii} />
                 </div>
               </div>
             )}
@@ -867,9 +871,10 @@ interface WebhookItemProps {
   callerName?: string | null;
   dbTransfers?: Transfer[];
   highlight?: boolean;
+  pii?: PIIMaskFunctions;
 }
 
-function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: WebhookItemProps) {
+function WebhookItem({ webhook, callerName, dbTransfers = [], highlight, pii }: WebhookItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [transfersAcknowledged, setTransfersAcknowledged] = useState(false);
@@ -1010,7 +1015,7 @@ function WebhookItem({ webhook, callerName, dbTransfers = [], highlight }: Webho
                       <div key={transfer.toolCallId} className="p-1.5 bg-muted/50 rounded border text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-medium truncate mr-2">
-                            {transfer.callerName} → {transfer.staffName}
+                            {pii ? pii.name(transfer.callerName) : transfer.callerName} → {pii ? pii.name(transfer.staffName) : transfer.staffName}
                           </span>
                           <Badge variant={transfer.result.toLowerCase().includes('cancelled') ? 'destructive' : 'default'} className="text-[10px] px-1.5 py-0 shrink-0">
                             {transfer.result}
@@ -1441,6 +1446,7 @@ function FeedbackSection({
 export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onShare }: CallDetailPanelSharedProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const { environment } = useEnvironment();
+  const pii = usePIIMask();
   const platformCallId = data?.call?.platform_call_id;
   const sentryEnv = SENTRY_ENV_MAP[environment] || environment;
 
@@ -1645,8 +1651,8 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onSha
             </CardHeader>
             <CardContent className="pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                <InfoRow label="Caller" value={call.caller_name} icon={<User className="h-3.5 w-3.5" />} />
-                <InfoRow label="Phone" value={call.phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
+                <InfoRow label="Caller" value={pii.name(call.caller_name)} icon={<User className="h-3.5 w-3.5" />} />
+                <InfoRow label="Phone" value={pii.phone(call.phone_number)} icon={<Phone className="h-3.5 w-3.5" />} />
                 <InfoRow
                   label="Duration"
                   value={
@@ -1733,6 +1739,7 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onSha
                       transfer={t}
                       highlight={highlightReasons?.transferMismatch}
                       transcript={matchedWebhookTransfer?.transcript}
+                      pii={pii}
                     />
                   );
                 })}
@@ -1758,7 +1765,7 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onSha
             {emails.length > 0 ? (
               <div className="space-y-2">
                 {emails.map((e) => (
-                  <EmailItem key={e.id} email={e} highlight={highlightReasons?.transferMismatch} />
+                  <EmailItem key={e.id} email={e} highlight={highlightReasons?.transferMismatch} pii={pii} />
                 ))}
               </div>
             ) : (
@@ -1799,6 +1806,7 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onSha
                     callerName={call.caller_name}
                     dbTransfers={transfers}
                     highlight={highlightReasons?.transferMismatch}
+                    pii={pii}
                   />
                 ))}
               </div>
@@ -1852,6 +1860,7 @@ export function CallDetailLeftPanel({ callId, highlightReasons, dateRange, onSha
 export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelSharedProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const platformCallId = data?.call?.platform_call_id;
+  const pii = usePIIMask();
 
   // Fetch webhooks for advanced transcript
   const { data: webhooks, isLoading: webhooksLoading } = useWebhooksForCall(platformCallId || null);
@@ -1919,6 +1928,7 @@ export function CallDetailRightPanel({ callId, dateRange }: CallDetailPanelShare
           webhooksLoading={webhooksLoading}
           errorMetrics={errorMetrics}
           errorMetricsLoading={cekuraLoading}
+          pii={pii}
         />
       </div>
     </div>
@@ -1934,11 +1944,13 @@ function AccurateAdvancedTranscript({
   transfers,
   endedReason,
   accurateUtterances,
+  pii,
 }: {
   messages: WebhookMessage[];
   transfers: TransferAttempt[];
   endedReason?: string;
   accurateUtterances: AccurateUtterance[];
+  pii?: PIIMaskFunctions;
 }) {
   // Build tool results map (same as AdvancedTranscript)
   const { toolResults, toolResultTimestamps } = useMemo(() => {
@@ -2038,6 +2050,7 @@ function AccurateAdvancedTranscript({
         if (msg.role === 'bot' && msg.message) {
           const accurate = correctionMap.get(idx);
           const hasCorrections = accurate && accurate.corrections.length > 0;
+          const displayContent = accurate ? accurate.content : msg.message;
           return (
             <div key={idx} className="flex justify-start">
               <div className={cn(
@@ -2055,7 +2068,7 @@ function AccurateAdvancedTranscript({
                   </span>
                   <span className="text-[10px] text-muted-foreground font-mono tabular-nums">{timestamp}</span>
                 </div>
-                {accurate ? accurate.content : msg.message}
+                {pii ? pii.content(displayContent) : displayContent}
                 {hasCorrections && (
                   <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
                     {accurate.corrections.map((c, i) => (
@@ -2077,6 +2090,7 @@ function AccurateAdvancedTranscript({
         if (msg.role === 'user' && msg.message) {
           const accurate = correctionMap.get(idx);
           const hasCorrections = accurate && accurate.corrections.length > 0;
+          const displayContent = accurate ? accurate.content : msg.message;
           return (
             <div key={idx} className="flex justify-end">
               <div className={cn(
@@ -2094,7 +2108,7 @@ function AccurateAdvancedTranscript({
                   </span>
                   <span className="text-[10px] opacity-70 font-mono tabular-nums">{timestamp}</span>
                 </div>
-                {accurate ? accurate.content : msg.message}
+                {pii ? pii.content(displayContent) : displayContent}
                 {hasCorrections && (
                   <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
                     {accurate.corrections.map((c, i) => (
@@ -2124,7 +2138,7 @@ function AccurateAdvancedTranscript({
  * Accurate transcript view with on-demand generation via Gemini AI.
  * Shows a generate button initially, loading state, error state, or the corrected transcript.
  */
-function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, error, reset, messages, transfers, endedReason }: {
+function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, error, reset, messages, transfers, endedReason, pii }: {
   onGenerate: () => void;
   canGenerate: boolean;
   data: TranscriptionAccuracyResult | undefined;
@@ -2134,6 +2148,7 @@ function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, erro
   messages: WebhookMessage[];
   transfers: TransferAttempt[];
   endedReason?: string;
+  pii?: PIIMaskFunctions;
 }) {
 
   if (!data && !isPending && !error) {
@@ -2275,6 +2290,7 @@ function AccurateTranscriptView({ onGenerate, canGenerate, data, isPending, erro
         transfers={transfers}
         endedReason={endedReason}
         accurateUtterances={data.accurate_transcript}
+        pii={pii}
       />
     </div>
   );
@@ -2292,6 +2308,7 @@ function TranscriptSection({
   webhooksLoading,
   errorMetrics,
   errorMetricsLoading,
+  pii,
 }: {
   callId: number | string;
   recordingUrl: string | null;
@@ -2301,6 +2318,7 @@ function TranscriptSection({
   webhooksLoading: boolean;
   errorMetrics?: Array<{ name: string; score: number; explanation: string }>;
   errorMetricsLoading?: boolean;
+  pii?: PIIMaskFunctions;
 }) {
   const [mode, setMode] = useState<'basic' | 'advanced' | 'errors' | 'accurate'>('advanced');
   const accurateTranscript = useAccurateTranscript();
@@ -2417,6 +2435,7 @@ function TranscriptSection({
             isPending={accurateTranscript.isPending}
             error={accurateTranscript.error}
             reset={accurateTranscript.reset}
+            pii={pii}
           />
         ) : showErrors ? (
           <TranscriptErrorsView
@@ -2430,10 +2449,11 @@ function TranscriptSection({
                 messages={extractedData!.messages}
                 transfers={extractedData!.transfers}
                 endedReason={extractedData!.endedReason}
+                pii={pii}
               />
             ) : transcription ? (
               parseTranscript(transcription).map((msg, idx) => (
-                <TranscriptBubble key={idx} message={msg} />
+                <TranscriptBubble key={idx} message={msg} pii={pii} />
               ))
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
@@ -2631,6 +2651,7 @@ function TranscriptErrorsView({
 export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDetailPanelProps) {
   const { data, isLoading, error } = useCallDetail(callId);
   const { environment } = useEnvironment();
+  const pii = usePIIMask();
   const platformCallId = data?.call?.platform_call_id;
 
   // Map dashboard environment to Sentry environment for URL
@@ -2820,8 +2841,8 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
             </CardHeader>
             <CardContent className="pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                <InfoRow label="Caller" value={call.caller_name} icon={<User className="h-3.5 w-3.5" />} />
-                <InfoRow label="Phone" value={call.phone_number} icon={<Phone className="h-3.5 w-3.5" />} />
+                <InfoRow label="Caller" value={pii.name(call.caller_name)} icon={<User className="h-3.5 w-3.5" />} />
+                <InfoRow label="Phone" value={pii.phone(call.phone_number)} icon={<Phone className="h-3.5 w-3.5" />} />
                 <InfoRow
                   label="Duration"
                   value={
@@ -2877,6 +2898,7 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
             transcription={call.transcription}
             webhooks={webhooksList}
             webhooksLoading={webhooksLoading}
+            pii={pii}
           />
         </TabsContent>
 
@@ -2903,6 +2925,7 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
                       transfer={t}
                       highlight={highlightReasons?.transferMismatch}
                       transcript={matchedWebhookTransfer?.transcript}
+                      pii={pii}
                     />
                   );
                 })}
@@ -2928,7 +2951,7 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
             {emails.length > 0 ? (
               <div className="space-y-2">
                 {emails.map((e) => (
-                  <EmailItem key={e.id} email={e} highlight={highlightReasons?.transferMismatch} />
+                  <EmailItem key={e.id} email={e} highlight={highlightReasons?.transferMismatch} pii={pii} />
                 ))}
               </div>
             ) : (
@@ -2969,6 +2992,7 @@ export function CallDetailPanel({ callId, highlightReasons, dateRange }: CallDet
                     callerName={call.caller_name}
                     dbTransfers={transfers}
                     highlight={highlightReasons?.transferMismatch}
+                    pii={pii}
                   />
                 ))}
               </div>

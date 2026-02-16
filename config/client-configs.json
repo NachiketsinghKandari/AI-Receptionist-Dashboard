@@ -7,6 +7,30 @@
     {
       "email": "admin@beyandassociates.com",
       "firmId": 1
+    },
+    {
+      "email": "user@firm1.com",
+      "firmId": 1
+    },
+    {
+      "email": "user@firm2.com",
+      "firmId": 2
+    },
+    {
+      "email": "user@firm3.com",
+      "firmId": 3
+    },
+    {
+      "email": "user@firm4.com",
+      "firmId": 4
+    },
+    {
+      "email": "user@firm5.com",
+      "firmId": 5
+    },
+    {
+      "email": "user@firm6.com",
+      "firmId": 6
     }
   ],
   "firms": {
@@ -39,7 +63,8 @@
         "chat": true,
         "accurateTranscript": true,
         "dynamicFilters": true,
-        "environmentSwitcher": false
+        "environmentSwitcher": false,
+        "piiMasking": { "phones": true, "names": true, "emails": true, "transcripts": true }
       },
       "branding": {
         "displayName": "Bey & Associates",
@@ -81,6 +106,39 @@
           "chart-5": "oklch(0.750 0.070 203)"
         }
       }
+    },
+    "6": {
+      "firmId": 6,
+      "firmName": "Firm 6",
+      "pages": {
+        "calls": true,
+        "reports": true,
+        "emails": true,
+        "transfers": true,
+        "sentry": true,
+        "webhooks": true
+      },
+      "columns": {
+        "calls": {},
+        "emails": {},
+        "transfers": {},
+        "webhooks": {},
+        "sentry": {}
+      },
+      "features": {
+        "aiReports": true,
+        "cekuraIntegration": true,
+        "chat": true,
+        "accurateTranscript": true,
+        "dynamicFilters": true,
+        "environmentSwitcher": true,
+        "piiMasking": { "phones": true, "names": true, "emails": true, "transcripts": true }
+      },
+      "branding": {
+        "displayName": null,
+        "logoUrl": null,
+        "theme": null
+      }
     }
   },
   "defaults": {
@@ -105,7 +163,8 @@
       "chat": true,
       "accurateTranscript": true,
       "dynamicFilters": true,
-      "environmentSwitcher": true
+      "environmentSwitcher": true,
+      "piiMasking": { "phones": false, "names": false, "emails": false, "transcripts": false }
     },
     "branding": {
       "displayName": null,
