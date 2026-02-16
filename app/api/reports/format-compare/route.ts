@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 import { buildReportInputData, formatInputData } from '@/lib/eod/generate-ai-report';
-import { ensureCloned, getReportsDb, getReportById } from '@/lib/sqlite/reports-db';
+import { ensureCloned, getReportById } from '@/lib/sqlite/reports-db';
 import type { EODReportType } from '@/types/api';
 
 const VALID_REPORT_TYPES = new Set<EODReportType>(['success', 'failure', 'full', 'weekly']);
@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
     let rawData = body.rawData;
     if (!rawData && reportId) {
       await ensureCloned(environment);
-      const db = getReportsDb(environment);
-      const report = getReportById(db, reportId);
+      const report = await getReportById(reportId);
 
       if (!report) {
         return errorResponse('Report not found', 404, 'NOT_FOUND');

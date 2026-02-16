@@ -1,11 +1,10 @@
 /**
- * SQLite-based reports storage
- * Replaces Supabase for the reports table with a local file-based DB.
- * On first access, clones existing data from Supabase, then all reads/writes go to SQLite.
+ * Turso-based reports storage
+ * Uses @libsql/client to connect to a hosted Turso (libSQL) database.
+ * On first access per environment, clones existing data from Supabase.
  */
 
-import Database from 'better-sqlite3';
-import path from 'path';
+import { createClient, type Client, type Row } from '@libsql/client';
 import crypto from 'crypto';
 import type { Environment } from '@/lib/constants';
 import { getSupabaseClient } from '@/lib/supabase/client';
@@ -26,20 +25,6 @@ export interface ReportRow {
   firm_id: number | null;
 }
 
-interface RawReportRow {
-  id: string;
-  report_date: string;
-  raw_data: string;
-  generated_at: string;
-  trigger_type: string;
-  full_report: string | null;
-  success_report: string | null;
-  failure_report: string | null;
-  report_type: string | null;
-  errors: number | null;
-  firm_id: number | null;
-}
-
 interface ListReportsOptions {
   reportType?: string | null;
   firmId?: number | null;
@@ -49,93 +34,110 @@ interface ListReportsOptions {
   offset: number;
 }
 
-// --- Connection singleton ---
+// --- Turso client singleton ---
 
-const dbInstances = new Map<Environment, Database.Database>();
+let client: Client | null = null;
 
-function getDbPath(environment: Environment): string {
-  return path.join(process.cwd(), '.data', `reports-${environment}.db`);
+function getClient(): Client {
+  if (client) return client;
+
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  if (!url) throw new Error('TURSO_DATABASE_URL is not set');
+  if (!authToken) throw new Error('TURSO_AUTH_TOKEN is not set');
+
+  client = createClient({ url, authToken });
+  return client;
 }
 
-export function getReportsDb(environment: Environment): Database.Database {
-  const existing = dbInstances.get(environment);
-  if (existing) return existing;
+// --- Schema initialization ---
 
-  const dbPath = getDbPath(environment);
-  const db = new Database(dbPath);
+let schemaInitialized = false;
 
-  // Enable WAL mode for better concurrent read performance
-  db.pragma('journal_mode = WAL');
+async function ensureSchema(): Promise<void> {
+  if (schemaInitialized) return;
 
-  // Create tables and indexes
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS reports (
-      id TEXT PRIMARY KEY,
-      report_date TEXT NOT NULL,
-      raw_data TEXT NOT NULL,
-      generated_at TEXT NOT NULL,
-      trigger_type TEXT,
-      full_report TEXT,
-      success_report TEXT,
-      failure_report TEXT,
-      report_type TEXT,
-      errors INTEGER,
-      firm_id INTEGER
-    );
+  const db = getClient();
+  await db.batch(
+    [
+      {
+        sql: `CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY,
+        environment TEXT NOT NULL DEFAULT 'production',
+        report_date TEXT NOT NULL,
+        raw_data TEXT NOT NULL,
+        generated_at TEXT NOT NULL,
+        trigger_type TEXT,
+        full_report TEXT,
+        success_report TEXT,
+        failure_report TEXT,
+        report_type TEXT,
+        errors INTEGER,
+        firm_id INTEGER
+      )`,
+        args: [],
+      },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_reports_env ON reports(environment)', args: [] },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_reports_report_date ON reports(report_date)', args: [] },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_reports_report_type ON reports(report_type)', args: [] },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_reports_firm_id ON reports(firm_id)', args: [] },
+      {
+        sql: 'CREATE INDEX IF NOT EXISTS idx_reports_env_date_type ON reports(environment, report_date, report_type)',
+        args: [],
+      },
+    ],
+    'write'
+  );
 
-    CREATE INDEX IF NOT EXISTS idx_reports_report_date ON reports(report_date);
-    CREATE INDEX IF NOT EXISTS idx_reports_report_type ON reports(report_type);
-    CREATE INDEX IF NOT EXISTS idx_reports_firm_id ON reports(firm_id);
-    CREATE INDEX IF NOT EXISTS idx_reports_date_type ON reports(report_date, report_type);
-  `);
-
-  dbInstances.set(environment, db);
-  return db;
+  schemaInitialized = true;
 }
 
 // --- Lazy clone from Supabase ---
 
+const clonedEnvironments = new Set<Environment>();
 const clonePromises = new Map<Environment, Promise<void>>();
 
 export async function ensureCloned(environment: Environment): Promise<void> {
-  const db = getReportsDb(environment);
+  await ensureSchema();
 
-  // Quick check: if table already has rows, skip
-  const row = db.prepare('SELECT COUNT(*) as cnt FROM reports').get() as { cnt: number };
-  if (row.cnt > 0) return;
+  if (clonedEnvironments.has(environment)) return;
+
+  const db = getClient();
+  const result = await db.execute({
+    sql: 'SELECT COUNT(*) as cnt FROM reports WHERE environment = ?',
+    args: [environment],
+  });
+
+  const count = Number(result.rows[0]?.cnt ?? 0);
+  if (count > 0) {
+    clonedEnvironments.add(environment);
+    return;
+  }
 
   // Prevent concurrent clones for the same environment
   const existing = clonePromises.get(environment);
   if (existing) return existing;
 
-  const promise = cloneFromSupabase(db, environment);
+  const promise = cloneFromSupabase(environment);
   clonePromises.set(environment, promise);
 
   try {
     await promise;
+    clonedEnvironments.add(environment);
   } finally {
     clonePromises.delete(environment);
   }
 }
 
-async function cloneFromSupabase(db: Database.Database, environment: Environment): Promise<void> {
-  console.log(`[reports-db] Cloning reports from Supabase (${environment})...`);
+async function cloneFromSupabase(environment: Environment): Promise<void> {
+  console.log(`[reports-db] Cloning reports from Supabase (${environment}) to Turso...`);
 
   const supabase = getSupabaseClient(environment);
+  const db = getClient();
   const PAGE_SIZE = 500;
   let offset = 0;
   let total = 0;
-
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO reports (id, report_date, raw_data, generated_at, trigger_type, full_report, success_report, failure_report, report_type, errors, firm_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const insertMany = db.transaction((rows: RawReportRow[]) => {
-    for (const r of rows) {
-      insert.run(r.id, r.report_date, r.raw_data, r.generated_at, r.trigger_type, r.full_report, r.success_report, r.failure_report, r.report_type, r.errors, r.firm_id);
-    }
-  });
 
   while (true) {
     const { data, error } = await supabase
@@ -151,36 +153,50 @@ async function cloneFromSupabase(db: Database.Database, environment: Environment
 
     if (!data || data.length === 0) break;
 
-    const rows: RawReportRow[] = data.map((r: Record<string, unknown>) => ({
-      id: r.id as string,
-      report_date: r.report_date as string,
-      raw_data: typeof r.raw_data === 'string' ? r.raw_data : JSON.stringify(r.raw_data),
-      generated_at: r.generated_at as string,
-      trigger_type: r.trigger_type as string,
-      full_report: (r.full_report as string | null) ?? null,
-      success_report: (r.success_report as string | null) ?? null,
-      failure_report: (r.failure_report as string | null) ?? null,
-      report_type: (r.report_type as string | null) ?? null,
-      errors: (r.errors as number | null) ?? null,
-      firm_id: (r.firm_id as number | null) ?? null,
+    const statements = data.map((r: Record<string, unknown>) => ({
+      sql: `INSERT OR IGNORE INTO reports (id, environment, report_date, raw_data, generated_at, trigger_type, full_report, success_report, failure_report, report_type, errors, firm_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        r.id as string,
+        environment,
+        r.report_date as string,
+        typeof r.raw_data === 'string' ? r.raw_data : JSON.stringify(r.raw_data),
+        r.generated_at as string,
+        (r.trigger_type as string) ?? null,
+        (r.full_report as string | null) ?? null,
+        (r.success_report as string | null) ?? null,
+        (r.failure_report as string | null) ?? null,
+        (r.report_type as string | null) ?? null,
+        (r.errors as number | null) ?? null,
+        (r.firm_id as number | null) ?? null,
+      ],
     }));
 
-    insertMany(rows);
-    total += rows.length;
+    await db.batch(statements, 'write');
+    total += data.length;
 
     if (data.length < PAGE_SIZE) break;
     offset += PAGE_SIZE;
   }
 
-  console.log(`[reports-db] Cloned ${total} reports from Supabase (${environment})`);
+  console.log(`[reports-db] Cloned ${total} reports from Supabase (${environment}) to Turso`);
 }
 
 // --- Helpers ---
 
-function parseRow(row: RawReportRow): ReportRow {
+function parseRow(row: Row): ReportRow {
   return {
-    ...row,
-    raw_data: JSON.parse(row.raw_data),
+    id: row.id as string,
+    report_date: row.report_date as string,
+    raw_data: JSON.parse(row.raw_data as string),
+    generated_at: row.generated_at as string,
+    trigger_type: row.trigger_type as string,
+    full_report: (row.full_report as string | null) ?? null,
+    success_report: (row.success_report as string | null) ?? null,
+    failure_report: (row.failure_report as string | null) ?? null,
+    report_type: (row.report_type as string | null) ?? null,
+    errors: row.errors != null ? Number(row.errors) : null,
+    firm_id: row.firm_id != null ? Number(row.firm_id) : null,
   };
 }
 
@@ -189,14 +205,14 @@ const SORTABLE_COLUMNS = new Set(['report_date', 'generated_at', 'report_type', 
 
 // --- CRUD functions ---
 
-export function listReports(
-  db: Database.Database,
+export async function listReports(
+  environment: Environment,
   options: ListReportsOptions
-): { data: ReportRow[]; total: number } {
+): Promise<{ data: ReportRow[]; total: number }> {
   const { reportType, firmId, sortBy = 'report_date', sortOrder = 'desc', limit, offset } = options;
 
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+  const conditions: string[] = ['environment = ?'];
+  const params: (string | number | null)[] = [environment];
 
   if (reportType) {
     conditions.push('report_type = ?');
@@ -208,63 +224,73 @@ export function listReports(
     params.push(firmId);
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  // Validate sortBy against allowlist
+  const where = `WHERE ${conditions.join(' AND ')}`;
   const safeSortBy = SORTABLE_COLUMNS.has(sortBy) ? sortBy : 'report_date';
   const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
-  const countRow = db.prepare(`SELECT COUNT(*) as cnt FROM reports ${where}`).get(...params) as { cnt: number };
+  const db = getClient();
 
-  const rows = db.prepare(
-    `SELECT * FROM reports ${where} ORDER BY ${safeSortBy} ${safeSortOrder} LIMIT ? OFFSET ?`
-  ).all(...params, limit, offset) as RawReportRow[];
+  const countResult = await db.execute({
+    sql: `SELECT COUNT(*) as cnt FROM reports ${where}`,
+    args: params,
+  });
+
+  const dataResult = await db.execute({
+    sql: `SELECT * FROM reports ${where} ORDER BY ${safeSortBy} ${safeSortOrder} LIMIT ? OFFSET ?`,
+    args: [...params, limit, offset],
+  });
 
   return {
-    data: rows.map(parseRow),
-    total: countRow.cnt,
+    data: dataResult.rows.map(parseRow),
+    total: Number(countResult.rows[0]?.cnt ?? 0),
   };
 }
 
-export function getReportByDateAndType(
-  db: Database.Database,
+export async function getReportByDateAndType(
+  environment: Environment,
   reportDate: string,
   reportType: string
-): ReportRow | null {
-  const row = db.prepare(
-    'SELECT * FROM reports WHERE report_date = ? AND report_type = ? LIMIT 1'
-  ).get(reportDate, reportType) as RawReportRow | undefined;
+): Promise<ReportRow | null> {
+  const db = getClient();
+  const result = await db.execute({
+    sql: 'SELECT * FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? LIMIT 1',
+    args: [environment, reportDate, reportType],
+  });
 
-  return row ? parseRow(row) : null;
+  return result.rows.length > 0 ? parseRow(result.rows[0]) : null;
 }
 
-export function findReportByDateTypeAndFirm(
-  db: Database.Database,
+export async function findReportByDateTypeAndFirm(
+  environment: Environment,
   reportDate: string,
   reportType: string,
   firmId: number | null
-): { id: string } | null {
-  let row: { id: string } | undefined;
+): Promise<{ id: string } | null> {
+  const db = getClient();
+  let result;
+
   if (firmId != null) {
-    row = db.prepare(
-      'SELECT id FROM reports WHERE report_date = ? AND report_type = ? AND firm_id = ? LIMIT 1'
-    ).get(reportDate, reportType, firmId) as { id: string } | undefined;
+    result = await db.execute({
+      sql: 'SELECT id FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? AND firm_id = ? LIMIT 1',
+      args: [environment, reportDate, reportType, firmId],
+    });
   } else {
-    row = db.prepare(
-      'SELECT id FROM reports WHERE report_date = ? AND report_type = ? AND firm_id IS NULL LIMIT 1'
-    ).get(reportDate, reportType) as { id: string } | undefined;
+    result = await db.execute({
+      sql: 'SELECT id FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? AND firm_id IS NULL LIMIT 1',
+      args: [environment, reportDate, reportType],
+    });
   }
-  return row ?? null;
+
+  return result.rows.length > 0 ? { id: result.rows[0].id as string } : null;
 }
 
-export function updateReport(
-  db: Database.Database,
+export async function updateReport(
   id: string,
   data: Partial<Omit<ReportRow, 'id'>>
-): ReportRow | null {
+): Promise<ReportRow | null> {
   const rawData = data.raw_data != null ? JSON.stringify(data.raw_data) : undefined;
   const fields: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | null)[] = [];
 
   if (rawData !== undefined) { fields.push('raw_data = ?'); params.push(rawData); }
   if (data.generated_at !== undefined) { fields.push('generated_at = ?'); params.push(data.generated_at); }
@@ -275,90 +301,108 @@ export function updateReport(
   if ('success_report' in data) { fields.push('success_report = ?'); params.push(data.success_report ?? null); }
   if ('failure_report' in data) { fields.push('failure_report = ?'); params.push(data.failure_report ?? null); }
 
-  if (fields.length === 0) return getReportById(db, id);
+  if (fields.length === 0) return getReportById(id);
 
+  const db = getClient();
   params.push(id);
-  db.prepare(`UPDATE reports SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  await db.execute({
+    sql: `UPDATE reports SET ${fields.join(', ')} WHERE id = ?`,
+    args: params,
+  });
 
-  return getReportById(db, id);
+  return getReportById(id);
 }
 
-export function insertReport(
-  db: Database.Database,
+export async function insertReport(
+  environment: Environment,
   data: Omit<ReportRow, 'id'> & { firm_id?: number | null }
-): ReportRow {
+): Promise<ReportRow> {
   const id = crypto.randomUUID();
   const rawData = JSON.stringify(data.raw_data);
 
-  db.prepare(`
-    INSERT INTO reports (id, report_date, raw_data, generated_at, trigger_type, full_report, success_report, failure_report, report_type, errors, firm_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    data.report_date,
-    rawData,
-    data.generated_at,
-    data.trigger_type,
-    data.full_report ?? null,
-    data.success_report ?? null,
-    data.failure_report ?? null,
-    data.report_type ?? null,
-    data.errors ?? null,
-    data.firm_id ?? null
-  );
+  const db = getClient();
+  await db.execute({
+    sql: `INSERT INTO reports (id, environment, report_date, raw_data, generated_at, trigger_type, full_report, success_report, failure_report, report_type, errors, firm_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      id,
+      environment,
+      data.report_date,
+      rawData,
+      data.generated_at,
+      data.trigger_type ?? null,
+      data.full_report ?? null,
+      data.success_report ?? null,
+      data.failure_report ?? null,
+      data.report_type ?? null,
+      data.errors ?? null,
+      data.firm_id ?? null,
+    ],
+  });
 
-  return getReportById(db, id)!;
+  return (await getReportById(id))!;
 }
 
-export function updateReportColumns(
-  db: Database.Database,
+export async function updateReportColumns(
   id: string,
   columns: Record<string, unknown>
-): void {
+): Promise<void> {
   const fields: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number | null)[] = [];
 
   for (const [key, value] of Object.entries(columns)) {
     fields.push(`${key} = ?`);
-    params.push(value ?? null);
+    params.push((value as string | number | null) ?? null);
   }
 
   if (fields.length === 0) return;
 
+  const db = getClient();
   params.push(id);
-  db.prepare(`UPDATE reports SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  await db.execute({
+    sql: `UPDATE reports SET ${fields.join(', ')} WHERE id = ?`,
+    args: params,
+  });
 }
 
-export function getReportsForWeeklyAggregation(
-  db: Database.Database,
+export async function getReportsForWeeklyAggregation(
+  environment: Environment,
   weekStart: string,
   weekEnd: string,
   firmId: number | null | undefined
-): ReportRow[] {
-  let rows: RawReportRow[];
+): Promise<ReportRow[]> {
+  const db = getClient();
+  let result;
 
   if (firmId != null) {
-    rows = db.prepare(`
-      SELECT * FROM reports
-      WHERE report_date >= ? AND report_date <= ?
-        AND (report_type = 'eod' OR report_type IS NULL)
-        AND firm_id = ?
-      ORDER BY report_date ASC
-    `).all(weekStart, weekEnd, firmId) as RawReportRow[];
+    result = await db.execute({
+      sql: `SELECT * FROM reports
+            WHERE environment = ? AND report_date >= ? AND report_date <= ?
+              AND (report_type = 'eod' OR report_type IS NULL)
+              AND firm_id = ?
+            ORDER BY report_date ASC`,
+      args: [environment, weekStart, weekEnd, firmId],
+    });
   } else {
-    rows = db.prepare(`
-      SELECT * FROM reports
-      WHERE report_date >= ? AND report_date <= ?
-        AND (report_type = 'eod' OR report_type IS NULL)
-        AND firm_id IS NULL
-      ORDER BY report_date ASC
-    `).all(weekStart, weekEnd) as RawReportRow[];
+    result = await db.execute({
+      sql: `SELECT * FROM reports
+            WHERE environment = ? AND report_date >= ? AND report_date <= ?
+              AND (report_type = 'eod' OR report_type IS NULL)
+              AND firm_id IS NULL
+            ORDER BY report_date ASC`,
+      args: [environment, weekStart, weekEnd],
+    });
   }
 
-  return rows.map(parseRow);
+  return result.rows.map(parseRow);
 }
 
-export function getReportById(db: Database.Database, id: string): ReportRow | null {
-  const row = db.prepare('SELECT * FROM reports WHERE id = ?').get(id) as RawReportRow | undefined;
-  return row ? parseRow(row) : null;
+export async function getReportById(id: string): Promise<ReportRow | null> {
+  const db = getClient();
+  const result = await db.execute({
+    sql: 'SELECT * FROM reports WHERE id = ?',
+    args: [id],
+  });
+
+  return result.rows.length > 0 ? parseRow(result.rows[0]) : null;
 }

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
-import { ensureCloned, getReportsDb, getReportsForWeeklyAggregation } from '@/lib/sqlite/reports-db';
+import { ensureCloned, getReportsForWeeklyAggregation } from '@/lib/sqlite/reports-db';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import type {
   EODRawData,
@@ -42,9 +42,8 @@ export async function POST(request: NextRequest) {
     const weekEnd = format(sunday, 'yyyy-MM-dd');
 
     await ensureCloned(environment);
-    const db = getReportsDb(environment);
 
-    const eodReports = getReportsForWeeklyAggregation(db, weekStart, weekEnd, firmId);
+    const eodReports = await getReportsForWeeklyAggregation(environment, weekStart, weekEnd, firmId);
 
     if (eodReports.length === 0) {
       return errorResponse(

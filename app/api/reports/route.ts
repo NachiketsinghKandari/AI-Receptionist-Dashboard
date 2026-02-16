@@ -10,7 +10,6 @@ import { errorResponse, parseIntOrDefault, clamp, parseEnvironment } from '@/lib
 import { MAX_PAGE_LIMIT, DEFAULT_PAGE_LIMIT } from '@/lib/constants';
 import {
   ensureCloned,
-  getReportsDb,
   listReports,
   findReportByDateTypeAndFirm,
   updateReport,
@@ -35,9 +34,8 @@ export async function GET(request: NextRequest) {
     const firmId = firmIdParam ? parseInt(firmIdParam, 10) : null;
 
     await ensureCloned(environment);
-    const db = getReportsDb(environment);
 
-    const { data, total } = listReports(db, {
+    const { data, total } = await listReports(environment, {
       reportType,
       firmId,
       sortBy,
@@ -78,14 +76,13 @@ export async function POST(request: NextRequest) {
     }
 
     await ensureCloned(environment);
-    const db = getReportsDb(environment);
 
     // Check if report already exists for this date, type, and firm
-    const existing = findReportByDateTypeAndFirm(db, reportDate, reportType, firmIdValue);
+    const existing = await findReportByDateTypeAndFirm(environment, reportDate, reportType, firmIdValue);
 
     if (existing) {
       // Update existing report - clear AI fields for regeneration
-      const data = updateReport(db, existing.id, {
+      const data = await updateReport(existing.id, {
         raw_data: rawData,
         generated_at: new Date().toISOString(),
         trigger_type: triggerType,
@@ -118,7 +115,7 @@ export async function POST(request: NextRequest) {
       insertPayload.firm_id = firmIdValue;
     }
 
-    const data = insertReport(db, insertPayload as Parameters<typeof insertReport>[1]);
+    const data = await insertReport(environment, insertPayload as Parameters<typeof insertReport>[1]);
 
     return NextResponse.json({
       report: data,

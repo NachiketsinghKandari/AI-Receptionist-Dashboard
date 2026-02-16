@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
-import { ensureCloned, getReportsDb, getReportByDateAndType } from '@/lib/sqlite/reports-db';
+import { ensureCloned, getReportByDateAndType } from '@/lib/sqlite/reports-db';
 
 export async function GET(
   request: NextRequest,
@@ -40,9 +40,8 @@ export async function GET(
     }
 
     await ensureCloned(environment);
-    const db = getReportsDb(environment);
 
-    const data = getReportByDateAndType(db, reportDate, reportType);
+    const data = await getReportByDateAndType(environment, reportDate, reportType);
 
     if (!data) {
       return errorResponse('Report not found', 404, 'NOT_FOUND');

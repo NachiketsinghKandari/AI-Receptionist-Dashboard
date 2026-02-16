@@ -5,7 +5,7 @@
 
 import { generateContent, type GeminiConfig, type LLMModel, type LLMProvider } from '@/lib/llm';
 import { getSupabaseClient } from '@/lib/supabase/client';
-import { ensureCloned, getReportsDb, updateReportColumns } from '@/lib/sqlite/reports-db';
+import { ensureCloned, updateReportColumns } from '@/lib/sqlite/reports-db';
 import type { Environment } from '@/lib/constants';
 import type { EODRawData, WeeklyRawData, EODReportType, EODCallRawData, DataFormat } from '@/types/api';
 import { encode as toonEncode } from '@toon-format/toon';
@@ -317,8 +317,7 @@ export async function generateAIReportForEOD(
       }
 
       await ensureCloned(environment);
-      const reportsDb = getReportsDb(environment);
-      updateReportColumns(reportsDb, reportId, {
+      await updateReportColumns(reportId, {
         [COLUMN_MAP[reportType]]: aiResult.ai_response,
         errors: weeklyData.failure_count,
       });
@@ -344,8 +343,7 @@ export async function generateAIReportForEOD(
         : 'No calls to analyze for this period.';
 
       await ensureCloned(environment);
-      const emptyDb = getReportsDb(environment);
-      updateReportColumns(emptyDb, reportId, { [COLUMN_MAP[reportType]]: emptyMessage });
+      await updateReportColumns(reportId, { [COLUMN_MAP[reportType]]: emptyMessage });
 
       console.log(`No ${reportType} calls for report ${reportId}, saved empty message`);
       return { success: true, reportType };
@@ -423,8 +421,7 @@ export async function generateAIReportForEOD(
 
     // Update the appropriate column based on report type, and also update errors count
     await ensureCloned(environment);
-    const eodDb = getReportsDb(environment);
-    updateReportColumns(eodDb, reportId, {
+    await updateReportColumns(reportId, {
       [COLUMN_MAP[reportType]]: aiResult.ai_response,
       errors: errorCount,
     });
