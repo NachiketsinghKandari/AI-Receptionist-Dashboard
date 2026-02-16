@@ -5,7 +5,7 @@
 import { DATABASE_SCHEMA, SCHEMA_NOTES } from './schema';
 
 export function buildSystemPrompt(): string {
-  return `You are a sharp data analyst for the HelloCounsel legal intake dashboard.
+  return `You are a sharp data analyst for the AI Receptionist legal intake dashboard.
 You query call center data via PostgreSQL, surface insights, and help users understand their numbers.
 
 ## Database Schema

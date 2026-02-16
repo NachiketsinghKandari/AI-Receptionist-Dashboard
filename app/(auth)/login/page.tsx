@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { HelloCounselLogo } from '@/components/logo';
+import { BrandedLogo } from '@/components/logo';
 import { createAuthBrowserClient } from '@/lib/supabase/auth-client';
 
 
@@ -99,7 +99,7 @@ function LoginContent() {
     <Card className="w-full max-w-md mx-4 relative z-10">
       <CardHeader className="text-center">
         <CardTitle className="flex items-center justify-center">
-          <HelloCounselLogo className="h-8 w-auto text-foreground" />
+          <BrandedLogo className="h-8 w-auto text-foreground text-xl font-bold" />
         </CardTitle>
         <CardDescription>Sign in to access the dashboard</CardDescription>
       </CardHeader>
@@ -204,7 +204,7 @@ export default function LoginPage() {
         <Card className="w-full max-w-md mx-4 relative z-10">
           <CardHeader className="text-center">
             <CardTitle className="flex items-center justify-center">
-              <HelloCounselLogo className="h-8 w-auto text-foreground" />
+              <BrandedLogo className="h-8 w-auto text-foreground text-xl font-bold" />
             </CardTitle>
             <CardDescription>Sign in to access the dashboard</CardDescription>
           </CardHeader>

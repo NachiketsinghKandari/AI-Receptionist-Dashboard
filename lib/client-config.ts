@@ -11,7 +11,7 @@ export function readConfig(): ClientConfig {
   } catch {
     // Return safe defaults if file is missing/corrupt
     return {
-      adminDomains: ['hellocounsel.com'],
+      adminDomains: ['hellocounsel.ai'],
       userFirmMappings: [],
       firms: {},
       defaults: {

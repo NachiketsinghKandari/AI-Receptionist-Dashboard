@@ -2,7 +2,7 @@
 
 ## System Summary
 
-HelloCounsel Dashboard is a Next.js 16 internal dashboard for monitoring AI-powered legal call center operations. Built with React 19, TypeScript, Tailwind CSS v4, and shadcn/ui. It follows the BFF (Backend-for-Frontend) pattern where all external API calls go through Next.js API routes. Data lives in two Supabase PostgreSQL projects (production and staging), with external integrations to Sentry (error tracking) and Cekura (call observability).
+AI Receptionist Dashboard is a Next.js 16 internal dashboard for monitoring AI-powered legal call center operations. Built with React 19, TypeScript, Tailwind CSS v4, and shadcn/ui. It follows the BFF (Backend-for-Frontend) pattern where all external API calls go through Next.js API routes. Data lives in two Supabase PostgreSQL projects (production and staging), with external integrations to Sentry (error tracking) and Cekura (call observability).
 
 **Tech Stack:**
 - **Frontend**: Next.js 16 (App Router, Turbopack), React 19, TypeScript (strict), TanStack Query, TanStack Table, Recharts
@@ -728,8 +728,8 @@ JWT_SECRET=xxx                                  # Secret for signing JWT session
 
 ```bash
 # Sentry Integration (Error Tracking)
-SENTRY_ORG=hellocounsel                         # Sentry organization slug
-SENTRY_PROJECT=hellocounsel-dashboard           # Sentry project slug
+SENTRY_ORG=ai-receptionist                      # Sentry organization slug
+SENTRY_PROJECT=ai-receptionist-dashboard        # Sentry project slug
 SENTRY_AUTH_TOKEN=xxx                           # Sentry API token
 
 # Cekura Integration (Call Quality)
@@ -998,4 +998,4 @@ graph TB
 
 **Document Version**: 1.0
 **Last Updated**: 2026-02-08
-**Maintained By**: HelloCounsel Engineering Team
+**Maintained By**: AI Receptionist Engineering Team

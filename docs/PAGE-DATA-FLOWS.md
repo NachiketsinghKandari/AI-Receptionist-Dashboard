@@ -1,6 +1,6 @@
 # Page Data Flows
 
-This document traces the complete data pipeline for each page in the HelloCounsel Dashboard — from user interaction through React components, TanStack Query hooks, API routes, and external services.
+This document traces the complete data pipeline for each page in the AI Receptionist Dashboard — from user interaction through React components, TanStack Query hooks, API routes, and external services.
 
 ## Shared Infrastructure
 

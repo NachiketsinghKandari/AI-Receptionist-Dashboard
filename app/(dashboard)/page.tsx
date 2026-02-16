@@ -289,7 +289,7 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex flex-col gap-1">
         <p className="text-xs md:text-sm text-muted-foreground">
-          {(!isAdmin && config?.branding?.displayName) || 'HelloCounsel'} {environment.charAt(0).toUpperCase() + environment.slice(1)}
+          {(!isAdmin && config?.branding?.displayName) || 'AI Receptionist'} {environment.charAt(0).toUpperCase() + environment.slice(1)}
         </p>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           Welcome{typedName ? ` ${typedName}` : ''}

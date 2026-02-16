@@ -1,7 +1,7 @@
 {
 	"info": {
-		"_postman_id": "hellocounsel-dashboard-api",
-		"name": "HelloCounsel Dashboard API",
+		"_postman_id": "ai-receptionist-dashboard-api",
+		"name": "AI Receptionist Dashboard API",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"auth": {
@@ -17,7 +17,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "https://hellocounsel-dashboard.vercel.app"
+			"value": "https://ai-receptionist-dashboard.vercel.app"
 		},
 		{
 			"key": "email",

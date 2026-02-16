@@ -1,4 +1,4 @@
-# HelloCounsel Dashboard - Design Principles
+# AI Receptionist Dashboard - Design Principles
 
 This document outlines the UI design system, patterns, and conventions used throughout the dashboard.
 
@@ -63,7 +63,7 @@ Uses **OKLCH** for perceptual uniformity and better color manipulation.
 | `font-medium` | Labels, emphasis |
 | `font-semibold` | Card titles, headers |
 | `font-bold` | Strong emphasis |
-| `font-black` | Logo ("Counsel" in HelloCounsel) |
+| `font-black` | Logo ("Counsel" in AI Receptionist) |
 
 ---
 

@@ -116,7 +116,7 @@ export function BrandingEditor({ branding, onChange }: BrandingEditorProps) {
               }
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Replaces &quot;HelloCounsel&quot; in the navbar and page title
+              Replaces &quot;AI Receptionist&quot; in the navbar and page title
             </p>
           </div>
           <div>

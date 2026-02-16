@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { HelloCounselLogo } from '@/components/logo';
+import { BrandedLogo } from '@/components/logo';
 import { createAuthBrowserClient } from '@/lib/supabase/auth-client';
 
 export default function ForgotPasswordPage() {
@@ -76,7 +76,7 @@ export default function ForgotPasswordPage() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center">
-            <HelloCounselLogo className="h-8 w-auto text-foreground" />
+            <BrandedLogo className="h-8 w-auto text-foreground text-xl font-bold" />
           </CardTitle>
           <CardDescription>
             Enter your email address and we&apos;ll send you a link to reset your password

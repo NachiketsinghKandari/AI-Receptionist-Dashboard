@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the improved implementation strategy for Sentry logs integration in the HelloCounsel Dashboard, addressing current limitations and leveraging better API endpoints.
+This document outlines the improved implementation strategy for Sentry logs integration in the AI Receptionist Dashboard, addressing current limitations and leveraging better API endpoints.
 
 ---
 

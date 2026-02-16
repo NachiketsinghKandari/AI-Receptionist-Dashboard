@@ -12,12 +12,8 @@ import {
 
 const BEY_LOGO_URL = 'https://beyandassociates.com/wp-content/uploads/2021/08/bey-logo-300x66.png';
 
-let cachedHCLogoSvg: string | null = null;
-async function fetchHelloCounselSvg(): Promise<string> {
-  if (cachedHCLogoSvg) return cachedHCLogoSvg;
-  const res = await fetch(`${window.location.origin}/HelloCounsel.svg`);
-  cachedHCLogoSvg = await res.text();
-  return cachedHCLogoSvg;
+function getDefaultLogoSvg(): string {
+  return `<span style="font-size:22px;font-weight:700;color:#18181b;">AI Receptionist</span>`;
 }
 
 function imageToDataUrl(url: string): Promise<string> {
@@ -36,7 +32,7 @@ function imageToDataUrl(url: string): Promise<string> {
   });
 }
 
-type LogoBranding = 'firm' | 'hellocounsel' | 'none';
+type LogoBranding = 'firm' | 'default' | 'none';
 
 interface PDFExportButtonProps {
   contentRef: RefObject<HTMLDivElement | null>;
@@ -286,7 +282,7 @@ export function PDFExportButton({
 
   const getLogoHtml = async (branding: LogoBranding): Promise<string> => {
     if (branding === 'none') return '';
-    if (branding === 'hellocounsel') return fetchHelloCounselSvg();
+    if (branding === 'default') return getDefaultLogoSvg();
 
     // Firm logo
     if (firmId === 1) {
@@ -297,8 +293,8 @@ export function PDFExportButton({
         return `<img src="${BEY_LOGO_URL}" alt="Bey &amp; Associates" />`;
       }
     }
-    // Fallback to HelloCounsel if no firm logo available
-    return fetchHelloCounselSvg();
+    // Fallback to default if no firm logo available
+    return getDefaultLogoSvg();
   };
 
   const handlePrint = async (branding: LogoBranding) => {
@@ -325,8 +321,8 @@ export function PDFExportButton({
             With Firm Logo{firmName ? ` (${firmName})` : ''}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={() => handlePrint('hellocounsel')}>
-          With HelloCounsel Logo
+        <DropdownMenuItem onClick={() => handlePrint('default')}>
+          With AI Receptionist Logo
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handlePrint('none')}>
           Without Logo

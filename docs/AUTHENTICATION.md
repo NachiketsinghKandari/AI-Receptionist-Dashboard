@@ -1,7 +1,7 @@
 # Authentication and Session Management
 
 ## Overview
-HelloCounsel Dashboard uses Supabase Auth for authentication. Sessions are managed via Supabase cookies (sb-* prefix). A proxy.ts file acts as the auth gate for all non-public routes (replacing deprecated middleware.ts in Next.js 16).
+AI Receptionist Dashboard uses Supabase Auth for authentication. Sessions are managed via Supabase cookies (sb-* prefix). A proxy.ts file acts as the auth gate for all non-public routes (replacing deprecated middleware.ts in Next.js 16).
 
 ## Auth Flow Diagrams
 

@@ -26,7 +26,7 @@ CREATE TABLE calls (
 );
 
 -- Table: firms
--- Law firms / legal organizations that use HelloCounsel. Every call, transfer, and email belongs to a firm.
+-- Law firms / legal organizations that use the AI Receptionist. Every call, transfer, and email belongs to a firm.
 -- Use this table when the user asks about firms, firm names, or wants to group/filter data by firm.
 CREATE TABLE firms (
   id   serial PRIMARY KEY,                       -- Internal firm ID. Referenced by calls.firm_id, transfers_details.firm_id, email_logs.firm_id, eod_reports.firm_id

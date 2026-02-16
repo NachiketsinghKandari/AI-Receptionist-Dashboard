@@ -82,7 +82,7 @@ async function fetchPrompt(
 }
 
 // Dashboard base URL for correlation ID links
-const DASHBOARD_URL = 'https://hellocounsel-dashboard.vercel.app/calls';
+const DASHBOARD_URL = 'https://ai-receptionist-dashboard.vercel.app/calls';
 
 // Brief explanation of TOON syntax prepended when dataFormat is 'toon'
 const TOON_PREAMBLE = `=== DATA FORMAT ===

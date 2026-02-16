@@ -1,4 +1,4 @@
-# HelloCounsel Dashboard - Product Demo Script
+# AI Receptionist Dashboard - Product Demo Script
 
 A walkthrough guide for recording a product demo video. Follow these sections sequentially.
 
@@ -8,7 +8,7 @@ A walkthrough guide for recording a product demo video. Follow these sections se
 
 ### Login Page
 - Navigate to the login URL.
-- Show the branded card with the HelloCounsel logo, email/password fields, and the password visibility toggle (eye icon).
+- Show the branded card with the AI Receptionist logo, email/password fields, and the password visibility toggle (eye icon).
 - Mention the "Forgot your password?" link, which sends a reset email via Supabase Auth.
 - Note: Google OAuth is built in but currently hidden. Only authorized team members can access.
 
@@ -23,7 +23,7 @@ A walkthrough guide for recording a product demo video. Follow these sections se
 
 ### Welcome and Navigation
 - After logging in, show the home page with the personalized welcome message. On first load or page refresh, the username types out letter-by-letter (typing animation). On client-side navigation, it appears instantly.
-- Point out the subtitle showing the current environment (e.g., "HelloCounsel Production") and the tagline "Call routing and management dashboard."
+- Point out the subtitle showing the current environment (e.g., "AI Receptionist Production") and the tagline "Call routing and management dashboard."
 
 ### Quick Links Grid
 - Demonstrate the six quick-link cards: Calls, Reports, Emails, Transfers, Sentry, Webhooks.
@@ -242,7 +242,7 @@ A walkthrough guide for recording a product demo video. Follow these sections se
 - **AI Reports** with tabs: Failure, Success, Full (for EOD) or Weekly Report (for weekly).
 - Each tab shows the AI-generated markdown report rendered with proper formatting (headings, lists, tables, bold/italic).
 - **Export Options** per report:
-  - **PDF Export**: Click the printer icon. Choose branding: firm logo, HelloCounsel logo, or no logo. Generates a branded PDF with header, title, and formatted content.
+  - **PDF Export**: Click the printer icon. Choose branding: firm logo, AI Receptionist logo, or no logo. Generates a branded PDF with header, title, and formatted content.
   - **DOCX Export**: Click the document icon. Downloads a Word document.
   - **Copy to Clipboard**: Click the copy icon.
   - **Regenerate**: Click the refresh icon dropdown to regenerate with JSON or TOON format.
@@ -317,7 +317,7 @@ A walkthrough guide for recording a product demo video. Follow these sections se
   - Environment Switcher
 
 #### Branding Tab
-- **Display Name**: Replace "HelloCounsel" with the firm's name throughout the UI (navbar, page title).
+- **Display Name**: Replace "AI Receptionist" with the firm's name throughout the UI (navbar, page title).
 - **Logo URL**: Provide a URL to the firm's logo. A preview renders below the input.
 - **Border Radius**: Choose corner roundness (Sharp/0, 0.25rem, 0.5rem, 0.625rem) with quick-select buttons or a custom value.
 - **Color Theme**: Full color customization with sections:

@@ -1,4 +1,4 @@
-# Responsive Design Overhaul Plan - HelloCounsel Dashboard
+# Responsive Design Overhaul Plan - AI Receptionist Dashboard
 
 ## Summary
 

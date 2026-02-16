@@ -40,7 +40,7 @@ SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_KEY=eyJ...
 
 # Sentry API (same as Python codebase)
-SENTRY_ORG=hellocounsel
+SENTRY_ORG=ai-receptionist
 SENTRY_PROJECT=routing-intake-agent
 SENTRY_AUTH_TOKEN=sntrys_xxx
 
@@ -71,10 +71,10 @@ To set up initial users, configure them in your Supabase project's Authenticatio
 
 ## API Documentation
 
-A Postman collection is available at `postman/hellocounsel-dashboard-api.json`. Import it into Postman to explore all API endpoints.
+A Postman collection is available at `postman/ai-receptionist-dashboard-api.json`. Import it into Postman to explore all API endpoints.
 
 Collection variables to configure:
-- `base_url` -- Your server URL (default: `https://hellocounsel-dashboard.vercel.app`)
+- `base_url` -- Your server URL (default: `https://ai-receptionist-dashboard.vercel.app`)
 - `email` -- Your login email
 - `password` -- Your login password
 - `access_token` -- Auto-populated after running the Login request
