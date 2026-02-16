@@ -29,6 +29,7 @@ export interface ReportRow {
 interface ListReportsOptions {
   reportType?: string | null;
   firmId?: number | null;
+  excludeTriggerType?: string;
   sortBy?: string;
   sortOrder?: string;
   limit: number;
@@ -193,7 +194,7 @@ export async function listReports(
   environment: Environment,
   options: ListReportsOptions
 ): Promise<{ data: ReportRow[]; total: number }> {
-  const { reportType, firmId, sortBy = 'report_date', sortOrder = 'desc', limit, offset } = options;
+  const { reportType, firmId, excludeTriggerType, sortBy = 'report_date', sortOrder = 'desc', limit, offset } = options;
 
   const conditions: string[] = ['environment = ?'];
   const params: (string | number | null)[] = [environment];
@@ -206,6 +207,11 @@ export async function listReports(
   if (firmId != null) {
     conditions.push('firm_id = ?');
     params.push(firmId);
+  }
+
+  if (excludeTriggerType) {
+    conditions.push('(trigger_type IS NULL OR trigger_type != ?)');
+    params.push(excludeTriggerType);
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`;
@@ -313,7 +319,7 @@ export async function insertReport(
       environment,
       data.report_date,
       rawData,
-      data.generated_at,
+      data.generated_at ?? new Date().toISOString(),
       data.trigger_type ?? null,
       data.full_report ?? null,
       data.success_report ?? null,
