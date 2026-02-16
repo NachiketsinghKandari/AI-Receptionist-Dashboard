@@ -15,6 +15,36 @@ export const USERS: UserConfig[] = [
     password: 'admin@receptionist.ai123',
     apps: ['dashboard', 'analytics'],
   },
+  {
+    email: 'user@firm1.com',
+    password: 'user@firm1.com123',
+    apps: ['dashboard'],
+  },
+  {
+    email: 'user@firm2.com',
+    password: 'user@firm2.com123',
+    apps: ['dashboard'],
+  },
+  {
+    email: 'user@firm3.com',
+    password: 'user@firm3.com123',
+    apps: ['dashboard'],
+  },
+  {
+    email: 'user@firm4.com',
+    password: 'user@firm4.com123',
+    apps: ['dashboard'],
+  },
+  {
+    email: 'user@firm5.com',
+    password: 'user@firm5.com123',
+    apps: ['dashboard'],
+  },
+  {
+    email: 'user@firm6.com',
+    password: 'user@firm6.com123',
+    apps: ['dashboard'],
+  },
 ];
 
 // Session configuration

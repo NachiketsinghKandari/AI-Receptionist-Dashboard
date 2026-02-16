@@ -33,6 +33,7 @@ import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/d
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { CALL_FILTER_FIELDS } from '@/lib/filter-fields';
 import { useClientConfig } from '@/hooks/use-client-config';
+import { usePIIMask, type PIIMaskFunctions } from '@/hooks/use-pii-mask';
 import { filterColumns } from '@/lib/column-filter';
 import type { DynamicFilter } from '@/types/api';
 
@@ -46,7 +47,8 @@ function createColumns(
     isLoading: boolean;
     isFullyLoaded: boolean;
     hasError: boolean;
-  }
+  },
+  pii: PIIMaskFunctions,
 ): ColumnDef<CallListItem>[] {
   return [
     {
@@ -65,7 +67,7 @@ function createColumns(
     {
       accessorKey: 'caller_name',
       header: 'Caller',
-      cell: ({ row }) => <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none block">{row.getValue('caller_name')}</span>,
+      cell: ({ row }) => <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none block">{pii.name(row.getValue('caller_name'))}</span>,
     },
     {
       accessorKey: 'call_duration',
@@ -126,7 +128,7 @@ function createColumns(
       accessorKey: 'phone_number',
       header: 'Phone',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.getValue('phone_number')}</span>
+        <span className="font-mono text-sm">{pii.phone(row.getValue('phone_number'))}</span>
       ),
     },
     {
@@ -168,6 +170,7 @@ export default function CallsPage() {
   const router = useRouter();
   const { environment } = useEnvironment();
   const { config, isAdmin } = useClientConfig();
+  const pii = usePIIMask();
 
   // === Sync environment from URL (e.g., shared links from a different environment) ===
   useSyncEnvironmentFromUrl(searchParams.get('e'));
@@ -1182,8 +1185,8 @@ export default function CallsPage() {
 
   // Memoize columns with Sentry error, important call, mismatch, and Cekura data
   const allColumns = useMemo(
-    () => createColumns(errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData),
-    [errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData]
+    () => createColumns(errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData, pii),
+    [errorCorrelationIds, importantCallIds, transferMismatchIds, cekuraData, pii]
   );
 
   // Apply column visibility filtering from client config

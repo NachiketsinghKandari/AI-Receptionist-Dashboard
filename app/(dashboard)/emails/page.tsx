@@ -21,79 +21,86 @@ import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/d
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { EMAIL_FILTER_FIELDS } from '@/lib/filter-fields';
 import { useClientConfig } from '@/hooks/use-client-config';
+import { usePIIMask, type PIIMaskFunctions } from '@/hooks/use-pii-mask';
 import { filterColumns } from '@/lib/column-filter';
 
-const columns: ColumnDef<Email>[] = [
-  {
-    accessorKey: 'id',
-    header: 'ID',
-    cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
-  },
-  {
-    accessorKey: 'call_id',
-    header: 'Call ID',
-    cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('call_id')}</span>,
-  },
-  {
-    accessorKey: 'email_type',
-    header: 'Type',
-    cell: ({ row }) => <Badge variant="outline">{row.getValue('email_type')}</Badge>,
-  },
-  {
-    accessorKey: 'subject',
-    header: 'Subject',
-    cell: ({ row }) => (
-      <span className="block">{row.getValue('subject')}</span>
-    ),
-  },
-  {
-    accessorKey: 'recipients',
-    header: 'Recipients',
-    cell: ({ row }) => {
-      const recipients = row.getValue('recipients') as string[];
-      return (
-        <div className="max-w-[250px] overflow-hidden">
-          <RecipientsDisplay recipients={recipients} compact className="text-sm" />
-        </div>
-      );
+function createEmailColumns(pii: PIIMaskFunctions): ColumnDef<Email>[] {
+  return [
+    {
+      accessorKey: 'id',
+      header: 'ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
     },
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const status = row.getValue('status') as string;
-      const subject = row.original.subject;
-      const isImportant = subject?.includes('[Important]');
-      const variant = status === 'sent' ? 'default' : 'destructive';
+    {
+      accessorKey: 'call_id',
+      header: 'Call ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('call_id')}</span>,
+    },
+    {
+      accessorKey: 'email_type',
+      header: 'Type',
+      cell: ({ row }) => <Badge variant="outline">{row.getValue('email_type')}</Badge>,
+    },
+    {
+      accessorKey: 'subject',
+      header: 'Subject',
+      cell: ({ row }) => (
+        <span className="block">{row.getValue('subject')}</span>
+      ),
+    },
+    {
+      accessorKey: 'recipients',
+      header: 'Recipients',
+      cell: ({ row }) => {
+        const recipients = row.getValue('recipients') as string[];
+        return (
+          <div className="max-w-[250px] overflow-hidden">
+            <RecipientsDisplay recipients={pii.recipients(recipients)} compact className="text-sm" />
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.getValue('status') as string;
+        const subject = row.original.subject;
+        const isImportant = subject?.includes('[Important]');
+        const variant = status === 'sent' ? 'default' : 'destructive';
 
-      return (
-        <Badge
-          variant={variant}
-          className={isImportant ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800' : ''}
-        >
-          {status}
-        </Badge>
-      );
+        return (
+          <Badge
+            variant={variant}
+            className={isImportant ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800' : ''}
+          >
+            {status}
+          </Badge>
+        );
+      },
     },
-  },
-  {
-    accessorKey: 'sent_at',
-    header: 'Sent At (UTC)',
-    cell: ({ row }) => {
-      const value = row.getValue('sent_at') as string;
-      return formatUTCTimestamp(value);
+    {
+      accessorKey: 'sent_at',
+      header: 'Sent At (UTC)',
+      cell: ({ row }) => {
+        const value = row.getValue('sent_at') as string;
+        return formatUTCTimestamp(value);
+      },
     },
-  },
-];
+  ];
+}
 
 export default function EmailsPage() {
   const { config, isAdmin } = useClientConfig();
+  const pii = usePIIMask();
+
+  // Create columns with PII masking
+  const columns = useMemo(() => createEmailColumns(pii), [pii]);
 
   // Apply column visibility filtering from client config
   const visibleColumns = useMemo(
     () => isAdmin ? columns : filterColumns(columns, config?.columns.emails),
-    [isAdmin, config]
+    [isAdmin, config, columns]
   );
 
   // Shared date filter state from context
@@ -356,7 +363,7 @@ export default function EmailsPage() {
                   <div className="flex">
                     <span className="w-16 text-muted-foreground font-medium shrink-0">To:</span>
                     <div className="flex-1">
-                      <RecipientsDisplay recipients={selectedEmail.recipients} />
+                      <RecipientsDisplay recipients={pii.recipients(selectedEmail.recipients)} />
                     </div>
                   </div>
                   <div className="flex">
@@ -384,7 +391,7 @@ export default function EmailsPage() {
                   <CardTitle className="text-sm font-medium">Message</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <EmailBodyDisplay body={selectedEmail.body} />
+                  <EmailBodyDisplay body={selectedEmail.body} pii={pii} />
                 </CardContent>
               </Card>
             )}

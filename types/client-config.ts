@@ -15,6 +15,13 @@ export interface ColumnToggles {
   sentry: Record<string, boolean>;
 }
 
+export interface PiiMaskingConfig {
+  phones: boolean;
+  names: boolean;
+  emails: boolean;
+  transcripts: boolean;
+}
+
 export interface FeatureToggles {
   aiReports: boolean;
   cekuraIntegration: boolean;
@@ -22,6 +29,7 @@ export interface FeatureToggles {
   accurateTranscript: boolean;
   dynamicFilters: boolean;
   environmentSwitcher: boolean;
+  piiMasking: PiiMaskingConfig;
 }
 
 export interface FirmBranding {

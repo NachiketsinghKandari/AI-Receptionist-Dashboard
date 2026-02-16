@@ -21,61 +21,71 @@ import { getTodayRangeUTC, getYesterdayRangeUTC, getDateRangeUTC } from '@/lib/d
 import { DynamicFilterBuilder, type FilterRow, conditionRequiresValue } from '@/components/filters/dynamic-filter-builder';
 import { TRANSFER_FILTER_FIELDS } from '@/lib/filter-fields';
 import { useClientConfig } from '@/hooks/use-client-config';
+import { usePIIMask } from '@/hooks/use-pii-mask';
 import { filterColumns } from '@/lib/column-filter';
 
-const columns: ColumnDef<Transfer>[] = [
-  {
-    accessorKey: 'id',
-    header: 'ID',
-    cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
-  },
-  {
-    accessorKey: 'call_id',
-    header: 'Call ID',
-    cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('call_id')}</span>,
-  },
-  {
-    accessorKey: 'transfer_type',
-    header: 'Type',
-    cell: ({ row }) => <Badge variant="outline">{row.getValue('transfer_type')}</Badge>,
-  },
-  {
-    accessorKey: 'transferred_to_name',
-    header: 'Recipient',
-  },
-  {
-    accessorKey: 'transferred_to_phone_number',
-    header: 'Phone',
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.getValue('transferred_to_phone_number')}</span>
-    ),
-  },
-  {
-    accessorKey: 'transfer_status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const status = row.getValue('transfer_status') as string;
-      const variant = status === 'completed' ? 'default' : status === 'failed' ? 'destructive' : 'secondary';
-      return <Badge variant={variant}>{status}</Badge>;
+import type { PIIMaskFunctions } from '@/hooks/use-pii-mask';
+
+function createTransferColumns(pii: PIIMaskFunctions): ColumnDef<Transfer>[] {
+  return [
+    {
+      accessorKey: 'id',
+      header: 'ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('id')}</span>,
     },
-  },
-  {
-    accessorKey: 'transfer_started_at',
-    header: 'Started (UTC)',
-    cell: ({ row }) => {
-      const value = row.getValue('transfer_started_at') as string;
-      return formatUTCTimestamp(value);
+    {
+      accessorKey: 'call_id',
+      header: 'Call ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.getValue('call_id')}</span>,
     },
-  },
-];
+    {
+      accessorKey: 'transfer_type',
+      header: 'Type',
+      cell: ({ row }) => <Badge variant="outline">{row.getValue('transfer_type')}</Badge>,
+    },
+    {
+      accessorKey: 'transferred_to_name',
+      header: 'Recipient',
+      cell: ({ row }) => <span>{pii.name(row.getValue('transferred_to_name'))}</span>,
+    },
+    {
+      accessorKey: 'transferred_to_phone_number',
+      header: 'Phone',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">{pii.phone(row.getValue('transferred_to_phone_number'))}</span>
+      ),
+    },
+    {
+      accessorKey: 'transfer_status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.getValue('transfer_status') as string;
+        const variant = status === 'completed' ? 'default' : status === 'failed' ? 'destructive' : 'secondary';
+        return <Badge variant={variant}>{status}</Badge>;
+      },
+    },
+    {
+      accessorKey: 'transfer_started_at',
+      header: 'Started (UTC)',
+      cell: ({ row }) => {
+        const value = row.getValue('transfer_started_at') as string;
+        return formatUTCTimestamp(value);
+      },
+    },
+  ];
+}
 
 export default function TransfersPage() {
   const { config, isAdmin } = useClientConfig();
+  const pii = usePIIMask();
+
+  // Create columns with PII masking
+  const columns = useMemo(() => createTransferColumns(pii), [pii]);
 
   // Apply column visibility filtering from client config
   const visibleColumns = useMemo(
     () => isAdmin ? columns : filterColumns(columns, config?.columns.transfers),
-    [isAdmin, config]
+    [isAdmin, config, columns]
   );
 
   // Shared date filter state from context
@@ -362,7 +372,7 @@ export default function TransfersPage() {
             Transfer #{selectedTransfer?.id}
           </span>
         }
-        subtitle={selectedTransfer?.transferred_to_name}
+        subtitle={pii.name(selectedTransfer?.transferred_to_name ?? null)}
       >
         {selectedTransfer && (
           <div className="space-y-4">
@@ -397,8 +407,8 @@ export default function TransfersPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><strong>Type:</strong> {selectedTransfer.transfer_type}</div>
               <div><strong>Status:</strong> {selectedTransfer.transfer_status}</div>
-              <div><strong>To:</strong> {selectedTransfer.transferred_to_name}</div>
-              <div><strong>Phone:</strong> {selectedTransfer.transferred_to_phone_number}</div>
+              <div><strong>To:</strong> {pii.name(selectedTransfer.transferred_to_name)}</div>
+              <div><strong>Phone:</strong> {pii.phone(selectedTransfer.transferred_to_phone_number)}</div>
               <div><strong>Call ID:</strong> {selectedTransfer.call_id}</div>
               <div><strong>Started:</strong> {selectedTransfer.transfer_started_at || '-'}</div>
               <div><strong>Supervisor Answered:</strong> {selectedTransfer.supervisor_answered_at || '-'}</div>
