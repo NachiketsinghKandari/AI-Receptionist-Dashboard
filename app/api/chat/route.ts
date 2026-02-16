@@ -8,6 +8,8 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
 import { streamChat } from '@/lib/chat/gemini-chat';
+import { getSession } from '@/lib/auth/session';
+import { ensureChatsTab, logChatToSheet } from '@/lib/google-sheets';
 import type { ChatMessagePayload } from '@/types/chat';
 
 export async function POST(request: NextRequest) {
@@ -58,6 +60,18 @@ export async function POST(request: NextRequest) {
   );
 
   const environment = parseEnvironment(envParam ?? null);
+
+  // Log the latest user message to Google Sheets (fire-and-forget)
+  const lastUserMsg = [...validatedMessages].reverse().find((m) => m.role === 'user');
+  if (lastUserMsg) {
+    getSession()
+      .then(async (session) => {
+        if (!session) return;
+        await ensureChatsTab();
+        await logChatToSheet(session.id, session.email, lastUserMsg.content);
+      })
+      .catch(() => {/* non-critical */});
+  }
 
   // Create a readable stream of NDJSON events
   const encoder = new TextEncoder();
