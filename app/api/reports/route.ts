@@ -32,12 +32,14 @@ export async function GET(request: NextRequest) {
     const reportType = searchParams.get('reportType');
     const firmIdParam = searchParams.get('firmId');
     const firmId = firmIdParam ? parseInt(firmIdParam, 10) : null;
+    const excludeTriggerType = searchParams.get('excludeTriggerType') || undefined;
 
     await ensureCloned(environment);
 
     const { data, total } = await listReports(environment, {
       reportType,
       firmId,
+      excludeTriggerType,
       sortBy,
       sortOrder,
       limit,
@@ -81,11 +83,18 @@ export async function POST(request: NextRequest) {
     const existing = await findReportByDateTypeAndFirm(environment, reportDate, reportType, firmIdValue);
 
     if (existing) {
+      // When weekly prerequisite overwrites an existing manual/scheduled report,
+      // preserve the original trigger_type so the report stays visible in the EOD list
+      const effectiveTriggerType =
+        triggerType === 'weekly' && existing.trigger_type && existing.trigger_type !== 'weekly'
+          ? existing.trigger_type
+          : triggerType;
+
       // Update existing report - clear AI fields for regeneration
       const data = await updateReport(existing.id, {
         raw_data: rawData,
         generated_at: new Date().toISOString(),
-        trigger_type: triggerType,
+        trigger_type: effectiveTriggerType,
         report_type: reportType,
         full_report: null,
         errors: null,

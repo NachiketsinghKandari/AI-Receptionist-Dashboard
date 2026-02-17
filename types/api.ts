@@ -346,7 +346,7 @@ export interface EODReport {
   success_report: string | null;  // AI-generated report for successful calls
   failure_report: string | null;  // AI-generated report for failed calls
   generated_at: string;
-  trigger_type: 'scheduled' | 'manual';
+  trigger_type: 'scheduled' | 'manual' | 'weekly';
   report_type?: EODReportCategory; // 'eod' or 'weekly' — optional for backward compat
   firm_id?: number | null;        // null = all firms, number = firm-specific report
 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateAIReportForEOD } from '@/lib/eod/generate-ai-report';
 import { authenticateRequest } from '@/lib/api/auth';
 import { errorResponse, parseEnvironment } from '@/lib/api/utils';
+import { updateReportColumns } from '@/lib/sqlite/reports-db';
 import type { EODReportType } from '@/types/api';
 
 export async function POST(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     const environment = parseEnvironment(searchParams.get('env'));
 
     const body = await request.json();
-    const { reportId, rawData, reportType, dataFormat } = body;
+    const { reportId, rawData, reportType, dataFormat, promoteTriggerType } = body;
     const validFormat = dataFormat === 'toon' ? 'toon' as const : 'json' as const;
 
     if (!reportId) {
@@ -41,6 +42,11 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return errorResponse(result.error || 'AI generation failed', 500, 'AI_ERROR');
+    }
+
+    // Promote trigger_type to 'manual' so the report becomes visible in the EOD list
+    if (promoteTriggerType) {
+      await updateReportColumns(reportId, { trigger_type: 'manual' });
     }
 
     return NextResponse.json({

@@ -421,7 +421,7 @@ export default function EODReportsPage() {
               await fetch(`/api/reports?env=${environment}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reportDate: day, rawData: genResult.raw_data, triggerType: 'manual', firmId, reportType: 'eod' }),
+                body: JSON.stringify({ reportDate: day, rawData: genResult.raw_data, triggerType: 'weekly', firmId, reportType: 'eod' }),
               });
             } catch {
               // Individual day failures are acceptable — aggregation uses whatever exists
@@ -480,11 +480,13 @@ export default function EODReportsPage() {
   // Retry handlers for individual reports
   const handleRetrySuccessReport = async (fmt?: DataFormat) => {
     if (!selectedReport) return;
+    const shouldPromote = selectedReport.trigger_type === 'weekly';
     try {
       await successReportMutation.mutateAsync({
         reportId: selectedReport.id,
         rawData: selectedReport.raw_data as EODRawData,
         dataFormat: fmt,
+        promoteTriggerType: shouldPromote || undefined,
       });
     } catch (error) {
       console.error('Failed to retry success report:', error);
@@ -493,11 +495,13 @@ export default function EODReportsPage() {
 
   const handleRetryFailureReport = async (fmt?: DataFormat) => {
     if (!selectedReport) return;
+    const shouldPromote = selectedReport.trigger_type === 'weekly';
     try {
       await failureReportMutation.mutateAsync({
         reportId: selectedReport.id,
         rawData: selectedReport.raw_data as EODRawData,
         dataFormat: fmt,
+        promoteTriggerType: shouldPromote || undefined,
       });
     } catch (error) {
       console.error('Failed to retry failure report:', error);
@@ -507,18 +511,21 @@ export default function EODReportsPage() {
   const handleRetryFullReport = async (fmt?: DataFormat) => {
     if (!selectedReport) return;
     const isWeekly = !!(selectedReport.raw_data as EODRawData)?.week_start;
+    const shouldPromote = selectedReport.trigger_type === 'weekly';
     try {
       if (isWeekly) {
         await weeklyAIReportMutation.mutateAsync({
           reportId: selectedReport.id,
           rawData: selectedReport.raw_data as WeeklyRawData,
           dataFormat: fmt,
+          promoteTriggerType: shouldPromote || undefined,
         });
       } else {
         await fullReportMutation.mutateAsync({
           reportId: selectedReport.id,
           rawData: selectedReport.raw_data as EODRawData,
           dataFormat: fmt,
+          promoteTriggerType: shouldPromote || undefined,
         });
       }
     } catch (error) {

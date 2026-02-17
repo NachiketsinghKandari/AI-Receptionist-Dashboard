@@ -255,23 +255,25 @@ export async function findReportByDateTypeAndFirm(
   reportDate: string,
   reportType: string,
   firmId: number | null
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; trigger_type: string | null } | null> {
   const db = getTursoClient();
   let result;
 
   if (firmId != null) {
     result = await db.execute({
-      sql: 'SELECT id FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? AND firm_id = ? LIMIT 1',
+      sql: 'SELECT id, trigger_type FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? AND firm_id = ? LIMIT 1',
       args: [environment, reportDate, reportType, firmId],
     });
   } else {
     result = await db.execute({
-      sql: 'SELECT id FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? AND firm_id IS NULL LIMIT 1',
+      sql: 'SELECT id, trigger_type FROM reports WHERE environment = ? AND report_date = ? AND report_type = ? AND firm_id IS NULL LIMIT 1',
       args: [environment, reportDate, reportType],
     });
   }
 
-  return result.rows.length > 0 ? { id: result.rows[0].id as string } : null;
+  return result.rows.length > 0
+    ? { id: result.rows[0].id as string, trigger_type: (result.rows[0].trigger_type as string | null) ?? null }
+    : null;
 }
 
 export async function updateReport(

@@ -29,6 +29,9 @@ async function fetchEODReports(
   if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
   if (filters.firmId) params.set('firmId', String(filters.firmId));
   if (filters.reportCategory) params.set('reportType', filters.reportCategory);
+  if (!filters.reportCategory || filters.reportCategory === 'eod') {
+    params.set('excludeTriggerType', 'weekly');
+  }
 
   const response = await fetch(`/api/reports?${params}`);
   if (!response.ok) throw new Error('Failed to fetch EOD reports');
@@ -82,12 +85,13 @@ async function saveReport(
   rawData: EODRawData | WeeklyRawData,
   environment: string,
   firmId?: number | null,
-  reportType?: EODReportCategory
+  reportType?: EODReportCategory,
+  triggerType: string = 'manual'
 ): Promise<SaveReportResponse> {
   const response = await fetch(`/api/reports?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reportDate, rawData, triggerType: 'manual', firmId, reportType: reportType || 'eod' }),
+    body: JSON.stringify({ reportDate, rawData, triggerType, firmId, reportType: reportType || 'eod' }),
   });
 
   if (!response.ok) {
@@ -103,12 +107,13 @@ async function generateAIReport(
   rawData: EODRawData | WeeklyRawData,
   reportType: EODReportType,
   environment: string,
-  dataFormat: DataFormat = 'json'
+  dataFormat: DataFormat = 'json',
+  promoteTriggerType?: boolean
 ): Promise<{ success: boolean; reportType: EODReportType }> {
   const response = await fetch(`/api/reports/ai-generate?env=${environment}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reportId, rawData, reportType, dataFormat }),
+    body: JSON.stringify({ reportId, rawData, reportType, dataFormat, promoteTriggerType }),
   });
 
   if (!response.ok) {
@@ -149,8 +154,8 @@ export function useSaveReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportDate, rawData, firmId, reportType }: { reportDate: string; rawData: EODRawData | WeeklyRawData; firmId?: number | null; reportType?: EODReportCategory }) =>
-      saveReport(reportDate, rawData, environment, firmId, reportType),
+    mutationFn: ({ reportDate, rawData, firmId, reportType, triggerType }: { reportDate: string; rawData: EODRawData | WeeklyRawData; firmId?: number | null; reportType?: EODReportCategory; triggerType?: string }) =>
+      saveReport(reportDate, rawData, environment, firmId, reportType, triggerType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -162,8 +167,8 @@ export function useGenerateSuccessReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat }) =>
-      generateAIReport(reportId, rawData, 'success', environment, dataFormat),
+    mutationFn: ({ reportId, rawData, dataFormat, promoteTriggerType }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat; promoteTriggerType?: boolean }) =>
+      generateAIReport(reportId, rawData, 'success', environment, dataFormat, promoteTriggerType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -175,8 +180,8 @@ export function useGenerateFailureReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat }) =>
-      generateAIReport(reportId, rawData, 'failure', environment, dataFormat),
+    mutationFn: ({ reportId, rawData, dataFormat, promoteTriggerType }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat; promoteTriggerType?: boolean }) =>
+      generateAIReport(reportId, rawData, 'failure', environment, dataFormat, promoteTriggerType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -188,8 +193,8 @@ export function useGenerateFullReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat }) =>
-      generateAIReport(reportId, rawData, 'full', environment, dataFormat),
+    mutationFn: ({ reportId, rawData, dataFormat, promoteTriggerType }: { reportId: string; rawData: EODRawData; dataFormat?: DataFormat; promoteTriggerType?: boolean }) =>
+      generateAIReport(reportId, rawData, 'full', environment, dataFormat, promoteTriggerType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
@@ -233,8 +238,8 @@ export function useGenerateWeeklyAIReport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ reportId, rawData, dataFormat }: { reportId: string; rawData: WeeklyRawData; dataFormat?: DataFormat }) =>
-      generateAIReport(reportId, rawData, 'weekly', environment, dataFormat),
+    mutationFn: ({ reportId, rawData, dataFormat, promoteTriggerType }: { reportId: string; rawData: WeeklyRawData; dataFormat?: DataFormat; promoteTriggerType?: boolean }) =>
+      generateAIReport(reportId, rawData, 'weekly', environment, dataFormat, promoteTriggerType),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'list'] });
     },
