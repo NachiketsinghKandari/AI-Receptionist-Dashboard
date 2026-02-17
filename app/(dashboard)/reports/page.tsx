@@ -594,6 +594,7 @@ export default function EODReportsPage() {
               value={reportDate}
               onChange={(e) => setReportDate(e.target.value)}
               className="mt-1"
+              data-vaul-no-drag
             />
           </div>
 
@@ -658,6 +659,7 @@ export default function EODReportsPage() {
               value={reportDate}
               onChange={(e) => setReportDate(e.target.value)}
               className="mt-1"
+              data-vaul-no-drag
             />
             <p className="text-xs text-muted-foreground mt-1.5">
               Week: {weekRangeLabel}
